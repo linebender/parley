@@ -148,12 +148,6 @@ pub(crate) struct Justification {
     /// The amount of additional spacing to apply per justification opportunity.
     pub(crate) amount_per_opportunity: f32,
 
-    /// The line's logically first shaped cluster eligible for justification. Shaped clusters
-    /// before this index are not justified: they precede the line's last tab, and stretching them
-    /// would move what follows the tab off its tab stop (CSS Text 4 § 7.1 requires tab stops to
-    /// keep lining up under justification).
-    pub(crate) justification_start_cluster: u32,
-
     /// One past the line's logically last shaped cluster eligible for justification. Shaped
     /// clusters at or beyond this index are not justified, as they hang past the line's end, or are
     /// part of the last atom that doesn't fully hang (e.g., an NBSP doesn't hang, but if it closes
@@ -165,7 +159,6 @@ impl Justification {
     /// No justification.
     pub(crate) const NONE: Self = Self {
         amount_per_opportunity: 0.,
-        justification_start_cluster: 0,
         justification_end_cluster: u32::MAX,
     };
 }
@@ -245,14 +238,10 @@ impl<'a> EffectiveSpacing<'a> {
         if whitespace == Whitespace::Tab {
             // A tab shapes to no advance; its advance to its tab stop is recorded per line.
             gaps.after += self.line.tab_advance(atom.shaped_clusters_range().start);
-        } else if is_word_separator(whitespace) {
-            let justification = self.line.justification;
-            let clusters = atom.shaped_clusters_range();
-            if clusters.start >= justification.justification_start_cluster
-                && clusters.end <= justification.justification_end_cluster
-            {
-                gaps.after += justification.amount_per_opportunity;
-            }
+        } else if is_word_separator(whitespace)
+            && atom.shaped_clusters_range().end <= self.line.justification.justification_end_cluster
+        {
+            gaps.after += self.line.justification.amount_per_opportunity;
         }
 
         gaps

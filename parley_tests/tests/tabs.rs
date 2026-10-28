@@ -457,7 +457,7 @@ fn tab_stops_in_rtl_text_are_measured_from_the_right_edge() {
 }
 
 #[test]
-fn tab_stops_survive_justification() {
+fn justification_stretches_spaces_around_a_tab_but_not_the_tab() {
     let mut env = TestEnv::new(test_name!(), None);
     let space = advance(&mut env, " ");
     let a = advance(&mut env, "a");
@@ -470,9 +470,9 @@ fn tab_stops_survive_justification() {
         ..AlignmentOptions::default()
     };
 
-    // The space before the tab isn't a justification opportunity, as stretching it would move
-    // "b" off its stop. The space after the tab takes up all of the free space instead.
-    // Glyphs in order: a, space, a, b, space, b.
+    // Tab-aware justification is deferred: the tab keeps the advance the breaker gave it (to the
+    // first stop) and only the spaces stretch, each by the same amount, so the text after the
+    // tab moves off its stop by that amount. Glyphs in order: a, space, a, b, space, b.
     let text = "a a\tb b";
     let width = 200.;
     let mut builder = env.ranged_builder(text);
@@ -481,76 +481,28 @@ fn tab_stops_survive_justification() {
     layout.break_all_lines(Some(width));
     layout.align(Alignment::Justify, justify_all);
     assert_eq!(layout.len(), 1);
+    let natural_width = tab_size + b + space + b;
+    let share = (width - natural_width) / 2.;
     let xs = glyph_xs(&layout, 0);
     nearly_eq(xs[0], 0.);
-    nearly_eq(xs[2], a + space);
-    nearly_eq(xs[3], tab_size);
+    nearly_eq(xs[2], a + space + share);
+    nearly_eq(xs[3], tab_size + share);
     nearly_eq(xs[5], width - b);
 
-    // With no opportunity after the tab, the line isn't justified at all.
-    let text = "a a\tb";
-    let mut builder = env.ranged_builder(text);
-    builder.push_default(StyleProperty::TabSize(tab_size));
-    let mut layout = builder.build(text);
-    layout.break_all_lines(Some(width));
-    layout.align(Alignment::Justify, justify_all);
-    let xs = glyph_xs(&layout, 0);
-    nearly_eq(xs[0], 0.);
-    nearly_eq(xs[2], a + space);
-    nearly_eq(xs[3], tab_size);
-}
-
-#[test]
-fn justification_keeps_every_tab_on_its_stop() {
-    let mut env = TestEnv::new(test_name!(), None);
-    let space = advance(&mut env, " ");
-    let a = advance(&mut env, "a");
-    let b = advance(&mut env, "b");
-    let c = advance(&mut env, "c");
-    let tab_size = 8. * space;
-    assert!(a < tab_size - space / 2. && tab_size + b + space + b < 2. * tab_size - space / 2.);
-    let justify_all = AlignmentOptions {
-        last_line_alignment: Some(Alignment::Justify),
-        ..AlignmentOptions::default()
-    };
-
-    // Only the space after the last tab stretches, so both tabs stay on their stops and the
-    // space between them keeps its width. Glyphs: a, b, space, b, c, space, c.
-    let text = "a\tb b\tc c";
-    let width = 200.;
-    let mut builder = env.ranged_builder(text);
-    builder.push_default(StyleProperty::TabSize(tab_size));
-    let mut layout = builder.build(text);
-    layout.break_all_lines(Some(width));
-    layout.align(Alignment::Justify, justify_all);
-    let xs = glyph_xs(&layout, 0);
-    nearly_eq(xs[1], tab_size);
-    nearly_eq(xs[3], tab_size + b + space);
-    nearly_eq(xs[4], 2. * tab_size);
-    nearly_eq(xs[6], width - c);
-}
-
-#[test]
-fn justification_with_a_hanging_tab() {
-    let mut env = TestEnv::new(test_name!(), None);
-    let space = advance(&mut env, " ");
-    let a = advance(&mut env, "a");
-    let justify_all = AlignmentOptions {
-        last_line_alignment: Some(Alignment::Justify),
-        ..AlignmentOptions::default()
-    };
-
-    // The trailing space and tab hang past the line's end. The space precedes the line's last tab,
-    // so it was never a justification opportunity and must not be subtracted as a hanging one.
+    // Trailing whitespace hangs (in full under `Collapse`) and isn't stretched, with a tab in it
+    // or not; the one space inside the line takes up all of the free space.
     let text = "a a \t";
     let width = 2. * a + space + 0.5;
     let mut builder = env.ranged_builder(text);
-    builder.push_default(StyleProperty::TabSize(8. * space));
+    builder.push_default(StyleProperty::TabSize(tab_size));
+    builder.push_default(StyleProperty::WhiteSpaceCollapse(
+        WhiteSpaceCollapse::Collapse,
+    ));
     let mut layout = builder.build(text);
     layout.break_all_lines(Some(width));
     layout.align(Alignment::Justify, justify_all);
     assert_eq!(layout.len(), 1);
     let xs = glyph_xs(&layout, 0);
     nearly_eq(xs[0], 0.);
-    nearly_eq(xs[2], a + space);
+    nearly_eq(xs[2], width - a);
 }

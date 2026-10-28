@@ -81,16 +81,11 @@ struct LineState {
     /// being triggered on the cluster after the linebreak.
     text_wrap_mode: TextWrapMode,
 
-    /// The number of word separators appended to the line since its last tab.
+    /// The number of word separators appended to the line so far.
     ///
     /// These are the line's justification opportunities, before subtracting those that end up in
-    /// the line's hanging whitespace. Separators before a tab don't count: stretching them would
-    /// move the text after the tab off its tab stop.
+    /// the line's hanging whitespace.
     num_word_separators: u32,
-
-    /// One past the line's last tab cluster, or zero without one: where justification may start
-    /// (see [`Justification::justification_start_cluster`]).
-    justification_start_cluster: u32,
 }
 
 impl LineState {
@@ -99,7 +94,6 @@ impl LineState {
         self.x = 0.0;
         self.box_metrics.reset();
         self.num_word_separators = 0;
-        self.justification_start_cluster = 0;
     }
 }
 
@@ -817,9 +811,6 @@ impl BreakerState {
     /// Record the advance of a tab atom about to be [appended](Self::append_atom_to_line) to the
     /// line, which [`EffectiveSpacing`] adds to the tab's (zero) shaped advance when the line is
     /// read back. `tab_advances` is [`LineLayout::tab_advances`].
-    ///
-    /// Justification restarts after a tab, so that stretching the line can't move the tab off its
-    /// tab stop (see [`Justification::justification_start_cluster`]).
     fn push_tab_advance(
         &mut self,
         tab_advances: &mut Vec<TabAdvance>,
@@ -833,8 +824,6 @@ impl BreakerState {
             advance,
         });
         self.tab_advances = tab_advances.len();
-        self.line.num_word_separators = 0;
-        self.line.justification_start_cluster = clusters.end;
     }
 
     /// Add an inline box to the line.
@@ -1913,7 +1902,6 @@ fn commit_line<B: Brush>(
         &lines.line_items[start_item_idx..end_item_idx],
         &lines.tab_advances[tab_advances_start..],
         overflow,
-        state.justification_start_cluster,
     );
     // The word separators counted as the line was built include the line's hanging whitespace, and
     // hanging whitespace is not stretched by justification.
@@ -1932,7 +1920,6 @@ fn commit_line<B: Brush>(
         break_reason,
         num_justification_opportunities,
         justification: Justification {
-            justification_start_cluster: state.justification_start_cluster,
             justification_end_cluster,
             ..Justification::NONE
         },
@@ -1970,8 +1957,7 @@ fn commit_line<B: Brush>(
 /// that are no longer eligible, as they are at or beyond that cluster.
 ///
 /// `line_items` must be in logical order. `tab_advances` are the line's tab advances (see
-/// [`TabAdvance`]), and `justification_start_cluster` is the line's
-/// [`Justification::justification_start_cluster`].
+/// [`TabAdvance`]).
 ///
 /// `overflow` is the advance by which the line's content overflows the available width (including
 /// all of its trailing whitespace). Following CSS Text 4 § 9.2, conditionally hanging whitespace
@@ -1992,7 +1978,6 @@ fn hanging_whitespace<B: Brush>(
     line_items: &[LineItemData],
     tab_advances: &[TabAdvance],
     overflow: f32,
-    justification_start_cluster: u32,
 ) -> (f32, u32, u32) {
     let mut hanging_whitespace_advance = 0.;
     // Atoms with shaped clusters before this index may be stretched by justification.
@@ -2071,11 +2056,7 @@ fn hanging_whitespace<B: Brush>(
                     // Justification can't stretch within an atom, so it stops at the start of the
                     // last atom that hangs in its entirety or only partially.
                     justification_end_cluster = atom.shaped_clusters_range().start;
-                    // Only opportunities that were counted can be subtracted: those before the
-                    // line's last tab never were.
-                    if is_word_separator(whitespace)
-                        && atom.shaped_clusters_range().start >= justification_start_cluster
-                    {
+                    if is_word_separator(whitespace) {
                         hanging_opportunities += 1;
                     }
                     if !all_hang {
