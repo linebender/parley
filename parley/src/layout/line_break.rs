@@ -1172,7 +1172,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
 
                     // Iterate over the remaining atoms in the Run
                     for atom in slice.atoms_from(self.state.cluster_idx) {
-                        // Retrieve metadata about the atom.
+                        // Retrieve metadata about the atom
                         let first_cluster = atom.shaped_clusters()[0];
                         let whitespace = first_cluster.whitespace();
                         let is_newline = whitespace == Whitespace::Newline;
