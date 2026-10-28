@@ -124,15 +124,10 @@ pub(crate) fn align<B: Brush>(
                 line.metrics.offset += free_space * 0.5;
             }
             (Alignment::Justify, _) => {
-                // Justified alignment doesn't have any effect if free_space is negative or zero
-                if free_space <= 0.0 {
-                    continue;
-                }
-
-                // Justified alignment doesn't apply if there are no whitespace gaps to adjust. In
-                // that case, start-align, i.e., left-align for LTR text and right-align for RTL
-                // text.
-                if line.num_justification_opportunities == 0 {
+                // Justified alignment doesn't apply if the line overflows or if there are no
+                // whitespace gaps to adjust. In that case, start-align, i.e., left-align for LTR
+                // text and right-align for RTL text.
+                if free_space <= 0.0 || line.num_justification_opportunities == 0 {
                     if is_rtl {
                         line.metrics.offset += free_space;
                     }
