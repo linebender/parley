@@ -2,31 +2,37 @@
 
 # Attributed Text
 
-A library for working with attributed text.
+**A library for working with attributed text**
 
-[![Linebender Zulip, #parley channel](https://img.shields.io/badge/Linebender-%23parley-blue?logo=Zulip)](https://xi.zulipchat.com/#narrow/channel/205635-parley)
-[![dependency status](https://deps.rs/repo/github/linebender/parley/status.svg)](https://deps.rs/repo/github/linebender/parley)
+[![Latest published version.](https://img.shields.io/crates/v/attributed_text.svg)](https://crates.io/crates/attributed_text)
+[![Documentation build status.](https://img.shields.io/docsrs/attributed_text.svg)](https://docs.rs/attributed_text)
 [![Apache 2.0 or MIT license.](https://img.shields.io/badge/license-Apache--2.0_OR_MIT-blue.svg)](#license)
-[![Build status](https://github.com/linebender/parley/workflows/CI/badge.svg)](https://github.com/linebender/parley/actions)
-[![Crates.io](https://img.shields.io/crates/v/attributed_text.svg)](https://crates.io/crates/attributed_text)
-[![Docs](https://docs.rs/attributed_text/badge.svg)](https://docs.rs/attributed_text)
+\
+[![Linebender Zulip chat.](https://img.shields.io/badge/Linebender-%23parley-blue?logo=Zulip)](https://xi.zulipchat.com/#narrow/channel/205635-parley)
+[![GitHub Actions CI status.](https://img.shields.io/github/actions/workflow/status/linebender/parley/ci.yml?logo=github&label=CI)](https://github.com/linebender/parley/actions)
+[![Dependency staleness status.](https://deps.rs/crate/attributed_text/latest/status.svg)](https://deps.rs/crate/attributed_text)
 
 </div>
 
 <!-- We use cargo-rdme to update the README with the contents of lib.rs.
 To edit the following section, update it in lib.rs, then run:
-cargo rdme --workspace-project=attributed_text --heading-base-level=0
+cargo rdme --workspace-project=attributed_text
 Full documentation at https://github.com/orium/cargo-rdme -->
 
 <!-- Intra-doc links used in lib.rs should be evaluated here.
 See https://linebender.org/blog/doc-include/ for related discussion. -->
+[`alloc`]: https://doc.rust-lang.org/stable/alloc/
 <!-- cargo-rdme start -->
 
 Attributed Text is a Rust crate which ...
 
 ## Features
 
+The following crate [feature flags](https://doc.rust-lang.org/cargo/reference/features.html#dependency-features) are available:
+
 - `std` (enabled by default): This is currently unused and is provided for forward compatibility.
+
+Note that Attributed Text requires that an allocator is available (i.e. it uses [`alloc`][]).
 
 <!-- cargo-rdme end -->
 
@@ -52,8 +58,6 @@ cargo update -p package_name --precise 0.1.1
 
 ## Community
 
-[![Linebender Zulip](https://img.shields.io/badge/Xi%20Zulip-%23parley-blue?logo=Zulip)](https://xi.zulipchat.com/#narrow/channel/205635-parley)
-
 Discussion of Attributed Text development happens in the [Linebender Zulip](https://xi.zulipchat.com/), specifically the [#parley channel](https://xi.zulipchat.com/#narrow/channel/205635-parley).
 All public content can be read without logging in.
 
@@ -68,10 +72,11 @@ at your option.
 
 ## Contribution
 
-Contributions are welcome by pull request. The [Rust code of conduct] applies.
+Contributions are welcome by pull request.
+The [Rust code of conduct] applies.
 Please feel free to add your name to the [AUTHORS] file in any substantive pull request.
 
 Unless you explicitly state otherwise, any contribution intentionally submitted for inclusion in the work by you, as defined in the Apache-2.0 license, shall be licensed as above, without any additional terms or conditions.
 
-[Rust Code of Conduct]: https://www.rust-lang.org/policies/code-of-conduct
-[AUTHORS]: ./AUTHORS
+[Rust code of conduct]: https://www.rust-lang.org/policies/code-of-conduct
+[AUTHORS]: ../AUTHORS

@@ -5,6 +5,7 @@ use crate::IndentOptions;
 use crate::InlineBox;
 use crate::layout::alignment::align;
 use crate::layout::data::LayoutData;
+use crate::layout::style_metrics::StyleMetrics;
 use crate::layout::{
     ContentWidths, SpanMetrics, Style, alignment::Alignment, alignment::AlignmentOptions,
     line::Line, line_break::BreakLines,
@@ -76,11 +77,10 @@ impl<B: Brush> Layout<B> {
     /// The motivating use case is placing bullet list markers - Blink uses the root
     /// span's ascent and descent for their location and size.
     pub fn root_span_metrics(&self) -> Option<SpanMetrics> {
-        self.data.style_metrics.first().map(|it| SpanMetrics {
-            ascent: it.ascent,
-            descent: it.descent,
-            x_height: it.x_height,
-        })
+        self.data
+            .style_metrics
+            .first()
+            .map(StyleMetrics::span_metrics)
     }
 
     /// Returns the length of the source text, in bytes.
@@ -168,9 +168,27 @@ impl<B: Brush> Layout<B> {
         self.data.inline_boxes.iter().map(|b| &b.inline_box)
     }
 
-    /// Mutable iterator over the inline boxes in text index order.
-    pub fn inline_boxes_mut(&mut self) -> impl ExactSizeIterator<Item = &mut InlineBox> + '_ {
-        self.data.inline_boxes.iter_mut().map(|b| &mut b.inline_box)
+    /// Edit the inline box at `index` in [`Self::inline_boxes`] with `edit`.
+    ///
+    /// The changes do not apply to line breaks and line metrics until the layout is (re-)broken.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `index` is out of bounds, or if `edit` changes [`InlineBox::index`] or whether the
+    /// box is [`crate::InlineBoxKind::InFlow`].
+    pub fn edit_inline_box(&mut self, index: usize, edit: impl FnOnce(&mut InlineBox)) {
+        let layout_box = &mut self.data.inline_boxes[index];
+        let (text_index, is_inline_object) =
+            (layout_box.inline_box.index, layout_box.is_inline_object());
+        edit(&mut layout_box.inline_box);
+        assert!(
+            layout_box.inline_box.index == text_index
+                && layout_box.is_inline_object() == is_inline_object,
+            "an inline box's index and whether it is in-flow is not allowed to change"
+        );
+        if is_inline_object {
+            self.data.place_inline_object(index);
+        }
     }
 
     /// Returns an iterator over the lines in the layout.

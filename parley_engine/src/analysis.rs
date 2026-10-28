@@ -8,22 +8,18 @@
 
 use alloc::vec::Vec;
 use core::ops::Range;
+use icu_provider::DataProvider;
+use icu_segmenter::provider::{SegmenterDictionaryAutoV1, SegmenterDictionaryExtendedV1};
 
 use icu_locale_core::{LanguageIdentifier, langid};
-use icu_normalizer::properties::{
-    CanonicalComposition, CanonicalCompositionBorrowed, CanonicalDecomposition,
-    CanonicalDecompositionBorrowed,
-};
 use icu_properties::props::{BidiMirroringGlyph, GeneralCategory, GraphemeClusterBreak, Script};
-use icu_properties::{
-    CodePointMapData, CodePointMapDataBorrowed, PropertyNamesShort, PropertyNamesShortBorrowed,
-};
+use icu_properties::{CodePointMapData, CodePointMapDataBorrowed};
 use icu_segmenter::options::{
     LineBreakOptions, LineBreakStrictness, LineBreakWordOption, WordBreakInvariantOptions,
 };
 use icu_segmenter::{
     GraphemeClusterSegmenter, GraphemeClusterSegmenterBorrowed, LineSegmenter,
-    LineSegmenterBorrowed, WordSegmenter, WordSegmenterBorrowed,
+    LineSegmenterBorrowed, WordSegmenter,
 };
 use parlance::{BaseDirection, BidiLevel, LineBreak, WordBreak};
 use parley_data::Properties;
@@ -84,41 +80,167 @@ impl Analysis {
     }
 }
 
-// TODO: Make `pub(crate)` once `parley_engine` owns shaping.
-#[doc(hidden)]
-#[expect(missing_debug_implementations, reason = "Will become private")]
-pub struct AnalysisDataSources;
+// TODO: Properly document this crate's features, and point to this doc in the doc of [`complex-scripts`].
+// See https://github.com/linebender/parley/issues/773
+/// An external source of complex script dictionaries for line and word breaking in Parley.
+///
+/// Some scripts require complex context dependent analysis to find word and line breaks, as their writing
+/// doesn't have inherent word breaks (compare with English, which uses spaces as word break and
+/// soft wrap opportunities).
+/// The scripts we support this analysis for are currently Chinese, Japanese, Khmer, Lao, Myanmar, and Thai (however,
+/// this might change in patch releases).
+/// We use [`icu_segmenter`] to determine those boundaries in these scripts; its analysis requires access to
+/// somewhat large dictionaries for each supported language.
+///
+/// Parley supports providing these dictionaries in two ways:
+/// - Through this trait (see [using the trait](#using-the-trait)).
+/// - By enabling the `complex-scripts` cargo feature, which will compile these dictionaries into the binary instead.
+///   Most users should prefer enabling that feature, as it will be more stable across Parley releases.
+///
+/// This trait allows providing these dictionaries externally (i.e. not in the binary).
+/// One use case for this is where your application binary will be downloaded many times by each
+/// user (perhaps due to updates), but the dictionaries can be cached.
+/// You may also wish to avoid downloading any dictionaries your user's text does not use.
+///
+/// When an implementation of this trait is used, the compiled in (`complex-scripts`) dictionaries will never
+/// be used, even if they cover a script not provided by the trait implementation.
+///
+/// # Using the trait
+///
+/// If you're using Parley, this can be used through layout builder's `set_dictionary_provider` method.
+///
+/// This trait is implemented for each type which has the [`icu_provider::DataProvider`] implementations needed
+/// for word and line segmentation. We do not export this trait ourselves; you must instead depend on `icu_provider` directly.
+/// You must also depend directly on `icu_segmenter`; Parley depends on a specific minor version of `icu_segmenter`, which your
+/// dependency specification must be compatible with Parley's:
+///
+/// ```toml
+/// icu_segmenter = "~2.3.0"
+/// icu_provider = "2.3.0"
+/// ```
+///
+/// Additionally, you should avoid the use of [`DeserializingBufferProvider`](https://docs.rs/icu_provider/latest/icu_provider/buf/struct.DeserializingBufferProvider.html),
+/// as this would deserialise the dictionaries at the time of each layout. Our `external_dictionaries` example shows how
+/// to create a caching typed provider instead.
+/// If your underlying [`DataProvider`] implementations return an error except `IdentifierNotFound`, Parley Engine
+/// will currently panic during text analysis.
+///
+/// Please note that if the dictionary for one of the scripts mentioned above is not provided,
+/// word boundaries computed by Parley (as used for text selection) will not be valid. In that scenario, they
+/// will be even worse than if neither the dictionary nor `complex-scripts` are not enabled. This is due to a bug in `icu_segmenter`.
+///
+/// # Note on LSTMs
+///
+/// `icu_segmenter` also supports using [LSTM models](https://docs.rs/icu_segmenter/2.3.0/icu_segmenter/struct.LineSegmenter.html#method.new_lstm)
+/// for determining these boundaries. Parley doesn't currently support using these, but might in a future release.
+/// If we do, your use of this trait may need to change; this would be in a breaking release of Parley. This is another
+/// reason we recommend using `complex-scripts` instead, if your use case allows it.
+pub trait DictionaryProvider:
+    DataProvider<SegmenterDictionaryAutoV1> + DataProvider<SegmenterDictionaryExtendedV1>
+{
+}
 
-impl AnalysisDataSources {
-    #[expect(clippy::new_without_default, reason = "Will become private")]
-    pub fn new() -> Self {
-        Self
+impl<P: ?Sized> DictionaryProvider for P where
+    P: DataProvider<SegmenterDictionaryAutoV1> + DataProvider<SegmenterDictionaryExtendedV1>
+{
+}
+
+/// Provides runtime data needed for text analysis.
+///
+/// Currently, this only includes an optional [`DictionaryProvider`]
+#[derive(Default)]
+pub struct AnalysisDataSources<'a> {
+    provider: Option<&'a dyn DictionaryProvider>,
+}
+
+impl core::fmt::Debug for AnalysisDataSources<'_> {
+    fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
+        f.debug_struct("AnalysisDataSources")
+            .field("external_dictionaries", &self.provider.is_some())
+            .finish()
+    }
+}
+
+impl<'a> AnalysisDataSources<'a> {
+    /// Create a new `AnalysisDataSources` which will use `provider` for line and word segmentation.
+    /// If not provided, the data compiled into the binary will be used instead (if present).
+    ///
+    /// See [`DictionaryProvider`] for full details.
+    pub const fn new(provider: Option<&'a dyn DictionaryProvider>) -> Self {
+        Self { provider }
+    }
+
+    /// Whether ICU4X has a word-segmentation dictionary for this script.
+    ///
+    /// If it does not, we need to apply UAX #29 Rule WB999 manually, because ICU4X does not.
+    ///
+    /// This is approximate, because ICU4X actually decides based on a table of code point ranges: e.g.,
+    /// some Han characters do not get a dictionary check. That's only a problem if there's a run of
+    /// repeated such characters, which is probably not too likely to be a problem in practice.
+    ///
+    /// If ICU4X does implement WB999 in the future, we can stop doing it manually (and this method can
+    /// be removed).
+    #[inline(always)]
+    fn has_word_dictionary(&self, script: Script) -> bool {
+        // We assume that if external dictionaries are provided, they cover this set of scripts.
+        (self.provider.is_some() || cfg!(feature = "complex-scripts"))
+            && matches!(
+                script,
+                Script::Han
+                    | Script::Hiragana
+                    | Script::Thai
+                    | Script::Lao
+                    | Script::Khmer
+                    | Script::Myanmar
+            )
     }
 
     #[inline(always)]
-    pub fn properties(&self, c: char) -> Properties {
+    pub(crate) fn properties(&self, c: char) -> Properties {
         Properties::get(c)
     }
 
     #[inline(always)]
-    pub fn grapheme_segmenter(&self) -> GraphemeClusterSegmenterBorrowed<'_> {
+    fn grapheme_segmenter(&self) -> GraphemeClusterSegmenterBorrowed<'_> {
         const { GraphemeClusterSegmenter::new() }
     }
 
-    #[inline(always)]
-    fn word_segmenter(&self) -> WordSegmenterBorrowed<'static> {
+    #[inline]
+    fn word_segmenter(&self) -> WordSegmenter {
+        if let Some(provider) = self.provider {
+            let mut segmenter =
+                WordSegmenter::new_for_non_complex_scripts(WordBreakInvariantOptions::default())
+                    .static_to_owned();
+            segmenter.load_dictionary_unstable(provider).unwrap();
+            return segmenter;
+        }
         #[cfg(feature = "complex-scripts")]
         {
-            WordSegmenter::new_dictionary(WordBreakInvariantOptions::default())
+            WordSegmenter::new_dictionary(WordBreakInvariantOptions::default()).static_to_owned()
         }
         #[cfg(not(feature = "complex-scripts"))]
         {
             const { WordSegmenter::new_for_non_complex_scripts(WordBreakInvariantOptions::default()) }
+                .static_to_owned()
         }
     }
 
-    #[inline(always)]
-    fn line_segmenter(&self, key: SegmenterKey) -> LineSegmenterBorrowed<'static> {
+    #[inline]
+    fn line_segmenter(&self, key: SegmenterKey) -> LineSegmenter {
+        let options = Self::line_break_options(key);
+        match self.provider {
+            Some(provider) => {
+                let mut segmenter =
+                    LineSegmenter::new_for_non_complex_scripts(options).static_to_owned();
+                segmenter.load_dictionary_unstable(provider).unwrap();
+                segmenter
+            }
+            // `static_to_owned` only wraps the static references, so this does not allocate.
+            None => line_segmenter_impl(options).static_to_owned(),
+        }
+    }
+
+    fn line_break_options(key: SegmenterKey) -> LineBreakOptions<'static> {
         // We use Japanese arbitrarily; see `SegmenterKey::ja_zh`.
         static JA: LanguageIdentifier = langid!("ja");
 
@@ -126,22 +248,7 @@ impl AnalysisDataSources {
         opt.word_option = Some(key.word_option);
         opt.strictness = Some(key.strictness);
         opt.content_locale = key.ja_zh.then_some(&JA);
-        line_segmenter_impl(opt)
-    }
-
-    #[inline(always)]
-    pub fn composing_normalizer(&self) -> CanonicalCompositionBorrowed<'_> {
-        const { CanonicalComposition::new() }
-    }
-
-    #[inline(always)]
-    pub fn decomposing_normalizer(&self) -> CanonicalDecompositionBorrowed<'_> {
-        const { CanonicalDecomposition::new() }
-    }
-
-    #[inline(always)]
-    pub fn script_short_name(&self) -> PropertyNamesShortBorrowed<'static, Script> {
-        PropertyNamesShort::new()
+        opt
     }
 
     #[inline(always)]
@@ -232,6 +339,8 @@ impl CharInfo {
     const EMOJI_PRESENTATION_SHIFT: u16 = 10;
     const EMOJI_MODIFIER_SHIFT: u16 = 11;
     const EMOJI_MODIFIER_BASE_SHIFT: u16 = 12;
+    const INLINE_OBJECT_SHIFT: u16 = 13;
+    const DEFAULT_IGNORABLE_SHIFT: u16 = 14;
 
     const VARIATION_SELECTOR_MASK: u16 = 1 << Self::VARIATION_SELECTOR_SHIFT;
     const REGION_INDICATOR_MASK: u16 = 1 << Self::REGION_INDICATOR_SHIFT;
@@ -246,6 +355,8 @@ impl CharInfo {
     const EMOJI_PRESENTATION_MASK: u16 = 1 << Self::EMOJI_PRESENTATION_SHIFT;
     const EMOJI_MODIFIER_MASK: u16 = 1 << Self::EMOJI_MODIFIER_SHIFT;
     const EMOJI_MODIFIER_BASE_MASK: u16 = 1 << Self::EMOJI_MODIFIER_BASE_SHIFT;
+    const INLINE_OBJECT_MASK: u16 = 1 << Self::INLINE_OBJECT_SHIFT;
+    const DEFAULT_IGNORABLE_MASK: u16 = 1 << Self::DEFAULT_IGNORABLE_SHIFT;
 
     fn new(
         script: Script,
@@ -262,6 +373,7 @@ impl CharInfo {
         is_emoji_presentation: bool,
         is_emoji_modifier: bool,
         is_emoji_modifier_base: bool,
+        is_default_ignorable: bool,
     ) -> Self {
         Self {
             script,
@@ -277,7 +389,8 @@ impl CharInfo {
                 | (is_emoji as u16) << Self::EMOJI_SHIFT
                 | (is_emoji_presentation as u16) << Self::EMOJI_PRESENTATION_SHIFT
                 | (is_emoji_modifier as u16) << Self::EMOJI_MODIFIER_SHIFT
-                | (is_emoji_modifier_base as u16) << Self::EMOJI_MODIFIER_BASE_SHIFT,
+                | (is_emoji_modifier_base as u16) << Self::EMOJI_MODIFIER_BASE_SHIFT
+                | (is_default_ignorable as u16) << Self::DEFAULT_IGNORABLE_SHIFT,
         }
     }
 
@@ -345,6 +458,16 @@ impl CharInfo {
         self.flags & Self::EMOJI_MODIFIER_BASE_MASK != 0
     }
 
+    /// Whether this character has the [`Default_Ignorable_Code_Point`] property.
+    ///
+    /// This property is used in Parley to disable letter-spacing for some atoms, matching Blink.
+    ///
+    /// [`Default_Ignorable_Code_Point`]: https://www.unicode.org/reports/tr44/#Default_Ignorable_Code_Point
+    #[inline(always)]
+    pub fn is_default_ignorable(self) -> bool {
+        self.flags & Self::DEFAULT_IGNORABLE_MASK != 0
+    }
+
     /// Whether this character contributes glyphs to shaping (`false` for control characters and
     /// most format characters).
     #[inline(always)]
@@ -383,6 +506,14 @@ impl CharInfo {
     pub fn is_soft_wrap_opportunity(self) -> bool {
         self.flags & Self::SOFT_WRAP_OPPORTUNITY_MASK != 0
     }
+
+    /// Whether this character stands in for an inline object.
+    ///
+    /// See [`AnalysisOptions::inline_objects`].
+    #[inline(always)]
+    pub fn is_inline_object(self) -> bool {
+        self.flags & Self::INLINE_OBJECT_MASK != 0
+    }
 }
 
 pub(crate) fn analyze_text(
@@ -390,6 +521,7 @@ pub(crate) fn analyze_text(
     text: &str,
     options: &AnalysisOptions<'_>,
     analysis: &mut Analysis,
+    data_sources: &AnalysisDataSources<'_>,
 ) {
     /// Turns the sparse, sorted, non-overlapping `options.line_break` into a contiguous sequence of
     /// `(range, segmenter key)` segments covering all of `text`.
@@ -551,16 +683,15 @@ pub(crate) fn analyze_text(
     let contiguous_substrings = LineBreakSegmentIter::new(text, segments, first_segment);
 
     let mut global_offset = 0;
-    let mut line_boundary_positions: Vec<usize> = Vec::new();
-
-    let data_sources = AnalysisDataSources::new();
+    let line_boundary_positions = &mut analyzer.line_boundary_positions;
+    line_boundary_positions.clear();
 
     for (substring_index, (substring, segmenter_key, last)) in contiguous_substrings.enumerate() {
+        let line_segmenter = data_sources.line_segmenter(segmenter_key);
+        let segmenter = line_segmenter.as_borrowed();
         // Fast path for text with a single segmenter configuration.
         if substring_index == 0 && last {
-            let mut lb_iter = data_sources
-                .line_segmenter(segmenter_key)
-                .segment_str(substring);
+            let mut lb_iter = segmenter.segment_str(substring);
 
             let _first = lb_iter.next();
             let second = lb_iter.next();
@@ -580,10 +711,7 @@ pub(crate) fn analyze_text(
             break;
         }
 
-        let line_boundaries_iter = data_sources
-            .line_segmenter(segmenter_key)
-            .segment_str(substring);
-
+        let line_boundaries_iter = segmenter.segment_str(substring);
         let mut substring_chars = substring.chars();
         if substring_index != 0 {
             global_offset -= substring_chars.next().unwrap().len_utf8();
@@ -614,7 +742,9 @@ pub(crate) fn analyze_text(
     }
 
     // Collect boundary byte positions compactly
-    let mut wb_iter = data_sources.word_segmenter().segment_str(text).peekable();
+    let word_segmenter = data_sources.word_segmenter();
+    let word_segmenter = word_segmenter.as_borrowed();
+    let mut wb_iter = word_segmenter.segment_str(text).peekable();
     let mut gb_iter = data_sources
         .grapheme_segmenter()
         .segment_str(text)
@@ -683,7 +813,7 @@ pub(crate) fn analyze_text(
         if !is_word
             && is_grapheme_start
             && properties.needs_dictionary_word_break()
-            && !has_word_dictionary(properties.script())
+            && !data_sources.has_word_dictionary(properties.script())
         {
             is_word = true;
         }
@@ -773,7 +903,7 @@ pub(crate) fn analyze_text(
         let general_category = properties.general_category();
         let is_emoji_or_pictograph = properties.is_emoji_or_pictograph();
         let is_variation_selector = properties.is_variation_selector();
-        let is_region_indicator = properties.is_region_indicator();
+        let is_region_indicator = properties.is_regional_indicator();
 
         let force_normalize = {
             // "Extend" break chars should be normalized first, with two exceptions
@@ -805,7 +935,12 @@ pub(crate) fn analyze_text(
             properties.is_emoji_presentation(),
             properties.is_emoji_modifier(),
             properties.is_emoji_modifier_base(),
+            properties.is_default_ignorable(),
         ));
+    }
+
+    if !options.inline_objects.is_empty() {
+        mark_inline_objects(text, options, data_sources, &mut analysis.info);
     }
 
     if needs_bidi_resolution || options.base_direction == BaseDirection::Rtl {
@@ -820,6 +955,109 @@ pub(crate) fn analyze_text(
         );
         core::mem::swap(&mut analysis.levels, &mut analyzer.bidi.levels);
         analysis.paragraph_level = analyzer.bidi.base_level();
+    }
+}
+
+/// Mark the inline objects of `text` in `info` (see [`AnalysisOptions::inline_objects`]).
+///
+/// We assume inline objects are rare relative to normal text, so we make the choice to patch the
+/// analysis of each inline object and of the character after it.
+///
+/// For the same reason this is marked `#[inline(never)]`: inflating the caller's body will probably
+/// cost more on average than inlining would win.
+#[inline(never)]
+fn mark_inline_objects(
+    text: &str,
+    options: &AnalysisOptions<'_>,
+    data_sources: &AnalysisDataSources<'_>,
+    info: &mut [CharInfo],
+) {
+    const LEN: usize = '\u{FFFC}'.len_utf8();
+    let is_mandatory = |ch| data_sources.properties(ch).is_mandatory_linebreak();
+
+    // Between two objects, suppressing an opportunity wins.
+    let combine = |a: Option<bool>, b: Option<bool>| match (a, b) {
+        (Some(false), _) | (_, Some(false)) => Some(false),
+        _ => a.or(b),
+    };
+
+    let mut char_index = 0;
+    let mut counted_to = 0;
+    for (i, object) in options.inline_objects.iter().enumerate() {
+        let byte = object.text_byte_start;
+        debug_assert!(
+            text[byte..].starts_with('\u{FFFC}'),
+            "An inline object must be a U+FFFC OBJECT REPLACEMENT CHARACTER, found none at byte {byte}"
+        );
+        char_index += text[counted_to..byte].chars().count();
+        counted_to = byte;
+        info[char_index].flags = info[char_index].flags & !CharInfo::CONTRIBUTES_TO_SHAPING_MASK
+            | CharInfo::INLINE_OBJECT_MASK;
+
+        let break_before = match options.inline_objects[..i].last() {
+            Some(previous) if previous.text_byte_start + LEN == byte => {
+                combine(previous.break_after, object.break_before)
+            }
+            _ => object.break_before,
+        };
+        let break_after = match options.inline_objects.get(i + 1) {
+            Some(next) if byte + LEN == next.text_byte_start => {
+                combine(object.break_after, next.break_before)
+            }
+            _ => object.break_after,
+        };
+
+        // The object is a grapheme of its own, with soft wrap opportunities specified by its break
+        // conditions.
+        let mut before = text[..byte].chars().rev();
+        let (before, before_before) = (before.next(), before.next());
+        let after = text[byte + LEN..].chars().next();
+        for (char_index, byte, [before_before, before, after], condition) in [
+            (
+                char_index,
+                byte,
+                [before_before, before, Some('\u{FFFC}')],
+                break_before,
+            ),
+            (
+                char_index + 1,
+                byte + LEN,
+                [before, Some('\u{FFFC}'), after],
+                break_after,
+            ),
+        ] {
+            let Some(info) = info.get_mut(char_index) else {
+                continue;
+            };
+            info.flags |= CharInfo::GRAPHEME_START_MASK;
+            let (Some(before), Some(after)) = (before, after) else {
+                continue;
+            };
+            if is_mandatory(before) || is_mandatory(after) {
+                continue;
+            }
+            let forced = options.line_break_override.and_then(|lb_override| {
+                lb_override(LineBreakContext {
+                    before_before,
+                    before,
+                    after,
+                })
+            });
+            let is_break_anywhere = {
+                let i = options
+                    .line_break
+                    .partition_point(|(range, _)| range.end <= byte);
+                options.line_break.get(i).is_some_and(|(range, config)| {
+                    range.contains(&byte) && config.line_break == LineBreak::Anywhere
+                })
+            };
+            // Overrides take precedence, then the object's conditions, then the text's rules.
+            let opportunity = forced
+                .or(condition)
+                .unwrap_or_else(|| info.is_soft_wrap_opportunity() || is_break_anywhere);
+            info.flags = info.flags & !CharInfo::SOFT_WRAP_OPPORTUNITY_MASK
+                | (opportunity as u16) << CharInfo::SOFT_WRAP_OPPORTUNITY_SHIFT;
+        }
     }
 }
 
@@ -840,30 +1078,6 @@ pub(crate) fn contributes_to_shaping(general_category: GeneralCategory, script: 
     !(general_category == GeneralCategory::Format && script != Script::Inherited)
 }
 
-/// Whether ICU4X has a word-segmentation dictionary for this script.
-///
-/// If it does not, we need to apply UAX #29 Rule WB999 manually, because ICU4X does not.
-///
-/// This is approximate, because ICU4X actually decides based on a table of code point ranges: e.g.,
-/// some Han characters do not get a dictionary check. That's only a problem if there's a run of
-/// repeated such characters, which is probably not too likely to be a problem in practice.
-///
-/// If ICU4X does implement WB999 in the future, we can stop doing it manually (and this method can
-/// be removed).
-#[inline(always)]
-fn has_word_dictionary(script: Script) -> bool {
-    cfg!(feature = "complex-scripts")
-        && matches!(
-            script,
-            Script::Han
-                | Script::Hiragana
-                | Script::Thai
-                | Script::Lao
-                | Script::Khmer
-                | Script::Myanmar
-        )
-}
-
 #[cfg(test)]
 mod test {
     use alloc::vec::Vec;
@@ -876,7 +1090,7 @@ mod test {
     /// UAX #29 Rule WB999 says that, without a dictionary, there should be word boundaries.
     ///
     /// We do that patchup ourselves. Once this test starts failing, it's likely ICU4X now follows
-    /// that rule, and we can drop the patchup (the code calling [`super::has_word_dictionary`]).
+    /// that rule, and we can drop the patchup (the code calling [`super::AnalysisDataSources::has_word_dictionary`]).
     /// Once that's the case, [`parley_data::Properties::needs_dictionary_word_break`] can also be
     /// dropped.
     #[test]

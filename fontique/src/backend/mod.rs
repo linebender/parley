@@ -11,7 +11,12 @@ mod system;
 #[path = "coretext.rs"]
 mod system;
 
-#[cfg(all(feature = "system", any(target_os = "linux", target_os = "freebsd")))]
+// OpenHarmony reports `target_os = "linux"` but ships no Fontconfig library.
+#[cfg(all(
+    feature = "system",
+    any(target_os = "linux", target_os = "freebsd"),
+    not(target_env = "ohos")
+))]
 #[path = "fontconfig.rs"]
 mod system;
 
@@ -37,6 +42,7 @@ pub(crate) use system::SystemFonts;
 // Dummy system font backend for targets like wasm32-unknown-unknown
 #[cfg(any(
     not(feature = "system"),
+    target_env = "ohos",
     not(any(
         target_os = "windows",
         target_os = "linux",

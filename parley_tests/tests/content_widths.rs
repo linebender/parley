@@ -6,8 +6,8 @@
 use crate::util::TestEnv;
 use crate::{test_name, util::ColorBrush};
 use parley::{
-    Alignment, AlignmentOptions, ContentWidths, InlineBox, InlineBoxKind, Layout, LineBreak,
-    StyleProperty, TextWrapMode, VerticalAlign, WhiteSpaceCollapse,
+    Alignment, AlignmentOptions, ContentWidths, IndentOptions, InlineBox, InlineBoxKind, Layout,
+    LineBreak, StyleProperty, TextWrapMode, VerticalAlign, WhiteSpaceCollapse,
 };
 
 /// Checks that calculated content widths agree with actual line breaking.
@@ -205,7 +205,7 @@ fn inbox_content_width() {
     let mut env = TestEnv::new(test_name!(), None);
 
     {
-        let text = "Hello world!";
+        let text = "Hel\u{FFFC}lo world!";
         let mut builder = env.ranged_builder(text);
         builder.push_inline_box(InlineBox {
             id: 0,
@@ -228,7 +228,7 @@ fn inbox_content_width() {
     }
 
     {
-        let text = "A ";
+        let text = "A \u{FFFC}";
         let mut builder = env.ranged_builder(text);
         builder.push_inline_box(InlineBox {
             id: 0,
@@ -264,13 +264,13 @@ fn content_widths_max_floored_by_min() {
     // A negative-width inline box (e.g. an inline-block with a negative margin) reduces the
     // max-content width, but the max-content width can never be smaller than the min-content
     // width.
-    let text = "";
+    let text = "\u{FFFC}\u{FFFC}";
     let mut builder = env.ranged_builder(text);
-    for (id, width) in [(0, 100.0), (1, -50.0)] {
+    for (id, index, width) in [(0, 0, 100.0), (1, 3, -50.0)] {
         builder.push_inline_box(InlineBox {
             id,
             kind: InlineBoxKind::InFlow,
-            index: 0,
+            index,
             width,
             height: 10.0,
             baseline: None,
@@ -345,5 +345,196 @@ fn content_widths_trailing_whitespace_by_collapse_mode() {
         (widths.max - word_width).abs() < 1e-3,
         "Max content width {} should be the widest word's width {word_width}",
         widths.max,
+    );
+}
+
+#[test]
+fn content_widths_text_indent() {
+    struct IndentCase {
+        name: &'static str,
+        text: &'static str,
+        indent_amount: f32,
+        indent_options: IndentOptions,
+        expected: ContentWidths,
+        compare_with_layout: bool,
+    }
+
+    let mut env = TestEnv::new(test_name!(), None);
+    let indent = 100.0;
+    let short = single_line_width(&mut env, "AA");
+    let long = single_line_width(&mut env, "BBBB");
+    let full = single_line_width(&mut env, "AA BBBB");
+
+    let normal = IndentOptions::default();
+    let hanging = IndentOptions {
+        hanging: true,
+        ..Default::default()
+    };
+    let each_line = IndentOptions {
+        each_line: true,
+        ..Default::default()
+    };
+    let first_line_min = (indent + short).max(long);
+    let hanging_min = short.max(indent + long);
+    let partial = short + 10.0;
+
+    for case in [
+        // These widths also agree with the line breaker.
+        IndentCase {
+            name: "first line only",
+            text: "AA BBBB",
+            indent_amount: indent,
+            indent_options: normal,
+            expected: ContentWidths {
+                min: first_line_min,
+                max: indent + full,
+            },
+            compare_with_layout: true,
+        },
+        IndentCase {
+            name: "forced break without each-line",
+            text: "AA\nBBBB",
+            indent_amount: indent,
+            indent_options: normal,
+            expected: ContentWidths {
+                min: first_line_min,
+                max: first_line_min,
+            },
+            compare_with_layout: true,
+        },
+        IndentCase {
+            name: "forced break with each-line",
+            text: "AA\nBBBB",
+            indent_amount: indent,
+            indent_options: each_line,
+            expected: ContentWidths {
+                min: indent + long,
+                max: indent + long,
+            },
+            compare_with_layout: true,
+        },
+        // A line holding only a forced break is still indented.
+        IndentCase {
+            name: "empty first line",
+            text: "\nAA",
+            indent_amount: indent,
+            indent_options: normal,
+            expected: ContentWidths {
+                min: indent,
+                max: indent,
+            },
+            compare_with_layout: true,
+        },
+        // These cases differ from Layout::width(), so they are checked only by value.
+        // Hanging continuation indents floor max-content at min-content above the unwrapped width.
+        IndentCase {
+            name: "hanging max-content flooring",
+            text: "AA BBBB",
+            indent_amount: indent,
+            indent_options: hanging,
+            expected: ContentWidths {
+                min: hanging_min,
+                max: full.max(hanging_min),
+            },
+            compare_with_layout: false,
+        },
+        // Layout::width() ignores negative indents, so these widths don't agree with it. While the
+        // line's running width is still negative, soft wrap opportunities are not taken: here the
+        // whole text stays on the first line.
+        IndentCase {
+            name: "partially negative indent",
+            text: "AA BBBB",
+            indent_amount: -partial,
+            indent_options: normal,
+            expected: ContentWidths {
+                min: full - partial,
+                max: full - partial,
+            },
+            compare_with_layout: false,
+        },
+        // A negative indent wider than the text leaves no measurable width at all.
+        IndentCase {
+            name: "negative indent wider than text",
+            text: "AA BBBB",
+            indent_amount: -indent,
+            indent_options: normal,
+            expected: ContentWidths { min: 0.0, max: 0.0 },
+            compare_with_layout: false,
+        },
+        // Layout::width() counts the indent of the empty line after the final forced break.
+        IndentCase {
+            name: "trailing forced break",
+            text: "AA\n",
+            indent_amount: indent,
+            indent_options: hanging,
+            expected: ContentWidths {
+                min: short,
+                max: short,
+            },
+            compare_with_layout: false,
+        },
+    ] {
+        let mut layout = env.ranged_builder(case.text).build(case.text);
+        layout.set_text_indent(case.indent_amount, case.indent_options);
+        let widths = layout.calculate_content_widths();
+        assert!(
+            (widths.min - case.expected.min).abs() < 1e-3
+                && (widths.max - case.expected.max).abs() < 1e-3,
+            "{}: expected {:?}, got {widths:?}",
+            case.name,
+            case.expected,
+        );
+        if case.compare_with_layout {
+            assert_content_widths_match_layout(&mut layout);
+        }
+    }
+}
+
+#[test]
+fn content_widths_text_indent_inline_box() {
+    let mut env = TestEnv::new(test_name!(), None);
+    let indent = 100.0;
+
+    // The indent applies to an inline box at the start of the first line.
+    let text = "\u{FFFC}\nAA";
+    let mut builder = env.ranged_builder(text);
+    for (id, kind, index) in [
+        (0, InlineBoxKind::InFlow, 0),
+        (1, InlineBoxKind::OutOfFlow, 3),
+    ] {
+        builder.push_inline_box(InlineBox {
+            id,
+            kind,
+            index,
+            width: 10.0,
+            height: 10.0,
+            baseline: None,
+            vertical_align: VerticalAlign::BASELINE,
+        });
+    }
+    let mut layout = builder.build(text);
+    layout.set_text_indent(indent, IndentOptions::default());
+    let widths = layout.calculate_content_widths();
+    assert!(
+        (widths.min - (indent + 10.0)).abs() < 1e-3,
+        "Min content width {} should be the indented inline box's width {}",
+        widths.min,
+        indent + 10.0
+    );
+
+    // With `each-line hanging`, only lines after the first soft wrap are indented. Here, the forced
+    // break suppresses the in-flow inline box's soft wrap opportunity (ignoring the out-of-flow
+    // box), and so no line should be indented.
+    layout.set_text_indent(
+        indent,
+        IndentOptions {
+            each_line: true,
+            hanging: true,
+        },
+    );
+    let widths = assert_content_widths_match_layout(&mut layout);
+    assert!(
+        widths.max < indent,
+        "no line should be indented: {widths:?}"
     );
 }

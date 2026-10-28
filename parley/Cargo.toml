@@ -3,7 +3,7 @@ name = "parley"
 version.workspace = true
 description = "Parley provides an API for implementing rich text layout."
 keywords = ["text", "layout"]
-categories = ["gui", "graphics"]
+categories = ["gui", "graphics", "no-std"]
 edition.workspace = true
 rust-version.workspace = true
 license.workspace = true
@@ -13,17 +13,21 @@ exclude = ["/tests"]
 [package.metadata.docs.rs]
 all-features = true
 
-[lints]
-workspace = true
-
 [features]
 default = ["system"]
+# Get floating point functions from the standard library
+# (likely using your target's libc).
 std = ["fontique/std", "parley_engine/std", "peniko/std", "parlance/std"]
+# Use floating point implementations from libm.
+# This is useful for `no_std` environments.
+# However, note that the `libm` crate is not as efficient as the standard library.
 libm = ["fontique/libm", "parley_engine/libm", "peniko/libm", "dep:core_maths"]
+# Forwarded to `parlance`, which then implements traits from `bytemuck` on its types.
 bytemuck = ["fontique/bytemuck", "parlance/bytemuck", "parley_engine/bytemuck"]
-# Enables support for system font backends
+# Enable support for system font backends.
+# This also enables `std`.
 system = ["std", "fontique/system"]
-# Enables dictionary-based line and word breaking for complex scripts (CJK, Thai, Khmer, Lao, Myanmar).
+# Enable dictionary-based line and word breaking for complex scripts (CJK, Thai, Khmer, Lao, Myanmar).
 # When disabled, a lightweight segmenter is used that falls back to character-level breaks for those scripts.
 complex-scripts = ["parley_engine/complex-scripts"]
 
@@ -48,3 +52,6 @@ icu_segmenter = { workspace = true, features = ["compiled_data"] }
 # We special-case android targets because oxipng doesn't build in Android CI.
 [target.'cfg(not(target_os = "android"))'.dev-dependencies]
 oxipng = { version = "9.1.5", default-features = false, features = ["freestanding"] }
+
+[lints]
+workspace = true

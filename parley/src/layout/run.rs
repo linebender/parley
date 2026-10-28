@@ -1,6 +1,7 @@
 // Copyright 2021 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+use crate::FontData;
 use crate::layout::cluster::Cluster;
 use crate::layout::data::{LineItemData, RunData};
 use crate::layout::layout::Layout;
@@ -10,8 +11,8 @@ use crate::style::Brush;
 use core::ops::Range;
 use fontique::Synthesis;
 use parley_engine::{
-    Atom, Atoms, FontInstance, FontMetrics, Glyph, Graphemes, NormalizedCoord, ShapedClusterGlyphs,
-    ShapedRun, ShapedSlice,
+    Atom, Atoms, FontMetrics, Glyph, Graphemes, NormalizedCoord, ShapedClusterGlyphs, ShapedRun,
+    ShapedSlice,
 };
 
 /// Sequence of clusters with a single font and style.
@@ -82,13 +83,15 @@ impl<'a, B: Brush> Run<'a, B> {
     }
 
     /// Returns the font for the run.
-    pub fn font(&self) -> &FontInstance {
-        self.layout
+    pub fn font(&self) -> &'a FontData {
+        &self
+            .layout
             .data
             .shaped_text
             .fonts()
             .get(self.shaped.font_index)
             .unwrap()
+            .font
     }
 
     /// Returns the font size for the run.
@@ -97,7 +100,7 @@ impl<'a, B: Brush> Run<'a, B> {
     }
 
     /// Returns the font attributes for the run.
-    pub fn font_attrs(&self) -> &fontique::Attributes {
+    pub fn font_attrs(&self) -> &'a fontique::Attributes {
         &self.data.font_attrs
     }
 
@@ -108,7 +111,7 @@ impl<'a, B: Brush> Run<'a, B> {
 
     /// Returns the normalized variation coordinates for the font associated
     /// with the run.
-    pub fn normalized_coords(&self) -> &[NormalizedCoord] {
+    pub fn normalized_coords(&self) -> &'a [NormalizedCoord] {
         self.layout
             .data
             .shaped_text
@@ -118,7 +121,7 @@ impl<'a, B: Brush> Run<'a, B> {
     }
 
     /// Returns metrics for the run.
-    pub fn font_metrics(&self) -> &FontMetrics {
+    pub fn font_metrics(&self) -> &'a FontMetrics {
         &self.shaped.font_metrics
     }
 
@@ -436,7 +439,9 @@ impl<'a, B: Brush> Iterator for Clusters<'a, B> {
     }
 }
 
-/// The number of graphemes in `slice`.
+/// The number of graphemes in `slice`, also counting a grapheme the slice starts inside of.
+///
+/// This effectively counts the number of [`Cluster`]s the `slice` would produce.
 ///
 /// This is `O(n)` in the slice's characters.
 fn count_graphemes(slice: ShapedSlice<'_>) -> usize {
@@ -445,4 +450,5 @@ fn count_graphemes(slice: ShapedSlice<'_>) -> usize {
         .iter()
         .filter(|character| character.grapheme_start)
         .count()
+        + usize::from(slice.grapheme_continues_before())
 }

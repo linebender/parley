@@ -3,6 +3,7 @@
 
 //! The analyzer API.
 
+use alloc::vec::Vec;
 use core::ops::Range;
 
 use parlance::{BaseDirection, Language, LineBreak, WordBreak};
@@ -15,6 +16,8 @@ use crate::analysis::{Analysis, analyze_text};
 #[derive(Default)]
 pub struct Analyzer {
     pub(crate) bidi: BidiResolver,
+    /// Byte offsets of the line boundaries of the text being analyzed.
+    pub(crate) line_boundary_positions: Vec<usize>,
 }
 
 impl core::fmt::Debug for Analyzer {
@@ -32,9 +35,19 @@ impl Analyzer {
     /// Analyze `text`, overwriting `analysis`.
     ///
     /// This reuses the allocations of `analysis`.
-    pub fn analyze(&mut self, text: &str, options: &AnalysisOptions<'_>, analysis: &mut Analysis) {
+    ///
+    /// # Panics
+    ///
+    /// If the provider in `data_sources` returns an error other than `IdentifierNotFound`.
+    pub fn analyze(
+        &mut self,
+        text: &str,
+        options: &AnalysisOptions<'_>,
+        analysis: &mut Analysis,
+        data_sources: &crate::AnalysisDataSources<'_>,
+    ) {
         analysis.clear();
-        analyze_text(self, text, options, analysis);
+        analyze_text(self, text, options, analysis, data_sources);
     }
 }
 
@@ -90,6 +103,71 @@ pub struct AnalysisOptions<'a> {
     ///
     /// See [`LineBreakOverrideFn`] for more details.
     pub line_break_override: Option<&'a LineBreakOverrideFn>,
+
+    /// The inline objects in the source text.
+    ///
+    /// These must be in ascending order of [`InlineObject::text_byte_start`] without duplicates.
+    /// Each entry must point at a U+FFFC OBJECT REPLACEMENT CHARACTER in the source text. Any
+    /// U+FFFC character that is not in this list is treated as ordinary text (some fonts may render
+    /// `.notdef`, others may have a glyph for it).
+    ///
+    /// Such an inline object is part of the paragraph, but is not part of the paragraph's text;
+    /// e.g., it may be an image. In CSS, this is known as an [atomic inline][css-atomic-inline].
+    ///
+    /// The analysis marks these inline objects with
+    /// [`CharInfo::is_inline_object`](crate::CharInfo::is_inline_object), and they are treated
+    /// as follows.
+    ///
+    /// - The soft wrap opportunities before and after an inline object can be configured using
+    ///   [`break_before`](InlineObject::break_before) and
+    ///   [`break_after`](InlineObject::break_after). A side left unconfigured follows
+    ///   [UAX #14 LB20][uax-14-lb20]: there's an opportunity, unless suppressed (e.g. before a full
+    ///   stop).
+    /// - Each inline object is a grapheme of its own.
+    /// - Each inline object is shaped as a [`ShapedRun`](crate::ShapedRun) of its own. It is a
+    ///   [`ShapedCluster`](crate::shape::ShapedCluster) without glyphs, whose advance can only be
+    ///   set using
+    ///   [`ShapedText::set_inline_object_advance`](crate::ShapedText::set_inline_object_advance).
+    ///   The run's font and font metrics say nothing about the inline object.
+    ///
+    /// [css-atomic-inline]: https://www.w3.org/TR/css-display-3/#atomic-inline
+    /// [uax-14-lb20]: https://unicode.org/reports/tr14/#LB20
+    pub inline_objects: &'a [InlineObject],
+}
+
+/// An inline object in the source text, see [`AnalysisOptions::inline_objects`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub struct InlineObject {
+    /// The byte index of the inline object's U+FFFC OBJECT REPLACEMENT CHARACTER in the source
+    /// text.
+    pub text_byte_start: usize,
+
+    /// Whether there is a soft wrap opportunity before the inline object.
+    ///
+    /// If `None`, [UAX #14 LB20][uax-14-lb20] is followed, and there's an opportunity, unless
+    /// suppressed (e.g. before a full stop). Between two inline objects, if either of the two sides
+    /// has `Some(false)`, there's no opportunity.
+    ///
+    /// [`AnalysisOptions::line_break_override`] takes precedence over this.
+    ///
+    /// [uax-14-lb20]: https://unicode.org/reports/tr14/#LB20
+    pub break_before: Option<bool>,
+
+    /// Whether there is a soft wrap opportunity after the inline object.
+    ///
+    /// This works like [`Self::break_before`].
+    pub break_after: Option<bool>,
+}
+
+impl InlineObject {
+    /// An inline object at byte `text_byte_start`.
+    pub const fn new(text_byte_start: usize) -> Self {
+        Self {
+            text_byte_start,
+            break_before: None,
+            break_after: None,
+        }
+    }
 }
 
 impl core::fmt::Debug for AnalysisOptions<'_> {
@@ -98,6 +176,7 @@ impl core::fmt::Debug for AnalysisOptions<'_> {
             .field("base_direction", &self.base_direction)
             .field("line_break", &self.line_break)
             .field("break_spaces", &self.break_spaces)
+            .field("inline_objects", &self.inline_objects)
             .finish_non_exhaustive()
     }
 }
@@ -106,7 +185,7 @@ impl core::fmt::Debug for AnalysisOptions<'_> {
 mod tests {
     use parlance::BidiLevel;
 
-    use super::{AnalysisOptions, Analyzer};
+    use super::{AnalysisOptions, Analyzer, InlineObject};
     use crate::{Analysis, BaseDirection};
 
     fn analyze(text: &str, base_direction: BaseDirection) -> Analysis {
@@ -119,6 +198,7 @@ mod tests {
                 ..AnalysisOptions::default()
             },
             &mut analysis,
+            &crate::AnalysisDataSources::default(),
         );
         analysis
     }
@@ -161,6 +241,25 @@ mod tests {
 
         assert!(analysis.paragraph_level().is_rtl());
         assert!(analysis.bidi_levels().iter().all(|level| level.is_ltr()));
+    }
+
+    #[test]
+    fn inline_object_is_its_own_grapheme() {
+        let mut analysis = Analysis::new();
+        Analyzer::new().analyze(
+            "\u{FFFC}\u{301}",
+            &AnalysisOptions {
+                inline_objects: &[InlineObject::new(0)],
+                ..AnalysisOptions::default()
+            },
+            &mut analysis,
+            &crate::AnalysisDataSources::default(),
+        );
+        let [object, mark] = analysis.char_info() else {
+            unreachable!()
+        };
+        assert!(object.is_inline_object() && !object.contributes_to_shaping());
+        assert!(mark.is_grapheme_start() && !mark.is_inline_object());
     }
 
     #[test]

@@ -292,7 +292,7 @@ fn quantized_metrics_are_whole_pixels() {
 }
 
 #[test]
-fn line_with_only_empty_inline_boxes_is_invisible() {
+fn line_with_only_out_of_flow_boxes_is_invisible() {
     let mut fcx = create_font_context();
     let mut lcx: LayoutContext<ColorBrush> = LayoutContext::new();
     let root = root_style();
@@ -311,10 +311,10 @@ fn line_with_only_empty_inline_boxes_is_invisible() {
         layout.break_all_lines(None);
         layout.lines().next().unwrap().metrics().line_height
     };
-    // Empty and out-of-flow boxes alone do not make the strut apply.
-    assert_eq!(line_height(0., InlineBoxKind::InFlow), 0.);
+    // Out-of-flow boxes alone do not make the strut apply.
     assert_eq!(line_height(10., InlineBoxKind::OutOfFlow), 0.);
-    // A non-empty in-flow box does.
+    // An in-flow box does, even if empty.
+    assert_eq!(line_height(0., InlineBoxKind::InFlow), 30.);
     assert_eq!(line_height(10., InlineBoxKind::InFlow), 30.);
 }
 

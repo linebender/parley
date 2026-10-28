@@ -95,7 +95,7 @@ fn render_frame(
                     let normalized_coords = bytemuck::cast_slice::<_, i16>(run.normalized_coords());
                     renderer.set_paint(glyph_run.style().brush.color);
                     renderer
-                        .glyph_run(resources, &run.font().font)
+                        .glyph_run(resources, run.font())
                         .font_size(run.font_size())
                         .hint(config.hint)
                         .normalized_coords(normalized_coords)

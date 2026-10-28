@@ -96,18 +96,35 @@ impl Spacing {
         self.word == 0. && self.letter == 0.
     }
 
-    /// The gaps around an atom whose first character has the given whitespace class.
+    /// The gaps around an atom whose first character:
+    /// - has the given whitespace class, and
+    /// - has the given value for its [`CharacterFlags::is_default_ignorable`].
     ///
     /// This is [`EffectiveSpacing::gaps`] under [`Justification::NONE`].
+    ///
+    /// In CSS [letter-spacing][] ignores "invisible zero-width formatting characters", but
+    /// doesn't specify an exact list. Blink chooses to ignore clusters which start with a default
+    /// ignorable character, so we do the same. Blink does additionally hardcode skipping letter-spacing
+    /// for U+000C FORM FEED, but we choose not to, as the WPTs suggest it should have ink.
+    ///
+    /// Only checking the first character does sometimes cause undesirable results, primarily due to
+    /// U+115F HANGUL CHOSEONG FILLER. Blink has the same bug, but fixing this would be welcome.
+    ///
+    /// [`CharacterFlags::is_default_ignorable`]: parley_engine::shape::CharacterFlags::is_default_ignorable
+    /// [letter-spacing]: https://www.w3.org/TR/css-text-4/#letter-spacing-property
     #[inline(always)]
-    pub(crate) fn gaps(self, whitespace: Whitespace) -> Gaps {
+    pub(crate) fn gaps(self, whitespace: Whitespace, is_default_ignorable: bool) -> Gaps {
         if whitespace == Whitespace::Newline {
             return Gaps::ZERO;
         }
 
         let mut gaps = Gaps {
             before: 0.,
-            after: self.letter,
+            after: if is_default_ignorable {
+                0.
+            } else {
+                self.letter
+            },
         };
 
         if is_word_separator(whitespace) {
@@ -172,8 +189,11 @@ impl EffectiveSpacing {
     /// The gaps around `atom`.
     #[inline(always)]
     pub(crate) fn gaps(self, atom: &Atom<'_>) -> Gaps {
-        let whitespace = atom.characters()[0].whitespace;
-        let mut gaps = self.spacing.gaps(whitespace);
+        let first_cluster = atom.shaped_clusters()[0];
+        let whitespace = first_cluster.whitespace();
+        let mut gaps = self
+            .spacing
+            .gaps(whitespace, first_cluster.is_default_ignorable());
 
         if is_word_separator(whitespace)
             && atom.shaped_clusters_range().end <= self.justification.justification_end_cluster
@@ -197,8 +217,9 @@ impl EffectiveSpacing {
     pub(crate) fn grapheme_advance(self, atom: &Atom<'_>, grapheme: Grapheme, is_rtl: bool) -> f32 {
         let gaps = self.gaps(atom);
 
-        // TODO: perhaps spacing should not be applied if the grapheme `continues_before` /
-        // `continues_after`. The same then should hold true in `gaps` computed for an atom.
+        // TODO: perhaps spacing should not be applied if the grapheme `Grapheme::continues_before`
+        // / `Grapheme::continues_after`. The same then should hold true in `gaps` computed for an
+        // atom.
         let (owns_before, owns_after) = if is_rtl {
             (grapheme.is_atom_end(), grapheme.is_atom_start())
         } else {

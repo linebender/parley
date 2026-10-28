@@ -39,22 +39,27 @@ impl Character {
 }
 
 #[derive(Copy, Clone, Debug, PartialEq, Eq)]
-pub(crate) struct ShapedClusterFlags(u16);
+pub(crate) struct ShapedClusterFlags(u32);
 
 impl ShapedClusterFlags {
-    const GLYPH_LEN_MASK: u16 = 0x00FF;
-    const INLINE_GLYPH: u16 = 1 << 8;
-    const GRAPHEME_START: u16 = 1 << 9;
-    const SAFE_TO_BREAK_BEFORE: u16 = 1 << 10;
+    const GLYPH_LEN_MASK: u32 = 0x00FF;
+    const INLINE_GLYPH: u32 = 1 << 8;
+    const GRAPHEME_START: u32 = 1 << 9;
     /// Whether a soft wrap opportunity exists before the cluster's first character.
-    const SOFT_WRAP_BEFORE: u16 = 1 << 11;
+    const SOFT_WRAP_BEFORE: u32 = 1 << 10;
     /// [`Whitespace`] class of the cluster's first character (3 bits).
-    const WHITESPACE_SHIFT: u16 = 12;
-    const WHITESPACE_MASK: u16 = 0b111 << Self::WHITESPACE_SHIFT;
+    const WHITESPACE_SHIFT: u32 = 11;
+    const WHITESPACE_MASK: u32 = 0b111 << Self::WHITESPACE_SHIFT;
+    /// Whether the cluster is an inline object.
+    const INLINE_OBJECT: u32 = 1 << 14;
+    const SAFE_TO_BREAK_BEFORE: u32 = 1 << 15;
+    const SAFE_TO_CONCAT_BEFORE: u32 = 1 << 16;
+    /// Whether the cluster's first character is default ignorable.
+    const DEFAULT_IGNORABLE: u32 = 1 << 17;
 
     #[inline(always)]
     pub(crate) const fn new(glyph_len: u8) -> Self {
-        Self(glyph_len as u16)
+        Self(glyph_len as u32)
     }
 
     #[inline(always)]
@@ -77,18 +82,38 @@ impl ShapedClusterFlags {
     }
 
     #[inline(always)]
+    pub(crate) const fn with_safe_to_concat_before(mut self, set: bool) -> Self {
+        self.0 = self.0 & !Self::SAFE_TO_CONCAT_BEFORE
+            | if set { Self::SAFE_TO_CONCAT_BEFORE } else { 0 };
+        self
+    }
+
+    #[inline(always)]
+    pub(crate) const fn with_inline_object(mut self, set: bool) -> Self {
+        self.0 = self.0 & !Self::INLINE_OBJECT | if set { Self::INLINE_OBJECT } else { 0 };
+        self
+    }
+
+    #[inline(always)]
     pub(crate) const fn with_first_char(
         mut self,
         soft_wrap_opportunity: bool,
         whitespace: Whitespace,
+        default_ignorable: bool,
     ) -> Self {
-        self.0 = self.0 & !(Self::SOFT_WRAP_BEFORE | Self::WHITESPACE_MASK)
+        self.0 = self.0
+            & !(Self::SOFT_WRAP_BEFORE | Self::WHITESPACE_MASK | Self::DEFAULT_IGNORABLE)
             | if soft_wrap_opportunity {
                 Self::SOFT_WRAP_BEFORE
             } else {
                 0
             }
-            | ((whitespace as u16) << Self::WHITESPACE_SHIFT);
+            | ((whitespace as u32) << Self::WHITESPACE_SHIFT)
+            | if default_ignorable {
+                Self::DEFAULT_IGNORABLE
+            } else {
+                0
+            };
         self
     }
 
@@ -99,16 +124,12 @@ impl ShapedClusterFlags {
 
     #[inline(always)]
     const fn whitespace(self) -> Whitespace {
-        match (self.0 & Self::WHITESPACE_MASK) >> Self::WHITESPACE_SHIFT {
-            1 => Whitespace::Space,
-            2 => Whitespace::NoBreakSpace,
-            3 => Whitespace::IdeographicSpace,
-            4 => Whitespace::OtherSpaceSeparator,
-            5 => Whitespace::Tab,
-            6 => Whitespace::Newline,
-            7 => Whitespace::ControlWhitespace,
-            _ => Whitespace::None,
-        }
+        Whitespace::from_u8(((self.0 & Self::WHITESPACE_MASK) >> Self::WHITESPACE_SHIFT) as u8)
+    }
+
+    #[inline(always)]
+    const fn is_default_ignorable(self) -> bool {
+        self.0 & Self::DEFAULT_IGNORABLE != 0
     }
 
     #[inline(always)]
@@ -129,6 +150,16 @@ impl ShapedClusterFlags {
     #[inline(always)]
     const fn is_safe_to_break_before(self) -> bool {
         self.0 & Self::SAFE_TO_BREAK_BEFORE != 0
+    }
+
+    #[inline(always)]
+    const fn is_safe_to_concat_before(self) -> bool {
+        self.0 & Self::SAFE_TO_CONCAT_BEFORE != 0
+    }
+
+    #[inline(always)]
+    const fn is_inline_object(self) -> bool {
+        self.0 & Self::INLINE_OBJECT != 0
     }
 }
 
@@ -163,8 +194,6 @@ pub struct ShapedCluster {
     /// the documentation on that method.
     pub glyph_offset: u32,
 
-    // /// Number of glyphs in this cluster (0xFF = single glyph stored inline)
-    // pub glyph_len: u8,
     pub(crate) flags: ShapedClusterFlags,
 
     /// Advance width for this cluster
@@ -184,11 +213,7 @@ impl ShapedCluster {
     /// The number of glyphs of this cluster.
     #[inline(always)]
     pub fn glyph_len(self) -> u8 {
-        if self.has_inline_glyph() {
-            1
-        } else {
-            self.flags.glyph_len()
-        }
+        self.flags.glyph_len()
     }
 
     /// Whether this cluster's glyph is stored inline in [`Self::glyph_offset`].
@@ -207,13 +232,32 @@ impl ShapedCluster {
         self.flags.is_grapheme_start()
     }
 
-    /// Whether breaking logically before this shaped cluster requires reshaping.
+    /// Whether the text can be broken logically before this shaped cluster without reshaping.
     ///
-    /// Note that if this shaped cluster does not start a grapheme (see
-    /// [`Self::is_grapheme_start`]), you have to reshape regardless of this value.
+    /// If so, reshaping the text on either side of the break, would result in the same glyphs and
+    /// advances. For example, if a font kerns the glyphs of "To", the "o" is not safe to break
+    /// before. Breaking inside a shaped cluster (such as between the letters of an "ffi" ligature)
+    /// always requires shaping.
     #[inline(always)]
     pub fn is_safe_to_break_before(self) -> bool {
         self.flags.is_safe_to_break_before()
+    }
+
+    /// Whether shaping did not look across this shaped cluster's logical start.
+    ///
+    /// For example, if a font kerns "T" with some letters but not "e", the "e" in "Te" is safe to
+    /// break before, but not to concatenate before: say "To" would get kerning applied,
+    /// concatenating the "T" with "o" instead would miss that kern.
+    ///
+    /// If concatenating is safe for this cluster, [`Self::is_safe_to_break_before`] will also be
+    /// true.
+    ///
+    /// If the text was shaped without these flags, this is always `false`. See the
+    /// `produce_safe_to_concat_flags` argument of
+    /// [`Shaper::shape_text`](crate::Shaper::shape_text).
+    #[inline(always)]
+    pub fn is_safe_to_concat_before(self) -> bool {
+        self.flags.is_safe_to_concat_before()
     }
 
     /// Whether a soft wrap opportunity exists before this cluster's first character.
@@ -227,10 +271,33 @@ impl ShapedCluster {
 
     /// The [`Whitespace`] class of this cluster's first character.
     ///
-    /// See [`Self::is_soft_wrap_opportunity_before`].
+    /// Cached here so that measuring text does not need to read the character array.
     #[inline(always)]
     pub fn whitespace(self) -> Whitespace {
         self.flags.whitespace()
+    }
+
+    /// Whether this cluster's first character's [`CharacterFlags::is_default_ignorable`] flag is `true`.
+    ///
+    /// Cached here so that measuring text does not need to read the character array.
+    #[inline(always)]
+    pub fn is_default_ignorable(self) -> bool {
+        self.flags.is_default_ignorable()
+    }
+
+    /// Whether this cluster is an inline object.
+    ///
+    /// An inline object's cluster consists of just its U+FFFC OBJECT REPLACEMENT CHARACTER (see
+    /// [`AnalysisOptions::inline_objects`]), and it is an [`Atom`] of its own. It has no glyphs, and
+    /// its advance is zero until the caller, which lays out the inline object, sets it with
+    /// [`ShapedText::set_inline_object_advance`].
+    ///
+    /// [`AnalysisOptions::inline_objects`]: crate::AnalysisOptions::inline_objects
+    /// [`Atom`]: crate::Atom
+    /// [`ShapedText::set_inline_object_advance`]: crate::ShapedText::set_inline_object_advance
+    #[inline(always)]
+    pub fn is_inline_object(self) -> bool {
+        self.flags.is_inline_object()
     }
 
     /// The number of characters in this cluster.
@@ -266,9 +333,18 @@ impl CharacterFlags {
     const WORD_BOUNDARY: u8 = 1 << 3;
     /// Whether there is a soft wrap opportunity before the character.
     const SOFT_WRAP_OPPORTUNITY: u8 = 1 << 4;
+    /// Whether the character stands in for an inline object.
+    const INLINE_OBJECT: u8 = 1 << 5;
+    /// Whether the character has the `Default_Ignorable_Code_Point` unicode property.
+    const DEFAULT_IGNORABLE: u8 = 1 << 6;
 
     #[inline(always)]
-    pub fn new(source_char: char, is_word_boundary: bool, is_soft_wrap_opportunity: bool) -> Self {
+    pub(crate) fn new(
+        source_char: char,
+        is_word_boundary: bool,
+        is_soft_wrap_opportunity: bool,
+        is_default_ignorable: bool,
+    ) -> Self {
         // TODO: Defer to ICU4X properties (see: https://docs.rs/icu/latest/icu/properties/props/struct.Emoji.html).
         let is_emoji = matches!(source_char as u32, 0x1F600..=0x1F64F | 0x1F300..=0x1F5FF | 0x1F680..=0x1F6FF | 0x2600..=0x26FF | 0x2700..=0x27BF);
         #[expect(
@@ -286,6 +362,11 @@ impl CharacterFlags {
                 }
                 | if is_soft_wrap_opportunity {
                     Self::SOFT_WRAP_OPPORTUNITY
+                } else {
+                    0
+                }
+                | if is_default_ignorable {
+                    Self::DEFAULT_IGNORABLE
                 } else {
                     0
                 },
@@ -314,6 +395,39 @@ impl CharacterFlags {
         self.0 & Self::EMOJI != 0
     }
 
+    /// Returns if the character is default ignorable.
+    ///
+    /// These are the characters with the Unicode [`Default_Ignorable_Code_Point`] property.
+    /// This property is used in Parley to disable letter-spacing for some atoms, matching Blink.
+    ///
+    /// [`Default_Ignorable_Code_Point`]: https://www.unicode.org/reports/tr44/#Default_Ignorable_Code_Point
+    #[inline(always)]
+    pub fn is_default_ignorable(self) -> bool {
+        self.0 & Self::DEFAULT_IGNORABLE != 0
+    }
+
+    /// Returns these flags, marking whether the character stands in for an inline object.
+    #[inline(always)]
+    #[must_use]
+    pub(crate) const fn with_inline_object(self, is_inline_object: bool) -> Self {
+        Self(
+            self.0 & !Self::INLINE_OBJECT
+                | if is_inline_object {
+                    Self::INLINE_OBJECT
+                } else {
+                    0
+                },
+        )
+    }
+
+    /// Returns if the character stands in for an inline object.
+    ///
+    /// See [`AnalysisOptions::inline_objects`](crate::AnalysisOptions::inline_objects).
+    #[inline(always)]
+    pub fn is_inline_object(self) -> bool {
+        self.0 & Self::INLINE_OBJECT != 0
+    }
+
     /// Returns the number of bytes the source character would need if encoded in UTF-8.
     ///
     /// That number of bytes is always between 1 and 4, inclusive.
@@ -340,10 +454,16 @@ mod tests {
             ('\u{2600}', 3, true),
             ('\u{1F600}', 4, true),
         ] {
-            for (is_word_boundary, is_soft_wrap_opportunity) in
-                [(false, false), (true, false), (false, true), (true, true)]
-            {
-                let flags = CharacterFlags::new(ch, is_word_boundary, is_soft_wrap_opportunity);
+            for bits in 0..8_u8 {
+                let is_word_boundary = bits & 1 != 0;
+                let is_soft_wrap_opportunity = bits & 2 != 0;
+                let is_default_ignorable = bits & 4 != 0;
+                let flags = CharacterFlags::new(
+                    ch,
+                    is_word_boundary,
+                    is_soft_wrap_opportunity,
+                    is_default_ignorable,
+                );
                 assert_eq!(flags.len_utf8(), len, "{ch:?}");
                 assert_eq!(flags.is_emoji(), emoji, "{ch:?}");
                 assert_eq!(flags.is_word_boundary(), is_word_boundary, "{ch:?}");
@@ -352,13 +472,14 @@ mod tests {
                     is_soft_wrap_opportunity,
                     "{ch:?}"
                 );
+                assert_eq!(flags.is_default_ignorable(), is_default_ignorable, "{ch:?}");
             }
 
             let character = Character {
                 text_byte_start: 3,
                 style_index: 7,
                 whitespace: Whitespace::from_char(ch),
-                flags: CharacterFlags::new(ch, false, false),
+                flags: CharacterFlags::new(ch, false, false, false),
                 grapheme_start: true,
             };
             assert_eq!(character.text_byte_range(), 3..3 + len, "{ch:?}");
@@ -380,13 +501,16 @@ mod tests {
         ];
         for soft_wrap in soft_wraps {
             for whitespace in whitespaces {
-                let flags = ShapedClusterFlags::new(3)
-                    .with_grapheme_start(true)
-                    .with_first_char(soft_wrap, whitespace);
-                assert_eq!(flags.is_soft_wrap_opportunity_before(), soft_wrap);
-                assert_eq!(flags.whitespace(), whitespace);
-                assert_eq!(flags.glyph_len(), 3);
-                assert!(flags.is_grapheme_start());
+                for default_ignorable in [false, true] {
+                    let flags = ShapedClusterFlags::new(3)
+                        .with_grapheme_start(true)
+                        .with_first_char(soft_wrap, whitespace, default_ignorable);
+                    assert_eq!(flags.is_soft_wrap_opportunity_before(), soft_wrap);
+                    assert_eq!(flags.whitespace(), whitespace);
+                    assert_eq!(flags.is_default_ignorable(), default_ignorable);
+                    assert_eq!(flags.glyph_len(), 3);
+                    assert!(flags.is_grapheme_start());
+                }
             }
         }
     }

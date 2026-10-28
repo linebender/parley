@@ -46,6 +46,13 @@ pub struct Segment {
 /// the shaper as a single unit. Within an item, the script or bidirectional text embedding level
 /// may change, which requires further splitting the item into segments of constant script and bidi
 /// level (see [`Segment`]).
+///
+/// Grapheme boundaries are forced at item boundaries. Graphemes can span across segment boundaries
+/// (and so across shaped runs).
+//
+// TODO: we need to actually reset segmentation, instead of just forcing a boundary. E.g., three
+// Regional Indicator Symbols with an item boundary after the first, should let the second pair form
+// a grapheme.
 #[derive(Debug)]
 pub struct Item<'a> {
     /// The character offset in the source text which this item ends.
@@ -60,11 +67,8 @@ pub struct Item<'a> {
     // through some callback)? The motivation is for users to have access to the segment's `Script`
     // and be able to set font features based on that. If the entirety of `ShapeOptions` moves
     // there, it would allow users to set, e.g., a font size per segment, even though it's not
-    // necessarily an item boundary; and note an item then doesn't mean a whole lot anymore. We
-    // could also allow only some options to be per-segment. In any case, we're probably moving
-    // towards a future where items reset grapheme segmentation, but segments do not (note Gecko and
-    // Blink also reset grapheme segmentation when something like font size changes, but not when
-    // the script changes).
+    // necessarily an item boundary; and note an item then doesn't mean a whole lot anymore (other
+    // than forcing a grapheme boundary). We could also allow only some options to be per-segment.
     pub options: ShapeOptions<'a>,
     // TODO: we probably should allow users to pass in some data (like we allow passing
     // style_indices elsewhere), which we copy onto `ShapedRun`. That allows users to easily
@@ -142,10 +146,6 @@ impl Itemizer<'_> {
     /// split after that item; i.e., given a range of `start..end`, the predicate controls whether
     /// that item is now finished, or whether it is extended to include the character at `end` (at
     /// which point the item spans `start..end+1`).
-    //
-    // TODO: currently the items from `split_after` have the same effect as a change in bidi or
-    // script. This is not how browsers handle things. In particular, `split_after` should reset
-    // grapheme segmentation, whereas bidi and script should produce separately-shaped segments.
     #[inline]
     pub(crate) fn next(
         &mut self,
@@ -265,7 +265,12 @@ mod tests {
         let mut analyzer = Analyzer::new();
         let mut analysis = Analysis::new();
         let options = AnalysisOptions::default();
-        analyzer.analyze(text, &options, &mut analysis);
+        analyzer.analyze(
+            text,
+            &options,
+            &mut analysis,
+            &crate::AnalysisDataSources::default(),
+        );
         analysis
     }
 

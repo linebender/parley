@@ -38,7 +38,7 @@ impl Default for ColorBrush {
 fn main() {
     // The text we are going to style and lay out
     let text = String::from(
-        "Some text here. Let's make it a bit longer so that line wrapping kicks in 😊. And also some اللغة العربية arabic text.\nThis is underline and strikethrough text",
+        "Some text here. Let's make it a bit long\u{FFFC}er so that line wrapping kicks in 😊. And also some اللغة العربية arabic text.\nThis is underline and strikethrough text",
     );
 
     // The display scale for HiDPI rendering
@@ -84,8 +84,8 @@ fn main() {
     builder.push(StyleProperty::FontWeight(bold), 0..4);
 
     // Set the underline & strikethrough style
-    builder.push(StyleProperty::Underline(true), 141..150);
-    builder.push(StyleProperty::Strikethrough(true), 155..168);
+    builder.push(StyleProperty::Underline(true), 144..153);
+    builder.push(StyleProperty::Strikethrough(true), 158..171);
 
     builder.push_inline_box(InlineBox {
         id: 0,
@@ -165,8 +165,8 @@ fn render_glyph_run(glyph_run: &GlyphRun<'_, ColorBrush>, pen: &mut TinySkiaPen<
     let normalized_coords = bytemuck::cast_slice::<_, NormalizedCoord>(run.normalized_coords());
 
     // Get glyph outlines using Skrifa. This can be cached in production code.
-    let font_collection_ref = font.font.data.as_ref();
-    let font_ref = ReadFontsRef::from_index(font_collection_ref, font.font.index).unwrap();
+    let font_collection_ref = font.data.as_ref();
+    let font_ref = ReadFontsRef::from_index(font_collection_ref, font.index).unwrap();
     let outlines = font_ref.outline_glyphs();
 
     // Iterates over the glyphs in the GlyphRun

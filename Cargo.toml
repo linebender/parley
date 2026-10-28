@@ -19,12 +19,13 @@ members = [
     "examples/tiny_skia_render",
     "examples/vello_cpu_render",
     "examples/editor",
+    "examples/external_dictionaries",
     "xtask",
 ]
 
 [workspace.package]
+version = "0.12.0"
 edition = "2024"
-version = "0.11.0"
 # Keep in sync with RUST_MIN_VER in .github/workflows/ci.yml, with the relevant README.md files
 # and with the MSRV in the `Unreleased` section of CHANGELOG.md.
 # Until MSRV is bumped to 1.96+, use `core::ops::Range*` rather than `core::range::Range*`.
@@ -34,20 +35,20 @@ repository = "https://github.com/linebender/parley"
 
 [workspace.dependencies]
 # Local crates
-parlance = { version = "0.1.0", default-features = false, path = "parlance" }
-fontique = { version = "0.11.0", default-features = false, path = "fontique" }
-parley = { version = "0.11.0", default-features = false, path = "parley" }
-parley_data = { version = "0.11.0", path = "parley_data", default-features = false }
+parlance = { version = "0.1.1", default-features = false, path = "parlance" }
+fontique = { version = "0.12.0", default-features = false, path = "fontique" }
+parley = { version = "0.12.0", default-features = false, path = "parley" }
+parley_data = { version = "0.12.0", path = "parley_data", default-features = false }
 parley_data_gen = { path = "parley_data_gen" }
 parley_dev = { default-features = false, path = "parley_dev" }
-parley_engine = { version = "0.11.0", default-features = false, path = "parley_engine" }
-parley_emoji = { version = "0.11.0", default-features = false, path = "parley_emoji" }
+parley_engine = { version = "0.12.0", default-features = false, path = "parley_engine" }
+parley_emoji = { version = "0.12.0", default-features = false, path = "parley_emoji" }
 parley_linebreaking_cases = { path = "parley_tests/linebreaking_cases" }
 
 # External dependencies
-bytemuck = { version = "1.25.0", default-features = false }
+bytemuck = { version = "1.25.2", default-features = false }
 harfrust = { version = "0.12.0", default-features = false }
-hashbrown = { version = "0.17.0", default-features = false, features = [
+hashbrown = { version = "0.17.1", default-features = false, features = [
     "default-hasher",
     "raw-entry",
 ] }
@@ -55,23 +56,26 @@ icu_collections = { version = "2.3.0", default-features = false }
 icu_locale_core = { version = "2.3.0", default-features = false }
 icu_normalizer = { version = "2.3.0", default-features = false }
 icu_properties = { version = "2.3.0", default-features = false }
-icu_segmenter = { version = "2.3.0", default-features = false }
+icu_provider = { version = "2.3.0", default-features = false }
+icu_provider_blob = { version = "2.3.0", default-features = false }
+# Check CachingDictionary and DictionaryProvider when upgrading.
+icu_segmenter = { version = "~2.3.0", default-features = false }
 linebender_resource_handle = { version = "0.1.1", default-features = false }
 packtab = { version = "1.9.0" }
-rand = { version = "0.10.1", default-features = false, features = ["std", "std_rng"] }
+rand = { version = "0.10.3", default-features = false, features = ["std", "std_rng"] }
 rand_chacha = { version = "0.10.0", default-features = false }
-peniko = { version = "0.6.0", default-features = false }
+peniko = { version = "0.6.1", default-features = false }
 read-fonts = { version = "0.41.0", default-features = false }
 skrifa = { version = "0.44.0", default-features = false }
-smallvec = "1.15.1"
-swash = { version = "0.2.6", default-features = false }
+smallvec = "1.16.2"
+swash = { version = "0.2.10", default-features = false }
 vello_common = { version = "0.2.0", default-features = false }
 vello_cpu = { version = "0.2.0", default-features = false, features = ["u8_pipeline"] }
 
 [workspace.lints]
 rust.unsafe_code = "deny"
 
-# LINEBENDER LINT SET - Cargo.toml - v7
+# LINEBENDER LINT SET - Cargo.toml - v8
 # See https://linebender.org/wiki/canonical-lints/
 rust.keyword_idents_2024 = "forbid"
 rust.non_ascii_idents = "forbid"
@@ -93,6 +97,7 @@ clippy.too_many_arguments = "allow"
 
 clippy.allow_attributes_without_reason = "warn"
 clippy.cast_possible_truncation = "warn"
+clippy.cast_possible_wrap = "warn"
 clippy.collection_is_never_read = "warn"
 clippy.default_trait_access = "warn"
 clippy.dbg_macro = "warn"

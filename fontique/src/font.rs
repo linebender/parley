@@ -90,19 +90,24 @@ impl FontInfo {
     pub fn synthesis(&self, width: FontWidth, style: FontStyle, weight: FontWeight) -> Synthesis {
         let mut synth = Synthesis::default();
         let mut len = 0_usize;
-        if self.has_width_axis() && self.width != width {
-            synth.vars[len] = (Tag::new(b"wdth"), width.percentage());
-            len += 1;
-        }
+        // A variable font is shaped at its axis defaults unless we set the axes,
+        // and those defaults don't need to match the font's declared attributes.
+        //
         // Imagine a caller requests weight 400, but the `wght` axis defaults to
         // 100. Unless we synthesize `wght=400`, shaping will use weight 100. So,
         // when the axis default and requested weight are not the same, synthesize
         // the requested weight for correct shaping.
         //
-        // The requested weight and axis default can differ when:
-        // 1. A `FontInfoOverride` overrides font weight.
-        // 2. A non-conformant font specifies different weights in its OS/2 and `fvar` tables.
+        // The font's declared attributes and the axis defaults can differ when:
+        // 1. A `FontInfoOverride` overrides the width, style, or weight.
+        // 2. A non-conformant font specifies different values in its OS/2 and `fvar` tables.
         //      - See: <https://learn.microsoft.com/en-us/typography/opentype/spec/dvaraxistag_wght#additional-information>
+        if let Some(width_axis) = self.axes.iter().find(|axis| axis.tag == Tag::new(b"wdth"))
+            && width_axis.default != width.percentage()
+        {
+            synth.vars[len] = (Tag::new(b"wdth"), width.percentage());
+            len += 1;
+        }
         if let Some(weight_axis) = self.axes.iter().find(|axis| axis.tag == Tag::new(b"wght")) {
             if weight_axis.default != weight.value() {
                 synth.vars[len] = (Tag::new(b"wght"), weight.value());
@@ -111,35 +116,31 @@ impl FontInfo {
         } else if weight.value() > self.weight.value() + 200.0 {
             synth.embolden = true;
         }
-        if self.style != style {
-            match style {
-                FontStyle::Normal => {}
-                FontStyle::Italic => {
-                    if self.style == FontStyle::Normal {
-                        if self.has_italic_axis() {
-                            synth.vars[len] = (Tag::new(b"ital"), 1.0);
-                            len += 1;
-                        } else if self.has_slant_axis() {
-                            synth.vars[len] = (Tag::new(b"slnt"), 14.0);
-                            len += 1;
-                        } else {
-                            synth.skew = 14;
-                        }
-                    }
+        // A positive `slnt` slants counter-clockwise, whereas positive CSS obliques slant
+        // clockwise. Hence, we need to negate angles for `slnt`.
+        match style {
+            FontStyle::Normal => {}
+            FontStyle::Italic => {
+                if self.has_italic_axis() {
+                    synth.vars[len] = (Tag::new(b"ital"), 1.0);
+                    len += 1;
+                } else if self.has_slant_axis() {
+                    synth.vars[len] = (Tag::new(b"slnt"), -14.0);
+                    len += 1;
+                } else if self.style == FontStyle::Normal {
+                    synth.skew = 14;
                 }
-                FontStyle::Oblique(angle) => {
-                    if self.style == FontStyle::Normal {
-                        let degrees = angle.unwrap_or(14.0);
-                        if self.has_slant_axis() {
-                            synth.vars[len] = (Tag::new(b"slnt"), degrees);
-                            len += 1;
-                        } else if self.has_italic_axis() && degrees > 0. {
-                            synth.vars[len] = (Tag::new(b"ital"), 1.0);
-                            len += 1;
-                        } else {
-                            synth.skew = degrees as i8;
-                        }
-                    }
+            }
+            FontStyle::Oblique(angle) => {
+                let degrees = angle.unwrap_or(14.0);
+                if self.has_slant_axis() {
+                    synth.vars[len] = (Tag::new(b"slnt"), -degrees);
+                    len += 1;
+                } else if self.has_italic_axis() && degrees > 0. {
+                    synth.vars[len] = (Tag::new(b"ital"), 1.0);
+                    len += 1;
+                } else if self.style == FontStyle::Normal {
+                    synth.skew = degrees as i8;
                 }
             }
         }
@@ -424,7 +425,9 @@ fn read_attributes(font: &FontRef<'_>) -> (FontWidth, FontStyle, FontWeight) {
         let style = if fs_selection.contains(SelectionFlags::ITALIC) {
             FontStyle::Italic
         } else if fs_selection.contains(SelectionFlags::OBLIQUE) {
-            let angle = post.map(|post| post.italic_angle().to_f64() as f32);
+            // A positive `italicAngle` slants counter-clockwise, whereas positive CSS obliques
+            // slant clockwise. Hence, we need to negate the angle.
+            let angle = post.map(|post| -post.italic_angle().to_f64() as f32);
             FontStyle::Oblique(angle)
         } else {
             FontStyle::Normal

@@ -7,16 +7,18 @@ use core::ops::Range;
 
 use alloc::{vec, vec::Vec};
 
-use parley_engine::{Analysis, AnalysisDataSources, Analyzer, LineBreakConfig, Shaper};
+use parley_engine::{Analysis, Analyzer, InlineObject, LineBreakConfig, Shaper};
 
 use super::FontContext;
 use super::builder::{BuilderOptions, RangedBuilder, StyleRunBuilder};
 use super::resolve::tree::TreeStyleBuilder;
 use super::resolve::{RangedStyleBuilder, ResolveContext, ResolvedStyle, StyleRun};
-use super::style::{Brush, TextStyle};
+use super::style::{Brush, FontFeature, TextStyle};
 
 use crate::builder::TreeBuilder;
 use crate::inline_box::LayoutInlineBox;
+
+use smallvec::SmallVec;
 
 /// Shared scratch space used when constructing text layouts.
 ///
@@ -24,6 +26,8 @@ use crate::inline_box::LayoutInlineBox;
 pub struct LayoutContext<B: Brush = [u8; 4]> {
     pub(crate) rcx: ResolveContext,
     pub(crate) style_table: Vec<ResolvedStyle<B>>,
+    /// Font features for each style, parallel to `style_table`.
+    pub(crate) style_features: Vec<SmallVec<[FontFeature; 8]>>,
     pub(crate) style_runs: Vec<StyleRun>,
     pub(crate) inline_boxes: Vec<LayoutInlineBox>,
 
@@ -32,6 +36,7 @@ pub struct LayoutContext<B: Brush = [u8; 4]> {
     pub(crate) analysis: Analysis,
     pub(crate) line_break: Vec<(Range<usize>, LineBreakConfig)>,
     pub(crate) break_spaces: Vec<Range<usize>>,
+    pub(crate) inline_objects: Vec<InlineObject>,
 
     // Reusable style builders (to amortise allocations)
     pub(crate) ranged_style_builder: RangedStyleBuilder<B>,
@@ -40,9 +45,6 @@ pub struct LayoutContext<B: Brush = [u8; 4]> {
     /// Style index for each character, parallel to [`Analysis::char_info`].
     pub(crate) char_style_indices: Vec<u16>,
     pub(crate) scx: Shaper,
-
-    // Unicode analysis data sources (provided by icu)
-    pub(crate) analysis_data_sources: AnalysisDataSources,
 }
 
 impl<B: Brush> LayoutContext<B> {
@@ -50,8 +52,10 @@ impl<B: Brush> LayoutContext<B> {
         Self {
             rcx: ResolveContext::default(),
             style_table: vec![],
+            style_features: Vec::new(),
             style_runs: vec![],
             inline_boxes: vec![],
+            inline_objects: vec![],
             analyzer: Analyzer::new(),
             analysis: Analysis::new(),
             line_break: Vec::new(),
@@ -59,7 +63,6 @@ impl<B: Brush> LayoutContext<B> {
             ranged_style_builder: RangedStyleBuilder::default(),
             tree_style_builder: TreeStyleBuilder::default(),
             char_style_indices: vec![],
-            analysis_data_sources: AnalysisDataSources::new(),
             scx: Shaper::default(),
         }
     }

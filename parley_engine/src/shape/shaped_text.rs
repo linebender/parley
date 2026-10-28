@@ -6,7 +6,7 @@
 use core::ops::Range;
 
 use alloc::vec::Vec;
-use parlance::{BidiLevel, NormalizedCoord};
+use parlance::{BidiLevel, FontFeature, Language, NormalizedCoord, Script};
 use skrifa::MetadataProvider;
 
 use crate::{
@@ -92,31 +92,30 @@ impl FontMetrics {
                         .map(|v| (skrifa::Tag::new(&v.tag.to_bytes()), v.value)),
                 ),
         );
-        Some(Self::from_skrifa_metrics(&skrifa::metrics::Metrics::new(
-            &font_ref,
-            skrifa::prelude::Size::new(font_size),
-            &location,
-        )))
+        Some(Self::from_skrifa_metrics(
+            &skrifa::metrics::Metrics::new(
+                &font_ref,
+                skrifa::prelude::Size::new(font_size),
+                &location,
+            ),
+            font_size,
+        ))
     }
 
-    fn from_skrifa_metrics(metrics: &skrifa::metrics::Metrics) -> Self {
-        let units_per_em = metrics.units_per_em as f32;
+    fn from_skrifa_metrics(metrics: &skrifa::metrics::Metrics, font_size: f32) -> Self {
+        // Default values from HarfBuzz: https://github.com/harfbuzz/harfbuzz/blob/12ee77ee00514c442bcd28f9aa9d56b708c37382/src/hb-ot-metrics.cc#L355-L372
+        let fallback_decoration_size = font_size / 18.0;
 
-        // TODO: The following seems to be in the wrong scale, as its staying in design units rather
-        // than scaled to the font size like the other fields for `FontMetrics`.
         let (underline_offset, underline_size) = if let Some(underline) = metrics.underline {
             (underline.offset, underline.thickness)
         } else {
-            // Default values from Harfbuzz: https://github.com/harfbuzz/harfbuzz/blob/00492ec7df0038f41f78d43d477c183e4e4c506e/src/hb-ot-metrics.cc#L334
-            let default = units_per_em / 18.0;
-            (default, default)
+            (-fallback_decoration_size, fallback_decoration_size)
         };
         let (strikethrough_offset, strikethrough_size) = if let Some(strikeout) = metrics.strikeout
         {
             (strikeout.offset, strikeout.thickness)
         } else {
-            // Default values from HarfBuzz: https://github.com/harfbuzz/harfbuzz/blob/00492ec7df0038f41f78d43d477c183e4e4c506e/src/hb-ot-metrics.cc#L334-L347
-            (metrics.ascent / 2.0, units_per_em / 18.0)
+            (metrics.ascent / 2.0, fallback_decoration_size)
         };
 
         Self {
@@ -154,6 +153,9 @@ pub struct ShapedText {
     glyphs: Vec<Glyph>,
     fonts: Vec<FontInstance>,
     normalized_coords: Vec<NormalizedCoord>,
+    features: Vec<FontFeature>,
+    /// See [`Self::has_safe_to_concat_flags`].
+    pub(crate) has_safe_to_concat_flags: bool,
 }
 
 impl ShapedText {
@@ -181,6 +183,18 @@ impl ShapedText {
         self.glyphs.clear();
         self.fonts.clear();
         self.normalized_coords.clear();
+        self.features.clear();
+        self.has_safe_to_concat_flags = false;
+    }
+
+    /// Whether this text was shaped with production of [`ShapedCluster::is_safe_to_concat_before`]
+    /// flags.
+    ///
+    /// See the `produce_safe_to_concat_flags` argument of
+    /// [`Shaper::shape_text`](crate::Shaper::shape_text).
+    #[inline]
+    pub fn has_safe_to_concat_flags(&self) -> bool {
+        self.has_safe_to_concat_flags
     }
 
     /// Get a [`ShapedSlice`] of the run at `run_index`.
@@ -205,6 +219,26 @@ impl ShapedText {
     #[inline(always)]
     pub fn runs(&self) -> &[ShapedRun] {
         &self.runs
+    }
+
+    /// Set the advance of the inline object whose shaped cluster is at `cluster_index`, which
+    /// indexes into [`Self::shaped_clusters`].
+    ///
+    /// An inline object's shaped cluster consists of just its U+FFFC character, so it can be found
+    /// by searching on [`ShapedCluster::chars_range`].
+    ///
+    /// Its advance is initially zero, see [`ShapedCluster::is_inline_object`].
+    ///
+    /// # Panics
+    ///
+    /// Panics if the shaped cluster is not an inline object.
+    pub fn set_inline_object_advance(&mut self, cluster_index: u32, advance: f32) {
+        let cluster = &mut self.shaped_clusters[cluster_index as usize];
+        assert!(
+            cluster.is_inline_object(),
+            "shaped cluster {cluster_index} is not an inline object"
+        );
+        cluster.advance = advance;
     }
 
     /// Escape hatch for `parley` tests that remap style indices to check whether layouts are
@@ -263,12 +297,21 @@ impl ShapedText {
         &self.normalized_coords
     }
 
+    /// The font features used by runs in this shaped text.
+    ///
+    /// [`ShapedRun::features_range`] splits this into per-run slices.
+    #[inline(always)]
+    pub fn features(&self) -> &[FontFeature] {
+        &self.features
+    }
+
     #[expect(clippy::cast_possible_truncation, reason = "Deferred")]
     pub(crate) fn push_run(
         &mut self,
         text: &str,
         range: TextRange,
         segment: &Segment,
+        is_item_start: bool,
         options: &ShapeOptions<'_>,
         char_info: &[CharInfo],
         char_style_indices: &[u16],
@@ -294,6 +337,12 @@ impl ShapedText {
             start..self.normalized_coords.len()
         };
 
+        let features_range = {
+            let start = self.features.len();
+            self.features.extend_from_slice(options.features);
+            start..self.features.len()
+        };
+
         let font_index = self
             .fonts
             .iter()
@@ -315,7 +364,7 @@ impl ShapedText {
             )
         };
         let units_per_em = metrics.units_per_em as f32;
-        let font_metrics = FontMetrics::from_skrifa_metrics(&metrics);
+        let font_metrics = FontMetrics::from_skrifa_metrics(&metrics, options.font_size);
 
         // `HarfRust` returns glyphs in visual order, so we need to process them as such while
         // maintaining logical ordering of clusters.
@@ -339,14 +388,18 @@ impl ShapedText {
                     ch,
                     info.is_word_boundary(),
                     info.is_soft_wrap_opportunity(),
-                ),
+                    info.is_default_ignorable(),
+                )
+                .with_inline_object(info.is_inline_object()),
                 grapheme_start: info.is_grapheme_start(),
             });
         }
-        // TODO: we force a grapheme break at the start of the run, as itemization could have split
-        // a grapheme into two. Ideally, grapheme segmentation should be performed after
-        // itemization, at which case this will always be true.
-        self.characters[characters_start].grapheme_start = true;
+        // TODO: we force a grapheme break at the start of an item, as itemization could have split
+        // a grapheme into two. Ideally, grapheme segmentation would be reset at item boundaries
+        // instead, at which point this will always be true.
+        if is_item_start && range.char_range.start == segment.range.char_range.start {
+            self.characters[characters_start].grapheme_start = true;
+        }
 
         let glyphs_start = self.glyphs.len();
         if segment.bidi_level.is_ltr() {
@@ -358,6 +411,7 @@ impl ShapedText {
                 glyph_positions.iter(),
                 &self.characters,
                 characters_start,
+                self.has_safe_to_concat_flags,
             );
         } else {
             process_shaped_clusters(
@@ -368,12 +422,13 @@ impl ShapedText {
                 glyph_positions.iter().rev(),
                 &self.characters,
                 characters_start,
+                self.has_safe_to_concat_flags,
             );
             // Reverse each cluster's glyphs, such that they are in paint order.
             //
             // TODO: could this become a single `reverse` over the range?
             for cluster in &self.shaped_clusters[shaped_clusters_start..] {
-                if !cluster.has_inline_glyph() && cluster.glyph_len() > 1 {
+                if cluster.glyph_len() > 1 {
                     let start = cluster.glyph_offset as usize;
                     self.glyphs[start..start + cluster.glyph_len() as usize].reverse();
                 }
@@ -381,10 +436,6 @@ impl ShapedText {
         }
 
         let shaped_clusters_range = shaped_clusters_start as u32..self.shaped_clusters.len() as u32;
-        let run_advance = self.shaped_clusters[shaped_clusters_start..]
-            .iter()
-            .map(|cluster| cluster.advance)
-            .sum();
 
         self.runs.push(ShapedRun {
             range,
@@ -394,8 +445,10 @@ impl ShapedText {
             shaped_clusters_range,
             glyphs_range: glyphs_start..self.glyphs.len(),
             normalized_coords_range,
+            features_range,
             bidi_level: segment.bidi_level,
-            advance: run_advance,
+            script: segment.script,
+            language: options.language,
             font_metrics,
         });
     }
@@ -403,6 +456,7 @@ impl ShapedText {
 
 /// One shaped run, belonging to a [`ShapedText`].
 #[derive(Clone, Debug, PartialEq)]
+#[non_exhaustive]
 pub struct ShapedRun {
     /// The range of text this run corresponds to.
     pub range: TextRange,
@@ -421,10 +475,14 @@ pub struct ShapedRun {
     pub glyphs_range: Range<usize>,
     /// The normalized variation coords of this run, as a range into [`ShapedText::normalized_coords`].
     pub normalized_coords_range: Range<usize>,
+    /// The font features this run was shaped with, as a range into [`ShapedText::features`].
+    pub features_range: Range<usize>,
     /// The bidi level of the run.
     pub bidi_level: BidiLevel,
-    /// Total advance of the run.
-    pub advance: f32,
+    /// The script this run was shaped with.
+    pub script: Script,
+    /// The language this run was shaped with.
+    pub language: Option<Language>,
     /// The font metrics of this run.
     pub font_metrics: FontMetrics,
 }
@@ -446,6 +504,8 @@ pub struct ShapedRun {
 /// * `characters` must contain the shaped characters whose clusters we're now processing, starting at
 ///   index `characters_start`.
 /// * `characters_start` - See `characters`.
+/// * `produce_safe_to_concat_flags` - Whether `HarfRust` was asked to produce the unsafe-to-concat
+///   glyph flags.
 fn process_shaped_clusters<'a>(
     shaped_clusters: &mut Vec<ShapedCluster>,
     glyphs: &mut Vec<Glyph>,
@@ -454,6 +514,7 @@ fn process_shaped_clusters<'a>(
     glyph_positions: impl Iterator<Item = &'a harfrust::GlyphPosition>,
     characters: &[Character],
     characters_start: usize,
+    produce_safe_to_concat_flags: bool,
 ) {
     struct Cluster {
         id: u32,
@@ -462,10 +523,13 @@ fn process_shaped_clusters<'a>(
         glyphs: u32,
         inline_glyph: Option<Glyph>,
         advance: f32,
+        safe_to_break_before: bool,
+        safe_to_concat_before: bool,
     }
 
     /// Flush `cluster`, whose characters end at `char_end`, onto `shaped_clusters`.
     #[expect(clippy::cast_possible_truncation, reason = "Deferred")]
+    #[inline(always)]
     fn flush(
         cluster: &mut Cluster,
         char_end: usize,
@@ -474,8 +538,14 @@ fn process_shaped_clusters<'a>(
     ) {
         let first_character = &characters[cluster.characters_start];
         let is_newline = first_character.whitespace == Whitespace::Newline;
-        let (glyph_offset, glyph_len, inline_glyph, advance) = if is_newline {
-            // Elide glyphs of newlines.
+        let is_inline_object = first_character.flags.is_inline_object();
+        debug_assert!(
+            !is_inline_object || char_end - cluster.characters_start == 1,
+            "an inline object must be a cluster of its own"
+        );
+        let (glyph_offset, glyph_len, inline_glyph, advance) = if is_newline || is_inline_object {
+            // Elide glyphs and advances of newlines and inline objects. Note that inline objects'
+            // advances can be set later by the user.
             (cluster.glyphs_start as u32, 0, false, 0.)
         } else if let Some(inline_glyph) = cluster.inline_glyph.take() {
             (inline_glyph.id, 1, true, cluster.advance)
@@ -493,12 +563,14 @@ fn process_shaped_clusters<'a>(
             style_index: first_character.style_index,
             flags: ShapedClusterFlags::new(glyph_len)
                 .with_grapheme_start(first_character.grapheme_start)
-                // TODO: fill with actual shaping data (`parley` currently just ignores this)
-                .with_safe_to_break_before(false)
+                .with_safe_to_break_before(cluster.safe_to_break_before)
+                .with_safe_to_concat_before(cluster.safe_to_concat_before)
                 .with_inline_glyph(inline_glyph)
+                .with_inline_object(is_inline_object)
                 .with_first_char(
                     first_character.flags.is_soft_wrap_opportunity(),
                     first_character.whitespace,
+                    first_character.flags.is_default_ignorable(),
                 ),
             glyph_offset,
             advance,
@@ -512,6 +584,10 @@ fn process_shaped_clusters<'a>(
         glyphs: 0,
         inline_glyph: None,
         advance: 0.,
+        safe_to_break_before: true,
+        // A run without glyphs is not necessarily safe to concat: `HarfRust` only produces flags on
+        // glyphs, and a run can be glyphless conditional on the text before it.
+        safe_to_concat_before: false,
     };
 
     for (glyph_info, glyph_pos) in glyph_infos.zip(glyph_positions) {
@@ -526,7 +602,17 @@ fn process_shaped_clusters<'a>(
                 glyphs: 0,
                 inline_glyph: None,
                 advance: 0.,
+                safe_to_break_before: true,
+                safe_to_concat_before: false,
             };
+        }
+
+        if cluster.glyphs == 0 {
+            cluster.safe_to_break_before = !glyph_info.unsafe_to_break();
+
+            // Without the flag being produced, we can't know whether it's safe to concat.
+            cluster.safe_to_concat_before =
+                produce_safe_to_concat_flags && !glyph_info.unsafe_to_concat();
         }
 
         let glyph = Glyph {
@@ -639,6 +725,7 @@ mod tests {
                 ..AnalysisOptions::default()
             },
             &mut analysis,
+            &crate::AnalysisDataSources::default(),
         );
         analysis
     }
@@ -651,10 +738,14 @@ mod tests {
     }
 
     fn shape_with_font(text: &str, font_data: &'static [u8]) -> ShapedText {
-        shape_with_font_selector(text, SingleFont(font_instance(font_data)))
+        shape_with_font_selector(text, SingleFont(font_instance(font_data)), false)
     }
 
-    fn shape_with_font_selector(text: &str, select_font: impl FontSelector) -> ShapedText {
+    fn shape_with_font_selector(
+        text: &str,
+        select_font: impl FontSelector,
+        produce_safe_to_concat_flags: bool,
+    ) -> ShapedText {
         let analysis = analyze(text);
         let mut shaper = Shaper::default();
         let mut shaped = ShapedText::new();
@@ -675,6 +766,7 @@ mod tests {
             &char_style_indices,
             items,
             select_font,
+            produce_safe_to_concat_flags,
             &mut shaped,
         );
         shaped
@@ -697,6 +789,7 @@ mod tests {
                 font: font_instance(NOTO_COLOR_EMOJI),
                 other_font: font_instance(ROBOTO),
             },
+            false,
         );
 
         assert_eq!(
@@ -712,36 +805,26 @@ mod tests {
         assert_eq!(b.characters_range, 2..3);
 
         assert!(soft_hyphen.glyphs_range.is_empty());
-        assert_eq!(soft_hyphen.advance, 0.);
 
         // The soft-hyphen's run should have a single cluster, and it must be without glyphs.
         let clusters = shaped.run_slice(1).shaped_clusters();
         assert_eq!(clusters.len(), 1);
         assert_eq!(clusters[0].glyph_len(), 0);
+        assert_eq!(clusters[0].advance, 0.);
         assert_eq!(clusters[0].chars_range(), 1..2);
     }
 
+    /// [U+0600 U+0623 U+064F] is a single grapheme, but U+0600 has bidi class AN while the
+    /// following characters resolve to a different bidi level, so the grapheme is split over the
+    /// segments [U+0600] [U+0623 U+064F]. Segment boundaries don't force a grapheme boundary:
+    /// the grapheme spans across two shaped runs.
     #[test]
-    fn single_cluster_run_advance_matches_its_cluster() {
-        let shaped = shape_with_font("A", ROBOTO);
-        let run = &shaped.runs()[0];
-        let cluster = &shaped.shaped_clusters()[run.shaped_clusters_range.start as usize];
-
-        assert!(cluster.advance > 0.0);
-        assert_eq!(run.advance, cluster.advance);
-    }
-
-    /// [U+0600 U+0623 U+064F] is a single grapheme in text-wide segmentation, but U+0600 has
-    /// bidi class AN while the following characters resolve to a different bidi level, so
-    /// itemization splits the grapheme into the items [U+0600] [U+0623 U+064F]. The item
-    /// boundary forces a grapheme start on U+0623.
-    #[test]
-    fn one_grapheme_split_across_items() {
+    fn one_grapheme_split_across_segments() {
         let shaped = shape_with_font("\u{0600}\u{0623}\u{064F}", NOTO_KUFI_ARABIC);
 
         let grapheme_starts: Vec<bool> =
             shaped.characters.iter().map(|c| c.grapheme_start).collect();
-        assert_eq!(grapheme_starts, [true, true, false]);
+        assert_eq!(grapheme_starts, [true, false, false]);
 
         let clusters: Vec<(u32, u32, bool)> = shaped
             .shaped_clusters
@@ -754,7 +837,38 @@ mod tests {
                 )
             })
             .collect();
-        assert_eq!(clusters, [(0, 1, true), (1, 3, true)]);
+        assert_eq!(clusters, [(0, 1, true), (1, 3, false)]);
+
+        assert_eq!(shaped.runs().len(), 2);
+        let (first, second) = (shaped.run_slice(0), shaped.run_slice(1));
+        assert!(!first.grapheme_continues_before());
+        assert!(first.grapheme_continues_after());
+        assert!(second.grapheme_continues_before());
+        assert!(!second.grapheme_continues_after());
+
+        // The runs' atoms and graphemes stop at the run edges, and report the continuation.
+        let atom = first.atoms_start().next().unwrap();
+        assert_eq!(atom.char_range(), 0..1);
+        assert!(!atom.grapheme_continues_before());
+        assert!(atom.grapheme_continues_after());
+        let atom = second.atoms_end().prev().unwrap();
+        assert_eq!(atom.char_range(), 1..3);
+        assert!(atom.grapheme_continues_before());
+        assert!(!atom.grapheme_continues_after());
+
+        let grapheme = first.graphemes_start().next().unwrap();
+        assert_eq!(grapheme.char_range(), 0..1);
+        assert!(!grapheme.continues_before());
+        assert!(grapheme.continues_after());
+        let grapheme = second.graphemes_end().prev().unwrap();
+        assert_eq!(grapheme.char_range(), 1..3);
+        assert!(grapheme.continues_before());
+        assert!(!grapheme.continues_after());
+        // And walking the other way.
+        let grapheme = first.graphemes_end().prev().unwrap();
+        assert!(!grapheme.continues_before() && grapheme.continues_after());
+        let grapheme = second.graphemes_start().next().unwrap();
+        assert!(grapheme.continues_before() && !grapheme.continues_after());
     }
 
     /// "ffi" is three graphemes but shapes into one cluster.
@@ -796,7 +910,7 @@ mod tests {
         }
     }
 
-    /// An itemization boundary forces a cluster break in shaping, and must force a grapheme start.
+    /// An item boundary forces a grapheme boundary.
     #[test]
     fn item_boundaries_force_grapheme_start() {
         // Two regional indicators forming a single flag grapheme...
@@ -843,12 +957,17 @@ mod tests {
             &char_style_indices,
             items,
             SingleFont(font),
+            false,
             &mut shaped,
         );
 
         let grapheme_starts: Vec<bool> =
             shaped.characters.iter().map(|c| c.grapheme_start).collect();
         assert_eq!(grapheme_starts, [true, true]);
+
+        assert_eq!(shaped.runs().len(), 2);
+        assert!(!shaped.run_slice(0).grapheme_continues_after());
+        assert!(!shaped.run_slice(1).grapheme_continues_before());
 
         // But note that, had we had three regional indicator symbols, like `[R0 R1 R2]` itemized as
         // `[R0] [R1 R2]`, the last pair should form a single grapheme. We don't do that currently.

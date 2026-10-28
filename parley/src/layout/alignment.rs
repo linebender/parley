@@ -79,7 +79,7 @@ pub(crate) fn align<B: Brush>(
     for line in &mut layout.lines {
         line.justification.amount_per_opportunity = 0.;
 
-        let indent = line.indent;
+        let indent = line.metrics.indent;
 
         if is_rtl {
             // In RTL text, trailing whitespace is on the left. As we hang that whitespace, offset
@@ -124,15 +124,10 @@ pub(crate) fn align<B: Brush>(
                 line.metrics.offset += free_space * 0.5;
             }
             (Alignment::Justify, _) => {
-                // Justified alignment doesn't have any effect if free_space is negative or zero
-                if free_space <= 0.0 {
-                    continue;
-                }
-
-                // Justified alignment doesn't apply if there are no whitespace gaps to adjust. In
-                // that case, start-align, i.e., left-align for LTR text and right-align for RTL
-                // text.
-                if line.num_justification_opportunities == 0 {
+                // Justified alignment doesn't apply if the line overflows or if there are no
+                // whitespace gaps to adjust. In that case, start-align, i.e., left-align for LTR
+                // text and right-align for RTL text.
+                if free_space <= 0.0 || line.num_justification_opportunities == 0 {
                     if is_rtl {
                         line.metrics.offset += free_space;
                     }

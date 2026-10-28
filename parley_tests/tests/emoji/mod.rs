@@ -41,7 +41,7 @@ fn assert_emoji(entity: TestEntity<'_>) {
                 properties.is_emoji_presentation(),
                 properties.is_emoji_modifier(),
                 properties.is_emoji_modifier_base(),
-                properties.is_region_indicator(),
+                properties.is_regional_indicator(),
             );
 
             emoji_dfa.step_record(category);

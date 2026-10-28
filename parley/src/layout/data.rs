@@ -1,16 +1,14 @@
 // Copyright 2021 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use crate::inline_box::{InlineBox, LayoutInlineBox};
+use crate::inline_box::LayoutInlineBox;
 use crate::layout::spacing::{Justification, Spacing};
-use crate::layout::style_metrics::{BoxMetrics, StyleMetrics};
+use crate::layout::style_metrics::{BoxMetrics, StyleMetrics, inline_box_placement};
 use crate::layout::whitespace::whitespace_hangs;
 use crate::layout::{ContentWidths, LineMetrics, Style};
 use crate::resolve::ResolvedStyle;
 use crate::style::Brush;
-use crate::{
-    IndentOptions, InlineBoxKind, LineHeight, OverflowWrap, TextWrapMode, WhiteSpaceCollapse,
-};
+use crate::{IndentOptions, LineHeight, OverflowWrap, TextWrapMode, WhiteSpaceCollapse};
 use core::ops::Range;
 
 use alloc::vec::Vec;
@@ -94,8 +92,6 @@ pub(crate) struct LineData {
     /// The number of justification opportunities on the line.
     pub(crate) num_justification_opportunities: u32,
     pub(crate) justification: Justification,
-    /// Text indent applied to this line.
-    pub(crate) indent: f32,
     /// This line's entries in [`LayoutData::aligned_subtree_offsets`].
     ///
     /// Empty for lines with only baseline-relative content because the root aligned subtree
@@ -146,17 +142,13 @@ impl LineData {
             - self.aligned_subtree_offset(offsets, metrics.aligned_subtree_root)
             - metrics.baseline_offset
     }
-
-    pub(crate) fn size(&self) -> f32 {
-        self.metrics.line_height
-    }
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct LineItemData {
-    /// Whether the item is a run or an inline box
+    /// Whether the item is a run or an out-of-flow box
     pub(crate) kind: LayoutItemKind,
-    /// The index of the run or inline box in the runs or `inline_boxes` vec
+    /// The index of the run or out-of-flow box in the runs or `inline_boxes` vec
     pub(crate) index: usize,
     /// Bidi level for the item (used for reordering)
     pub(crate) bidi_level: BidiLevel,
@@ -181,14 +173,14 @@ impl LineItemData {
 #[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub(crate) enum LayoutItemKind {
     TextRun,
-    InlineBox,
+    OutOfFlowBox,
 }
 
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct LayoutItem {
-    /// Whether the item is a run or an inline box
+    /// Whether the item is a run or an out-of-flow box
     pub(crate) kind: LayoutItemKind,
-    /// The index of the run or inline box in the runs or `inline_boxes` vec
+    /// The index of the run or out-of-flow box in the runs or `inline_boxes` vec
     pub(crate) index: usize,
     /// Bidi level for the item (used for reordering)
     pub(crate) bidi_level: BidiLevel,
@@ -295,10 +287,31 @@ impl<B: Brush> LayoutData<B> {
         self.alignment = None;
     }
 
-    /// Push an inline box to the list of items
-    pub(crate) fn push_inline_box(&mut self, index: usize, bidi_level: BidiLevel) {
+    /// Place inline box `index`, which must be an inline object: its width becomes the advance of
+    /// its object, and its baseline offset is resolved.
+    pub(crate) fn place_inline_object(&mut self, index: usize) {
+        let layout_box = &mut self.inline_boxes[index];
+        debug_assert!(
+            layout_box.is_inline_object(),
+            "box {index} is not an inline object"
+        );
+        layout_box.baseline_offset = inline_box_placement(
+            &layout_box.inline_box,
+            layout_box.parent_style_index,
+            &self.style_metrics,
+            self.quantize,
+        )
+        .baseline_offset;
+        if let Some(cluster) = layout_box.inline_object_cluster {
+            self.shaped_text
+                .set_inline_object_advance(cluster, layout_box.inline_box.width);
+        }
+    }
+
+    /// Push an out-of-flow box to the list of items
+    pub(crate) fn push_out_of_flow_box(&mut self, index: usize, bidi_level: BidiLevel) {
         self.items.push(LayoutItem {
-            kind: LayoutItemKind::InlineBox,
+            kind: LayoutItemKind::OutOfFlowBox,
             index,
             bidi_level,
         });
@@ -403,7 +416,7 @@ impl<B: Brush> LayoutData<B> {
     /// - min-content width: any conditionally-hanging suffix hangs in full, so all hanging
     ///   whitespace hangs in full.
     pub(crate) fn calculate_content_widths(&self) -> ContentWidths {
-        ContentWidthsMeasurer::new().measure(self)
+        ContentWidthsMeasurer::new(self.indent_amount, self.indent_options).measure(self)
     }
 }
 
@@ -413,6 +426,11 @@ struct ContentWidthsMeasurer {
 
     running_min_width: f32,
     running_max_width: f32,
+
+    /// Whether anything has been placed on the current line yet. If not, a soft wrap opportunity
+    /// doesn't end it, and if the layout ends there (e.g., directly after a forced break), the line
+    /// box is not included in the layout.
+    line_has_content: bool,
 
     /// The running advance of whitespace that would hang if a line ended here. Can exceed
     /// `running_min_width` when the hanging whitespace started before the last break
@@ -426,34 +444,53 @@ struct ContentWidthsMeasurer {
     hangs_conditionally: bool,
 
     text_wrap_mode: TextWrapMode,
+
+    /// Indents for lines following a soft/hard wrap.
+    soft_indent: f32,
+    hard_indent: f32,
 }
 
 impl ContentWidthsMeasurer {
     #[inline(always)]
-    fn new() -> Self {
+    fn new(indent_amount: f32, indent_options: IndentOptions) -> Self {
+        let first_line_indent = indent_options.indent_for_first_line(indent_amount);
         Self {
             min_width: 0.,
             max_width: 0.,
-            running_min_width: 0.,
-            running_max_width: 0.,
+            running_min_width: first_line_indent,
+            running_max_width: first_line_indent,
             running_hanging_whitespace: 0.,
             hangs_conditionally: false,
             text_wrap_mode: TextWrapMode::Wrap,
+            soft_indent: indent_options.indent_following_soft_wrap_break(indent_amount),
+            hard_indent: indent_options.indent_following_forced_line_break(indent_amount),
+            line_has_content: false,
         }
     }
 
     /// Ends the current min-content fragment at a soft wrap opportunity.
     ///
-    /// Under a min-content constraint, every soft wrap opportunity is taken.
+    /// Under a min-content constraint, every soft wrap opportunity is taken, unless the line has no
+    /// content yet or its running width is still negative (due to a negative indent or inline box).
+    /// The next fragment then starts a line after a soft wrap break, which will be indented iff the
+    /// indent is "hanging" (see [`IndentOptions::hanging`]).
     #[inline(always)]
-    fn soft_break(&mut self) {
+    fn soft_break(&mut self, line_has_content: bool) {
+        if !line_has_content || self.running_min_width < 0.0 {
+            return;
+        }
         self.min_width = self
             .min_width
             .max(self.running_min_width - self.running_hanging_whitespace);
-        self.running_min_width = 0.0;
+        self.running_min_width = self.soft_indent;
     }
 
-    /// Ends the current line at a forced break or the end of the layout.
+    /// Ends the current line at a forced break.
+    ///
+    /// Note that a line that ends in a forced break is laid out even if it holds nothing else
+    /// ([CSS 2.2 § 9.4.2][css-inline-formatting]).
+    ///
+    /// [css-inline-formatting]: https://www.w3.org/TR/CSS22/visuren.html#inline-formatting
     #[inline(always)]
     fn hard_break(&mut self) {
         self.min_width = self
@@ -463,9 +500,10 @@ impl ContentWidthsMeasurer {
             self.running_max_width -= self.running_hanging_whitespace;
         }
         self.max_width = self.max_width.max(self.running_max_width);
-        self.running_min_width = 0.0;
-        self.running_max_width = 0.0;
         self.running_hanging_whitespace = 0.0;
+        self.line_has_content = false;
+        self.running_min_width = self.hard_indent;
+        self.running_max_width = self.hard_indent;
     }
 
     #[inline(always)]
@@ -500,15 +538,16 @@ impl ContentWidthsMeasurer {
                         );
                     }
                 }
-                LayoutItemKind::InlineBox => {
-                    self.measure_inline_box(&layout_data.inline_boxes[item.index].inline_box);
-                }
+                // Out-of-flow boxes take up no space.
+                LayoutItemKind::OutOfFlowBox => {}
             }
         }
 
         // The end of a layout is considered to be a forced line break as per CSS Text 4 § 5, so
         // whitespace can hang conditionally.
-        self.hard_break();
+        if self.line_has_content {
+            self.hard_break();
+        }
 
         // Negative-width inline boxes (e.g. negative margins) can make the max-content width
         // smaller than the min-content width. CSS Sizing 3 § 2.1 requires the max-content size to
@@ -542,6 +581,8 @@ impl ContentWidthsMeasurer {
         is_rtl: bool,
     ) {
         let clusters = slice.shaped_clusters();
+        // The cluster index at which nothing has been placed on the current line yet, if any.
+        let mut empty_at = if self.line_has_content { usize::MAX } else { 0 };
 
         // The spacing gap of the current atom.
         let mut gap = 0.;
@@ -558,19 +599,24 @@ impl ContentWidthsMeasurer {
                     && (cluster.is_soft_wrap_opportunity_before()
                         || style.overflow_wrap == OverflowWrap::Anywhere)
                 {
-                    self.soft_break();
+                    self.soft_break(i != empty_at);
                 }
                 // `Whitespace::Newline` are forced breaks. Note newlines have no advance.
                 if whitespace == Whitespace::Newline {
                     // Newlines hang, so whitespace before them keeps hanging.
                     self.hard_break();
+                    empty_at = i + 1;
                     skip_atom = true;
                     continue;
                 }
                 if SPACED {
-                    gap = spacing.gaps(whitespace).after;
+                    gap = spacing
+                        .gaps(whitespace, cluster.is_default_ignorable())
+                        .after;
                 }
             } else if skip_atom {
+                // The next line starts after the whole newline atom.
+                empty_at = i + 1;
                 continue;
             }
 
@@ -612,22 +658,6 @@ impl ContentWidthsMeasurer {
                 self.running_hanging_whitespace = 0.0;
             }
         }
-    }
-
-    fn measure_inline_box(&mut self, inline_box: &InlineBox) {
-        if inline_box.kind == InlineBoxKind::InFlow {
-            // Inline boxes have soft wrap opportunities on both sides.
-            let wraps = self.text_wrap_mode == TextWrapMode::Wrap;
-            if wraps {
-                self.soft_break();
-            }
-            // Inline boxes don't hang.
-            self.running_hanging_whitespace = 0.0;
-            self.running_min_width += inline_box.width;
-            self.running_max_width += inline_box.width;
-            if wraps {
-                self.soft_break();
-            }
-        }
+        self.line_has_content = empty_at != clusters.len();
     }
 }

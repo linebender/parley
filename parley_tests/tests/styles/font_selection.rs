@@ -170,21 +170,19 @@ fn style_font_style_values() {
     let mut env = TestEnv::new(test_name!(), None);
     let text = samples::LATIN;
 
-    use parley::setting::Tag;
-    use parley::style::{FontFamily, FontVariation, FontVariations};
+    use parley::FontStyle;
+    use parley::style::FontFamily;
 
-    // Using Roboto Flex with slnt axis for italic/oblique effects
-    // TODO: FontStyle property doesn't automatically map to slnt axis for variable fonts,
-    // so, for this test, we use FontVariations directly
-    for (slnt_value, name) in [(0.0, "normal"), (-10.0, "italic"), (-10.0, "oblique")] {
-        let variations = FontVariations::List(Cow::Borrowed(&[FontVariation {
-            tag: Tag::new(b"slnt"),
-            value: slnt_value,
-        }]));
-
+    // Note Roboto Flex has a `slnt` axis but no `ital` axis, so italic and oblique get a `slnt`
+    // variation.
+    for (style, name) in [
+        (FontStyle::Normal, "normal"),
+        (FontStyle::Italic, "italic"),
+        (FontStyle::Oblique(None), "oblique"),
+    ] {
         let mut builder = env.ranged_builder(text);
         builder.push_default(StyleProperty::FontFamily(FontFamily::named("Roboto Flex")));
-        builder.push_default(StyleProperty::FontVariations(variations));
+        builder.push_default(StyleProperty::FontStyle(style));
         let mut layout = builder.build(text);
         layout.break_all_lines(None);
         layout.align(Alignment::Start, AlignmentOptions::default());

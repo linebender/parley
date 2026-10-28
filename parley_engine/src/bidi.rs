@@ -9,7 +9,7 @@ use parlance::{BaseDirection, BidiLevel};
 
 /// Resolver for the Unicode bidirectional algorithm.
 #[derive(Clone, Default)]
-pub struct BidiResolver {
+pub(crate) struct BidiResolver {
     base_level: BidiLevel,
     pub(crate) levels: Vec<BidiLevel>,
     initial_types: Vec<BidiClass>,
@@ -31,34 +31,13 @@ impl core::fmt::Debug for BidiResolver {
 }
 
 impl BidiResolver {
-    /// Creates a new resolver.
-    pub fn new() -> Self {
-        Self {
-            base_level: BidiLevel::new(0),
-            levels: Vec::new(),
-            initial_types: Vec::new(),
-            types: Vec::new(),
-            brackets: Vec::new(),
-            bracket_pairs: Vec::new(),
-            runs: Vec::new(),
-            indices: Vec::new(),
-            flags: 0,
-        }
-    }
-
     /// Returns the base level of the text.
-    pub fn base_level(&self) -> BidiLevel {
+    pub(crate) fn base_level(&self) -> BidiLevel {
         self.base_level
     }
 
-    /// Returns the sequence of bidi levels corresponding to all characters in the
-    /// paragraph.
-    pub fn levels(&self) -> &[BidiLevel] {
-        &self.levels
-    }
-
     /// Clears the resolver state.
-    pub fn clear(&mut self) {
+    pub(crate) fn clear(&mut self) {
         self.initial_types.clear();
         self.levels.clear();
         self.types.clear();
@@ -70,7 +49,7 @@ impl BidiResolver {
 
     /// Resolves a paragraph with the specified base direction and
     /// precomputed types.
-    pub fn resolve(
+    pub(crate) fn resolve(
         &mut self,
         chars: impl Iterator<Item = (char, (BidiClass, BidiMirroringGlyph))>,
         base_direction: BaseDirection,
@@ -730,7 +709,7 @@ where
 
 /// Returns whether the character needs bidirectional resolution.
 #[inline(always)]
-pub fn needs_bidi_resolution(bidi_class: BidiClass) -> bool {
+pub(crate) fn needs_bidi_resolution(bidi_class: BidiClass) -> bool {
     mask(bidi_class) & BIDI_MASK != 0
 }
 

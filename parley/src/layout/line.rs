@@ -1,14 +1,15 @@
 // Copyright 2021 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use crate::layout::Style;
+use crate::inline_box::inline_object_box_index;
 use crate::layout::data::BreakReason;
 use crate::layout::data::{LayoutItemKind, LineData};
 use crate::layout::layout::Layout;
 use crate::layout::run::Run;
 use crate::layout::spacing::EffectiveSpacing;
+use crate::layout::{SpanMetrics, Style};
 use crate::style::Brush;
-use crate::{BaselineShift, InlineBox, InlineBoxKind};
+use crate::{BaselineShift, InlineBoxKind};
 
 use core::ops::Range;
 use parley_engine::{Atom, Atoms, Glyph};
@@ -23,7 +24,7 @@ pub struct Line<'a, B: Brush> {
 
 impl<'a, B: Brush> Line<'a, B> {
     /// Returns the metrics for the line.
-    pub fn metrics(&self) -> &LineMetrics {
+    pub fn metrics(&self) -> &'a LineMetrics {
         &self.data.metrics
     }
 
@@ -65,9 +66,7 @@ impl<'a, B: Brush> Line<'a, B> {
                 data: self.layout.data.runs.get(item.index)?,
                 line_data: Some(item),
             }),
-            LayoutItemKind::InlineBox => {
-                LineItem::InlineBox(&self.layout.data.inline_boxes.get(item.index)?.inline_box)
-            }
+            LayoutItemKind::OutOfFlowBox => LineItem::OutOfFlowBox(item.index),
         })
     }
 
@@ -132,9 +131,7 @@ impl<'a, B: Brush> Line<'a, B> {
                     data: &copy.layout.data.runs[line_data.index],
                     line_data: Some(line_data),
                 }),
-                LayoutItemKind::InlineBox => {
-                    LineItem::InlineBox(&copy.layout.data.inline_boxes[line_data.index].inline_box)
-                }
+                LayoutItemKind::OutOfFlowBox => LineItem::OutOfFlowBox(line_data.index),
             })
     }
 
@@ -168,7 +165,15 @@ pub struct LineMetrics {
     /// Offset for alignment.
     pub offset: f32,
 
-    /// Full inline advance of the line, including trailing whitespace.
+    /// The text indent applied to this line (see [`Layout::set_text_indent`]).
+    ///
+    /// This isn't part of [`Self::advance`]. After alignment, [`Self::offset`] accounts for it.
+    pub indent: f32,
+
+    /// The inline advance of the line's content.
+    ///
+    /// This includes [`Self::hanging_advance`], but not [`Self::indent`]. This also doesn't include
+    /// additional spacing from [justified alignment](crate::Alignment::Justify).
     pub advance: f32,
 
     /// The portion of [`Self::advance`] that hangs past the line's end edge.
@@ -232,11 +237,13 @@ impl LineMetrics {
     }
 }
 
-/// A line item and its corresponding data (a run or inline box). Unlike a
+/// A line item and its corresponding data (a run or out-of-flow box). Unlike a
 /// [`PositionedLayoutItem`], runs are not guaranteed to be split by style.
 pub(crate) enum LineItem<'a, B: Brush> {
     Run(Run<'a, B>),
-    InlineBox(&'a InlineBox),
+    /// An out-of-flow box, by its index into the layout's inline boxes. Note in-flow boxes are
+    /// inline objects, and are part of the runs.
+    OutOfFlowBox(usize),
 }
 
 impl<'a, B: Brush> LineItem<'a, B> {
@@ -294,7 +301,7 @@ impl<'a, B: Brush> GlyphRun<'a, B> {
     /// Returns the associated style.
     ///
     /// See also [`Self::style_index`].
-    pub fn style(&self) -> &Style<B> {
+    pub fn style(&self) -> &'a Style<B> {
         &self.run.layout.styles()[usize::from(self.style_index)]
     }
 
@@ -303,6 +310,15 @@ impl<'a, B: Brush> GlyphRun<'a, B> {
     /// See also [`Self::style`].
     pub fn style_index(&self) -> u16 {
         self.style_index
+    }
+
+    /// Returns the inherent metrics of the run's associated span, from the first available font.
+    ///
+    /// The metrics are identical for every run in the span, including runs that fell back to
+    /// another font. Blink positions `line-through` from this ascent (i.e. the primary font's),
+    /// for example, so a strikethrough placed from it keeps one height across fallback fonts.
+    pub fn span_metrics(&self) -> SpanMetrics {
+        self.run.layout.data.style_metrics[usize::from(self.style_index)].span_metrics()
     }
 
     /// Returns the offset to the baseline.
@@ -321,12 +337,12 @@ impl<'a, B: Brush> GlyphRun<'a, B> {
     }
 
     /// Returns an iterator over the glyphs in the run.
-    pub fn glyphs(&'a self) -> impl Iterator<Item = Glyph> + 'a + Clone {
+    pub fn glyphs(&self) -> impl Iterator<Item = Glyph> + 'a + Clone + use<'a, B> {
         self.run.glyphs_in(self.shaped_clusters.clone())
     }
 
     /// Returns an iterator over the fully positioned glyphs in the run.
-    pub fn positioned_glyphs(&'a self) -> impl Iterator<Item = Glyph> + 'a + Clone {
+    pub fn positioned_glyphs(&self) -> impl Iterator<Item = Glyph> + 'a + Clone + use<'a, B> {
         let mut offset = self.offset;
         let baseline = self.baseline;
         self.glyphs().map(move |mut g| {
@@ -414,6 +430,22 @@ struct GlyphRunIter<'a, B: Brush> {
     offset: f32,
 }
 
+impl<'a, B: Brush> GlyphRunIter<'a, B> {
+    /// The layout's inline box `box_index`, positioned at `offset` along the line.
+    fn positioned_inline_box(&self, box_index: usize, offset: f32) -> PositionedLayoutItem<'a, B> {
+        let inline_box = &self.line.layout.data.inline_boxes[box_index].inline_box;
+        PositionedLayoutItem::InlineBox(PositionedInlineBox {
+            x: offset + self.line.data.metrics.inline_min_coord + self.line.data.metrics.offset,
+            y: self.line.inline_box_top(box_index),
+            width: inline_box.width,
+            height: inline_box.height,
+            baseline: inline_box.baseline,
+            id: inline_box.id,
+            kind: inline_box.kind,
+        })
+    }
+}
+
 impl<'a, B: Brush> Iterator for GlyphRunIter<'a, B> {
     type Item = PositionedLayoutItem<'a, B>;
 
@@ -421,28 +453,11 @@ impl<'a, B: Brush> Iterator for GlyphRunIter<'a, B> {
         loop {
             let item = self.line.item(self.item_index)?;
             match item {
-                LineItem::InlineBox(inline_box) => {
-                    let x = self.offset
-                        + self.line.data.metrics.inline_min_coord
-                        + self.line.data.metrics.offset;
-                    let box_index = self.line.layout.data.line_items
-                        [self.line.data.item_range.start + self.item_index]
-                        .index;
-                    let y = self.line.inline_box_top(box_index);
-
+                // Out-of-flow boxes take up no space. In-flow boxes are inline objects, which are
+                // yielded from the runs below.
+                LineItem::OutOfFlowBox(box_index) => {
                     self.item_index += 1;
-                    if inline_box.kind == InlineBoxKind::InFlow {
-                        self.offset += inline_box.width;
-                    }
-                    return Some(PositionedLayoutItem::InlineBox(PositionedInlineBox {
-                        x,
-                        y,
-                        width: inline_box.width,
-                        height: inline_box.height,
-                        baseline: inline_box.baseline,
-                        id: inline_box.id,
-                        kind: inline_box.kind,
-                    }));
+                    return Some(self.positioned_inline_box(box_index, self.offset));
                 }
                 LineItem::Run(run) => {
                     // TODO: style indices are taken from the atom's first character, matching
@@ -478,6 +493,21 @@ impl<'a, B: Brush> Iterator for GlyphRunIter<'a, B> {
                             }
                             glyph_count += atom_glyph_count;
                             advance += atom_advance;
+                        } else if atom.is_inline_object() {
+                            // An inline object ends the glyph run and is yielded as a box.
+                            if glyph_run.is_some() {
+                                break;
+                            }
+                            atoms.consume();
+                            let box_index = inline_object_box_index(
+                                &self.line.layout.data.inline_boxes,
+                                atom.characters()[0].text_byte_start as usize,
+                            );
+                            // The object's advance is its box's width.
+                            let gaps = atoms.spacing.gaps(&atom);
+                            let x = self.offset + gaps.before;
+                            self.offset += atom_advance + gaps.total();
+                            return Some(self.positioned_inline_box(box_index, x));
                         }
                         atoms.consume();
                     }

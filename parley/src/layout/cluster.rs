@@ -113,9 +113,7 @@ impl<'a, B: Brush> Cluster<'a, B> {
                             return Some((cluster, side));
                         }
                     }
-                    LineItem::InlineBox(inline_box) => {
-                        offset += inline_box.width;
-                    }
+                    LineItem::OutOfFlowBox(_) => {}
                 }
             }
         }
@@ -444,7 +442,7 @@ impl<'a, B: Brush> Cluster<'a, B> {
     /// on the containing line.
     pub fn visual_offset(&self) -> Option<f32> {
         let line = self.line();
-        let mut offset = line.metrics().offset;
+        let mut offset = line.metrics().offset + line.metrics().inline_min_coord;
         for run_index in 0..=self.run.index as usize {
             let item = line.item(run_index)?;
             match item {
@@ -462,9 +460,7 @@ impl<'a, B: Brush> Cluster<'a, B> {
                         }
                     }
                 }
-                LineItem::InlineBox(inline_box) => {
-                    offset += inline_box.width;
-                }
+                LineItem::OutOfFlowBox(_) => {}
             }
         }
         Some(offset)

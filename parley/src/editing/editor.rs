@@ -1206,7 +1206,7 @@ where
         if let Some(preedit_range) = &self.compose {
             builder.push(StyleProperty::Underline(true), preedit_range.clone());
         }
-        self.layout = builder.build(&self.buffer);
+        builder.build_into(&mut self.layout, &self.buffer);
         self.layout.break_all_lines(self.width);
         self.layout
             .align(self.alignment, AlignmentOptions::default());

@@ -6,13 +6,12 @@
 use icu_properties::{
     CodePointMapData, CodePointSetData,
     props::{
-        BidiClass, Emoji, EmojiModifier, EmojiModifierBase, EmojiPresentation,
-        ExtendedPictographic, GeneralCategory, GraphemeClusterBreak, LineBreak, RegionalIndicator,
+        BidiClass, DefaultIgnorableCodePoint, Emoji, EmojiModifier, EmojiModifierBase,
+        EmojiPresentation, ExtendedPictographic, GeneralCategory, GraphemeClusterBreak, LineBreak,
         Script, VariationSelector,
     },
 };
 use parley_data::Properties;
-use std::fmt::Write as _;
 use std::io::{BufWriter, Write};
 
 const COPYRIGHT_HEADER: &str =
@@ -31,7 +30,6 @@ pub struct Config {
 pub fn generate(out: std::path::PathBuf, config: &Config) {
     let emoji_data = CodePointSetData::new::<Emoji>();
     let extended_pictographic_data = CodePointSetData::new::<ExtendedPictographic>();
-    let regional_indicator_data = CodePointSetData::new::<RegionalIndicator>();
 
     let script_data = CodePointMapData::<Script>::new();
     let general_category_data = CodePointMapData::<GeneralCategory>::new();
@@ -39,6 +37,7 @@ pub fn generate(out: std::path::PathBuf, config: &Config) {
     let bidi_class_data = CodePointMapData::<BidiClass>::new();
 
     let variation_selector_data = CodePointSetData::new::<VariationSelector>();
+    let default_ignorable_data = CodePointSetData::new::<DefaultIgnorableCodePoint>();
     let line_break_data = CodePointMapData::<LineBreak>::new();
 
     let emoji_presentation_data = CodePointSetData::new::<EmojiPresentation>();
@@ -67,7 +66,7 @@ pub fn generate(out: std::path::PathBuf, config: &Config) {
             bidi_class_data.get32(cp),
             is_emoji || is_extended_pictographic,
             variation_selector_data.contains32(cp),
-            regional_indicator_data.contains32(cp),
+            default_ignorable_data.contains32(cp),
             // See: https://github.com/unicode-org/icu4x/blob/ee5399a77a6b94efb5d4b60678bb458c5eedb25d/components/segmenter/src/line.rs#L338-L351
             matches!(
                 line_break_data.get32(cp),
@@ -82,7 +81,7 @@ pub fn generate(out: std::path::PathBuf, config: &Config) {
             emoji_modifier_data.contains32(cp),
             emoji_modifier_base_data.contains32(cp),
         );
-        characters.push(u32::from(v) as i64);
+        characters.push(u64::from(v).cast_signed());
     }
 
     let (info, best) = packtab::pack_table(&characters, Some(0), config.compression);
@@ -100,12 +99,6 @@ pub fn generate(out: std::path::PathBuf, config: &Config) {
     if !code.ends_with('\n') {
         code.push('\n');
     }
-    code.push('\n');
-    write!(
-        code,
-        "#[allow(missing_docs, reason = \"packtab generated code\")]\n#[inline]\npub fn composite_get(cp: u32) -> u32 {{\n    {namespace}_get(cp as usize)\n}}\n"
-    )
-    .unwrap();
 
     let mut file = BufWriter::new(std::fs::File::create(out.join("mod.rs")).unwrap());
     writeln!(&mut file, "{COPYRIGHT_HEADER}").unwrap();

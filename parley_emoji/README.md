@@ -22,7 +22,6 @@ Full documentation at https://github.com/orium/cargo-rdme -->
 <!-- Intra-doc links used in lib.rs should be evaluated here.
 See https://linebender.org/blog/doc-include/ for related discussion. -->
 [_alloc]: https://doc.rust-lang.org/stable/alloc/
-
 <!-- cargo-rdme start -->
 
 Emoji presentation resolution for text layout, translated from Christian Hansen's [c-emoji].

@@ -69,6 +69,19 @@ fn cursor_ligature_selection() {
     assert_eq!(clusters[0].as_ref().map(|c| c.text_range()), Some(1..2));
 }
 
+#[test]
+fn cursor_geometry_on_shifted_line() {
+    let mut env = TestEnv::new(test_name!(), None);
+    let text = "abc";
+    let mut layout = env.ranged_builder(text).build(text);
+    let mut breaker = layout.break_lines();
+    breaker.state_mut().set_line_x(13.);
+    breaker.break_remaining(f32::MAX);
+
+    let cursor = Cursor::from_byte_index(&layout, 0, Affinity::Downstream);
+    assert_eq!(cursor.geometry(&layout, 0.).x0 as f32, 13.);
+}
+
 /// Check consistency of cluster paths, navigation, and lookups.
 fn check_cluster_navigation(text: &str, max_advance: Option<f32>) {
     let mut env = TestEnv::new(test_name!(), None);
