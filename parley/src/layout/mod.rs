@@ -71,6 +71,9 @@ pub struct Style<B: Brush> {
     /// The distance between tab stops, in layout units (see
     /// [`StyleProperty::TabSize`](crate::StyleProperty::TabSize)).
     pub(crate) tab_size: f32,
+    /// How close to its next stop a tab may land before it skips to the one after, in layout units
+    /// (see [`TabSize::skip_threshold`](crate::TabSize::skip_threshold)).
+    pub(crate) tab_skip_threshold: f32,
     /// The locale of the text, if any.
     ///
     /// This is useful for consumers exposing the text to assistive technologies,

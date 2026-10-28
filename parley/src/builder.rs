@@ -489,11 +489,13 @@ fn build_into_layout<B: Brush>(
         }
     }
 
-    // Copy the visual styles into the layout
-    layout
-        .data
-        .styles
-        .extend(lcx.style_table.iter().map(|s| s.as_layout_style()));
+    // Copy the visual styles into the layout. The root style is at index 0.
+    let root_font_size = lcx.style_table.first().map_or(0., |style| style.font_size);
+    layout.data.styles.extend(
+        lcx.style_table
+            .iter()
+            .map(|s| s.as_layout_style(root_font_size)),
+    );
 
     {
         super::shape::shape_text(

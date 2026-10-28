@@ -7,7 +7,7 @@ use crate::util::TestEnv;
 use crate::{test_name, util::ColorBrush};
 use parley::{
     Alignment, AlignmentOptions, ContentWidths, IndentOptions, InlineBox, InlineBoxKind, Layout,
-    LineBreak, StyleProperty, TextWrapMode, VerticalAlign, WhiteSpaceCollapse,
+    LineBreak, StyleProperty, TabSize, TextWrapMode, VerticalAlign, WhiteSpaceCollapse,
 };
 
 /// Checks that calculated content widths agree with actual line breaking.
@@ -360,10 +360,12 @@ fn content_widths_tabs() {
     let aa = single_line_width(&mut env, "AA");
     let bb_cc = single_line_width(&mut env, "BB CC");
     let dd = single_line_width(&mut env, "DD");
-    // The first tab reaches the first stop; "BB CC" then ends between the second stop (minus
-    // the skip threshold) and the third, so the second tab reaches the third stop.
-    assert!(aa < tab_size);
-    assert!(bb_cc >= tab_size - tab_size / 16. && bb_cc < 2. * tab_size - tab_size / 16.);
+    // Tabs advance at least half a space. The first tab reaches the first stop; "BB CC" then
+    // ends between the second stop (minus half a space) and the third, so the second tab reaches
+    // the third stop.
+    let tab_size = TabSize::new(tab_size).with_skip_threshold(space / 2.);
+    assert!(aa < tab_size.size);
+    assert!(bb_cc >= tab_size.size - space / 2. && bb_cc < 2. * tab_size.size - space / 2.);
 
     let text = "AA\tBB CC\tDD";
     let mut builder = env.ranged_builder(text);
@@ -379,7 +381,7 @@ fn content_widths_tabs() {
         "Min content width {} should be the widest word {widest_word}, with the tabs hanging",
         widths.min
     );
-    let expected_max = 3. * tab_size + dd;
+    let expected_max = 3. * tab_size.size + dd;
     assert!(
         (widths.max - expected_max).abs() < 1e-3,
         "Max content width {} should reach the third stop then DD ({expected_max})",
@@ -403,7 +405,9 @@ fn content_widths_tabs() {
         "\u{627}\u{627}\u{627}\tabc\t\u{628}\u{628}\u{628}",
     ] {
         let mut builder = env.ranged_builder(text);
-        builder.push_default(StyleProperty::TabSize(4. * space));
+        builder.push_default(StyleProperty::TabSize(
+            TabSize::new(4. * space).with_skip_threshold(space / 2.),
+        ));
         let mut layout = builder.build(text);
         assert_content_widths_match_layout(&mut layout);
     }

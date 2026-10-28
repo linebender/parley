@@ -658,8 +658,16 @@ impl ContentWidthsMeasurer {
 
             let (mut min_advance, mut max_advance) = if whitespace == Whitespace::Tab {
                 (
-                    tab_advance(self.running_min_width, style.tab_size),
-                    tab_advance(self.running_max_width, style.tab_size),
+                    tab_advance(
+                        self.running_min_width,
+                        style.tab_size,
+                        style.tab_skip_threshold,
+                    ),
+                    tab_advance(
+                        self.running_max_width,
+                        style.tab_size,
+                        style.tab_skip_threshold,
+                    ),
                 )
             } else {
                 (cluster.advance, cluster.advance)

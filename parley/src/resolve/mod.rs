@@ -17,7 +17,7 @@ use super::style::{
 use crate::font::FontContext;
 use crate::style::TextStyle;
 use crate::util::nearly_eq;
-use crate::{LineBreak, LineHeight, OverflowWrap, VerticalAlign, layout};
+use crate::{LineBreak, LineHeight, OverflowWrap, TabSize, VerticalAlign, layout};
 use crate::{TextWrapMode, WhiteSpaceCollapse, WordBreak};
 use core::borrow::Borrow;
 use core::ops::Range;
@@ -169,7 +169,7 @@ impl ResolveContext {
             StyleProperty::OverflowWrap(value) => OverflowWrap(*value),
             StyleProperty::TextWrapMode(value) => TextWrapMode(*value),
             StyleProperty::WhiteSpaceCollapse(value) => WhiteSpaceCollapse(*value),
-            StyleProperty::TabSize(value) => TabSize(*value * scale),
+            StyleProperty::TabSize(value) => TabSize(value.scale(scale)),
         }
     }
 
@@ -211,7 +211,7 @@ impl ResolveContext {
             overflow_wrap: raw_style.overflow_wrap,
             text_wrap_mode: raw_style.text_wrap_mode,
             white_space_collapse: raw_style.white_space_collapse,
-            tab_size: raw_style.tab_size * scale,
+            tab_size: raw_style.tab_size.scale(scale),
         }
     }
 
@@ -402,8 +402,8 @@ pub(crate) enum ResolvedProperty<B: Brush> {
     TextWrapMode(TextWrapMode),
     /// Whitespace collapsing and hanging behavior.
     WhiteSpaceCollapse(WhiteSpaceCollapse),
-    /// The distance between tab stops.
-    TabSize(f32),
+    /// The distance between tab stops, and the tab's skip threshold.
+    TabSize(TabSize),
 }
 
 /// Flattened group of style properties.
@@ -452,8 +452,8 @@ pub(crate) struct ResolvedStyle<B: Brush> {
     pub(crate) text_wrap_mode: TextWrapMode,
     /// Whitespace collapsing and hanging behavior.
     pub(crate) white_space_collapse: WhiteSpaceCollapse,
-    /// The distance between tab stops.
-    pub(crate) tab_size: f32,
+    /// The distance between tab stops, and the tab's skip threshold.
+    pub(crate) tab_size: TabSize,
 }
 
 impl<B: Brush> ResolvedStyle<B> {
@@ -520,11 +520,14 @@ impl<B: Brush> ResolvedStyle<B> {
             OverflowWrap(value) => self.overflow_wrap == *value,
             TextWrapMode(value) => self.text_wrap_mode == *value,
             WhiteSpaceCollapse(value) => self.white_space_collapse == *value,
-            TabSize(value) => nearly_eq(self.tab_size, *value),
+            TabSize(value) => self.tab_size.nearly_eq(*value),
         }
     }
 
-    pub(crate) fn as_layout_style(&self) -> layout::Style<B> {
+    /// The style as the layout sees it. `root_font_size` is the font size of the layout's root
+    /// style, which the default skip threshold of a tab is relative to (see
+    /// [`TabSize::skip_threshold`]).
+    pub(crate) fn as_layout_style(&self, root_font_size: f32) -> layout::Style<B> {
         layout::Style {
             parent: self.parent,
             brush: self.brush.clone(),
@@ -535,7 +538,8 @@ impl<B: Brush> ResolvedStyle<B> {
             overflow_wrap: self.overflow_wrap,
             text_wrap_mode: self.text_wrap_mode,
             white_space_collapse: self.white_space_collapse,
-            tab_size: self.tab_size,
+            tab_size: self.tab_size.size,
+            tab_skip_threshold: self.tab_size.skip_threshold.unwrap_or(0.5 * root_font_size),
             locale: self.locale,
         }
     }

@@ -7,7 +7,8 @@ use crate::{
 };
 use parley::{
     Alignment, AlignmentOptions, BaseDirection, BreakReason, InlineBox, InlineBoxKind, Layout,
-    OverflowWrap, StyleProperty, TextWrapMode, VerticalAlign, WhiteSpaceCollapse, WordBreak,
+    OverflowWrap, StyleProperty, TabSize, TextWrapMode, VerticalAlign, WhiteSpaceCollapse,
+    WordBreak,
 };
 
 fn nearly_eq(actual: f32, expected: f32) {
@@ -28,7 +29,7 @@ fn build(
     let mut builder = env.ranged_builder(text);
     builder.push_default(StyleProperty::WhiteSpaceCollapse(collapse));
     builder.push_default(StyleProperty::TextWrapMode(wrap));
-    builder.push_default(StyleProperty::TabSize(TAB_SIZE));
+    builder.push_default(StyleProperty::TabSize(TabSize::new(TAB_SIZE)));
     builder.build(text)
 }
 
@@ -39,7 +40,7 @@ fn advance(env: &mut TestEnv, text: &str) -> f32 {
         WhiteSpaceCollapse::Preserve,
     ));
     builder.push_default(StyleProperty::TextWrapMode(TextWrapMode::NoWrap));
-    builder.push_default(StyleProperty::TabSize(TAB_SIZE));
+    builder.push_default(StyleProperty::TabSize(TabSize::new(TAB_SIZE)));
     let mut layout: Layout<ColorBrush> = builder.build(text);
     layout.break_all_lines(None);
     layout.full_width()

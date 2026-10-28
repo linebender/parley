@@ -1272,7 +1272,11 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         // including the indent). It is computed here, as it depends on the line
                         // breaking, and recorded for the line once the tab is appended.
                         let advance = if is_tab {
-                            tab_advance(self.state.line.x + line_indent, style.tab_size)
+                            tab_advance(
+                                self.state.line.x + line_indent,
+                                style.tab_size,
+                                style.tab_skip_threshold,
+                            )
                         } else {
                             spacing.atom_advance(&atom)
                         };
@@ -1463,7 +1467,11 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         let advance = if is_tab {
                             let style =
                                 &self.layout.data.styles[first_character.style_index as usize];
-                            tab_advance(self.state.line.x + line_indent, style.tab_size)
+                            tab_advance(
+                                self.state.line.x + line_indent,
+                                style.tab_size,
+                                style.tab_skip_threshold,
+                            )
                         } else {
                             spacing.atom_advance(&atom)
                         };

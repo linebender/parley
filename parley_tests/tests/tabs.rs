@@ -11,7 +11,7 @@ use crate::test_name;
 use crate::util::{ColorBrush, TestEnv};
 use parley::{
     Alignment, AlignmentOptions, Cluster, ClusterSide, IndentOptions, Layout, PositionedLayoutItem,
-    StyleProperty, TextWrapMode, WhiteSpaceCollapse,
+    StyleProperty, TabSize, TextWrapMode, WhiteSpaceCollapse,
 };
 
 fn nearly_eq(actual: f32, expected: f32) {
@@ -30,8 +30,14 @@ fn advance(env: &mut TestEnv, text: &str) -> f32 {
     layout.full_width()
 }
 
+/// Tab stops every `tab_size`, with a skip threshold of half a space as in Chrome, so that the
+/// tests can reason in spaces: the tab after text `n` spaces in goes to the stop past `n`.
+fn stops(tab_size: f32, space: f32) -> TabSize {
+    TabSize::new(tab_size).with_skip_threshold(space / 2.)
+}
+
 /// Lays out `text` on one line, with the given tab size.
-fn build(env: &mut TestEnv, text: &str, tab_size: f32) -> Layout<ColorBrush> {
+fn build(env: &mut TestEnv, text: &str, tab_size: TabSize) -> Layout<ColorBrush> {
     let mut builder = env.ranged_builder(text);
     builder.push_default(StyleProperty::TabSize(tab_size));
     let mut layout = builder.build(text);
@@ -76,7 +82,7 @@ fn tab_advances_the_line_to_the_next_stop() {
     let b = advance(&mut env, "b");
     assert!(a < 4. * space, "the first stop is past the first letter");
 
-    let layout = build(&mut env, "a\tb", 8. * space);
+    let layout = build(&mut env, "a\tb", stops(8. * space, space));
     nearly_eq(layout.width(), 8. * space + b);
     let [a_x, b_x] = glyph_xs(&layout, 0)[..] else {
         panic!("expected two glyphs");
@@ -84,19 +90,19 @@ fn tab_advances_the_line_to_the_next_stop() {
     nearly_eq(a_x, 0.);
     nearly_eq(b_x, 8. * space);
 
-    let layout = build(&mut env, "a\tb", 4. * space);
+    let layout = build(&mut env, "a\tb", stops(4. * space, space));
     nearly_eq(layout.width(), 4. * space + b);
     nearly_eq(glyph_xs(&layout, 0)[1], 4. * space);
 
     // Once the text is past the first stop, the tab goes to the second.
     let aa = advance(&mut env, "aa");
     assert!(aa > 4. * space && aa < 8. * space - space / 2.);
-    let layout = build(&mut env, "aa\tb", 4. * space);
+    let layout = build(&mut env, "aa\tb", stops(4. * space, space));
     nearly_eq(layout.width(), 8. * space + b);
     nearly_eq(glyph_xs(&layout, 0)[2], 8. * space);
 
     // Consecutive tabs each advance a stop.
-    let layout = build(&mut env, "a\t\t\tb", 4. * space);
+    let layout = build(&mut env, "a\t\t\tb", stops(4. * space, space));
     nearly_eq(layout.width(), 12. * space + b);
     nearly_eq(glyph_xs(&layout, 0)[1], 12. * space);
 }
@@ -106,8 +112,8 @@ fn tab_size_is_a_length_in_layout_units() {
     let mut env = TestEnv::new(test_name!(), None);
     let a = advance(&mut env, "a");
 
-    let layout = build(&mut env, "a\tb", a + 5.);
-    nearly_eq(glyph_xs(&layout, 0)[1], a + 5.);
+    let layout = build(&mut env, "a\tb", TabSize::new(a + 10.));
+    nearly_eq(glyph_xs(&layout, 0)[1], a + 10.);
 }
 
 #[test]
@@ -129,25 +135,67 @@ fn tab_default_size_gives_no_advance() {
 
     // Explicitly setting a tab size that isn't positive does the same.
     for tab_size in [0., -10.] {
-        let layout = build(&mut env, "a\tb", tab_size);
+        let layout = build(&mut env, "a\tb", TabSize::new(tab_size));
         nearly_eq(glyph_xs(&layout, 0)[1], a);
     }
 }
 
 #[test]
-fn tab_skips_a_stop_less_than_a_sixteenth_of_the_tab_size_away() {
+fn tab_skips_a_stop_closer_than_the_skip_threshold() {
     let mut env = TestEnv::new(test_name!(), None);
     let a = advance(&mut env, "a");
 
-    // The first stop is a thirty-second of the tab size past "a", so the tab goes to the second.
-    let tab_size = a * 32. / 31.;
-    let layout = build(&mut env, "a\tb", tab_size);
+    // By default the skip threshold is half the root font size (8 here): a stop 7 units past "a"
+    // is skipped for the one after it, a stop 9 units past "a" is used.
+    let tab_size = a + 7.;
+    let layout = build(&mut env, "a\tb", TabSize::new(tab_size));
+    nearly_eq(glyph_xs(&layout, 0)[1], 2. * tab_size);
+    let tab_size = a + 9.;
+    let layout = build(&mut env, "a\tb", TabSize::new(tab_size));
+    nearly_eq(glyph_xs(&layout, 0)[1], tab_size);
+
+    // The threshold can be set explicitly.
+    let tab_size = a + 7.;
+    let layout = build(
+        &mut env,
+        "a\tb",
+        TabSize::new(tab_size).with_skip_threshold(6.),
+    );
+    nearly_eq(glyph_xs(&layout, 0)[1], tab_size);
+    let layout = build(
+        &mut env,
+        "a\tb",
+        TabSize::new(tab_size).with_skip_threshold(7.5),
+    );
     nearly_eq(glyph_xs(&layout, 0)[1], 2. * tab_size);
 
-    // A stop a bit more than a sixteenth away is used.
-    let tab_size = a * 16. / 15. + 0.01;
-    let layout = build(&mut env, "a\tb", tab_size);
+    // The default follows the root style's font size, not the tab's own font size, as Chrome
+    // measures its half a space with the block container's font: a tab set at 64 units still
+    // uses a stop 9 units away.
+    let text = "a\tb";
+    let tab_size = a + 9.;
+    let mut builder = env.ranged_builder(text);
+    builder.push_default(StyleProperty::TabSize(TabSize::new(tab_size)));
+    builder.push(StyleProperty::FontSize(64.), 1..2);
+    let mut layout = builder.build(text);
+    layout.break_all_lines(None);
     nearly_eq(glyph_xs(&layout, 0)[1], tab_size);
+
+    // A root font size of 32 raises the default to 16, so a stop 12 units away is skipped.
+    let a_32 = {
+        let mut builder = env.ranged_builder("a");
+        builder.push_default(StyleProperty::FontSize(32.));
+        let mut layout: Layout<ColorBrush> = builder.build("a");
+        layout.break_all_lines(None);
+        layout.full_width()
+    };
+    let tab_size = a_32 + 12.;
+    let mut builder = env.ranged_builder(text);
+    builder.push_default(StyleProperty::FontSize(32.));
+    builder.push_default(StyleProperty::TabSize(TabSize::new(tab_size)));
+    let mut layout = builder.build(text);
+    layout.break_all_lines(None);
+    nearly_eq(glyph_xs(&layout, 0)[1], 2. * tab_size);
 }
 
 #[test]
@@ -163,7 +211,7 @@ fn tab_gets_no_letter_or_word_spacing_of_its_own() {
     // the stop.)
     let text = "a\tb";
     let mut builder = env.ranged_builder(text);
-    builder.push_default(StyleProperty::TabSize(tab_size));
+    builder.push_default(StyleProperty::TabSize(stops(tab_size, space)));
     builder.push_default(StyleProperty::LetterSpacing(10.));
     let mut layout = builder.build(text);
     layout.break_all_lines(None);
@@ -172,7 +220,7 @@ fn tab_gets_no_letter_or_word_spacing_of_its_own() {
     // The same with word spacing: the space before the tab gets both gaps, the tab gets neither.
     let text = "a \tb";
     let mut builder = env.ranged_builder(text);
-    builder.push_default(StyleProperty::TabSize(tab_size));
+    builder.push_default(StyleProperty::TabSize(stops(tab_size, space)));
     builder.push_default(StyleProperty::LetterSpacing(10.));
     builder.push_default(StyleProperty::WordSpacing(10.));
     let mut layout = builder.build(text);
@@ -202,11 +250,11 @@ fn tab_stops_are_measured_from_the_indented_line_start() {
     let tab_size = 4. * space;
 
     // With the indent, the first stop is already past "a", and the stop nearest to the tab is
-    // less than a sixteenth of the tab size before it, so the tab goes two stops along.
+    // less than half a space away, so the tab goes two stops along.
     let text = "a\tb";
     let indent = tab_size - space / 8.;
     let mut builder = env.ranged_builder(text);
-    builder.push_default(StyleProperty::TabSize(tab_size));
+    builder.push_default(StyleProperty::TabSize(stops(tab_size, space)));
     let mut layout = builder.build(text);
     layout.set_text_indent(indent, IndentOptions::default());
     layout.break_all_lines(None);
@@ -222,7 +270,7 @@ fn tab_stops_are_measured_from_the_indented_line_start() {
     // unindented edge: a tab a space before it advances just that space.
     let text = "\tb";
     let mut builder = env.ranged_builder(text);
-    builder.push_default(StyleProperty::TabSize(tab_size));
+    builder.push_default(StyleProperty::TabSize(stops(tab_size, space)));
     let mut layout = builder.build(text);
     layout.set_text_indent(-space, IndentOptions::default());
     layout.break_all_lines(None);
@@ -241,7 +289,7 @@ fn tab_resized_when_relayout_moves_it() {
 
     let text = "aaa aaa\tb";
     let mut builder = env.ranged_builder(text);
-    builder.push_default(StyleProperty::TabSize(8. * space));
+    builder.push_default(StyleProperty::TabSize(stops(8. * space, space)));
     let mut layout = builder.build(text);
 
     // On one line, the tab is past the first stop.
@@ -278,7 +326,7 @@ fn tab_placed_before_a_taken_break_is_sized_on_the_next_line() {
     // first.
     let text = "aaa aaa\t!!!";
     let mut builder = env.ranged_builder(text);
-    builder.push_default(StyleProperty::TabSize(tab_size));
+    builder.push_default(StyleProperty::TabSize(stops(tab_size, space)));
     let mut layout = builder.build(text);
     layout.break_all_lines(Some(aaa_aaa + 1.));
     assert_eq!(layout.len(), 2);
@@ -303,7 +351,7 @@ fn tab_sized_when_breaking_by_length() {
 
     let text = "ab\tc\tab";
     let mut builder = env.ranged_builder(text);
-    builder.push_default(StyleProperty::TabSize(8. * space));
+    builder.push_default(StyleProperty::TabSize(stops(8. * space, space)));
     let mut layout = builder.build(text);
     let mut breaker = layout.break_lines();
     breaker.break_next_with_length(3);
@@ -332,7 +380,7 @@ fn tab_sized_after_newline_when_breaking_by_length() {
     // first stop.
     let text = "ab\ncd\tef";
     let mut builder = env.ranged_builder(text);
-    builder.push_default(StyleProperty::TabSize(tab_size));
+    builder.push_default(StyleProperty::TabSize(stops(tab_size, space)));
     let mut layout = builder.build(text);
     let mut breaker = layout.break_lines();
     breaker.break_next_with_length(100);
@@ -354,7 +402,7 @@ fn tab_trailing_hangs_like_a_space() {
     // is excluded from the layout's width.
     let text = "a\t";
     let mut builder = env.ranged_builder(text);
-    builder.push_default(StyleProperty::TabSize(tab_size));
+    builder.push_default(StyleProperty::TabSize(stops(tab_size, space)));
     builder.push_default(StyleProperty::WhiteSpaceCollapse(
         WhiteSpaceCollapse::Collapse,
     ));
@@ -369,7 +417,7 @@ fn tab_trailing_hangs_like_a_space() {
 
     // Under `WhiteSpaceCollapse::Preserve`, whitespace before the end of the layout hangs only as
     // far as it overflows, like a space would.
-    let layout = build(&mut env, "a\t", tab_size);
+    let layout = build(&mut env, "a\t", stops(tab_size, space));
     nearly_eq(layout.width(), tab_size);
     nearly_eq(layout.full_width(), tab_size);
 }
@@ -381,7 +429,7 @@ fn tab_advance_is_visible_to_clusters_and_hit_testing() {
     let a = advance(&mut env, "a");
     let tab_size = 8. * space;
 
-    let layout = build(&mut env, "a\tb", tab_size);
+    let layout = build(&mut env, "a\tb", stops(tab_size, space));
     let tab = Cluster::from_byte_index(&layout, 1).unwrap();
     assert_eq!(tab.text_range(), 1..2);
     nearly_eq(tab.advance(), tab_size - a);
@@ -404,7 +452,7 @@ fn tab_columns_align() {
     // first three lines, and the next one for the line whose first word is wider.
     let text = "1\tfoo\tx\n12\tfoo\tx\n123\tfoo\tx\n1234567\tfoo\tx";
     let mut builder = env.ranged_builder(text);
-    builder.push_default(StyleProperty::TabSize(4. * space));
+    builder.push_default(StyleProperty::TabSize(stops(4. * space, space)));
     let mut layout = builder.build(text);
     layout.break_all_lines(None);
     layout.align(Alignment::Start, AlignmentOptions::default());
@@ -426,7 +474,7 @@ fn tab_stops_in_rtl_text_are_measured_from_the_right_edge() {
     let mut layout = build(
         &mut env,
         "\u{627}\u{627}\t\u{628}\u{628}\u{628}\u{628}",
-        tab_size,
+        stops(tab_size, space),
     );
     layout.align(Alignment::Start, AlignmentOptions::default());
     nearly_eq(layout.width(), tab_size + bas);
@@ -445,7 +493,7 @@ fn tab_stops_in_rtl_text_are_measured_from_the_right_edge() {
     let mut layout = build(
         &mut env,
         "\u{628}\u{628}\u{628}\u{628}\t\u{627}\u{627}",
-        tab_size,
+        stops(tab_size, space),
     );
     layout.align(Alignment::Start, AlignmentOptions::default());
     nearly_eq(layout.width(), 2. * tab_size + alefs);
@@ -476,7 +524,7 @@ fn justification_stretches_spaces_around_a_tab_but_not_the_tab() {
     let text = "a a\tb b";
     let width = 200.;
     let mut builder = env.ranged_builder(text);
-    builder.push_default(StyleProperty::TabSize(tab_size));
+    builder.push_default(StyleProperty::TabSize(stops(tab_size, space)));
     let mut layout = builder.build(text);
     layout.break_all_lines(Some(width));
     layout.align(Alignment::Justify, justify_all);
@@ -494,7 +542,7 @@ fn justification_stretches_spaces_around_a_tab_but_not_the_tab() {
     let text = "a a \t";
     let width = 2. * a + space + 0.5;
     let mut builder = env.ranged_builder(text);
-    builder.push_default(StyleProperty::TabSize(tab_size));
+    builder.push_default(StyleProperty::TabSize(stops(tab_size, space)));
     builder.push_default(StyleProperty::WhiteSpaceCollapse(
         WhiteSpaceCollapse::Collapse,
     ));

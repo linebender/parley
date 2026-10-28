@@ -37,7 +37,7 @@ fn tabbed_layout(text: &str) -> Layout<ColorBrush> {
     let mut lcx: LayoutContext<ColorBrush> = LayoutContext::new();
     let mut builder = lcx.ranged_builder(&mut fcx, text, 1., false);
     builder.push_default(FontFamily::from(FONT_FAMILY_LIST));
-    builder.push_default(crate::StyleProperty::TabSize(40.));
+    builder.push_default(crate::StyleProperty::TabSize(crate::TabSize::new(40.)));
     builder.build(text)
 }
 
@@ -128,11 +128,21 @@ fn tab_size_scales_like_other_lengths() {
     let mut fcx = create_font_context();
     let mut lcx: LayoutContext<ColorBrush> = LayoutContext::new();
     let text = "a\tb";
-    for (scale, expected) in [(1., 40.), (2., 80.)] {
+    for scale in [1., 2.] {
         let mut builder = lcx.ranged_builder(&mut fcx, text, scale, false);
         builder.push_default(FontFamily::from(FONT_FAMILY_LIST));
-        builder.push_default(crate::StyleProperty::TabSize(40.));
+        builder.push_default(crate::StyleProperty::TabSize(crate::TabSize::new(40.)));
         let layout = builder.build(text);
-        assert_eq!(layout.data.styles[0].tab_size, expected);
+        assert_eq!(layout.data.styles[0].tab_size, 40. * scale);
+        // The default skip threshold is half the root font size (16), which is already scaled.
+        assert_eq!(layout.data.styles[0].tab_skip_threshold, 8. * scale);
+
+        let mut builder = lcx.ranged_builder(&mut fcx, text, scale, false);
+        builder.push_default(FontFamily::from(FONT_FAMILY_LIST));
+        builder.push_default(crate::StyleProperty::TabSize(
+            crate::TabSize::new(40.).with_skip_threshold(3.),
+        ));
+        let layout = builder.build(text);
+        assert_eq!(layout.data.styles[0].tab_skip_threshold, 3. * scale);
     }
 }
