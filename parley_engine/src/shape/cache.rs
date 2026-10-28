@@ -101,7 +101,7 @@ pub(crate) struct ShapePlanId {
     script: harfrust::Script,
     language: Option<harfrust::Language>,
     features: Box<[harfrust::Feature]>,
-    normalized_coords: Box<[harfrust::NormalizedCoord]>,
+    normalized_coords: Box<[harfrust::font::NormalizedCoord]>,
 }
 
 pub(crate) struct ShapePlanKey<'a> {
@@ -113,7 +113,7 @@ pub(crate) struct ShapePlanKey<'a> {
     script: harfrust::Script,
     language: Option<harfrust::Language>,
     features: &'a [harfrust::Feature],
-    normalized_coords: &'a [harfrust::NormalizedCoord],
+    normalized_coords: &'a [harfrust::font::NormalizedCoord],
 }
 
 impl<'a> ShapePlanKey<'a> {
@@ -124,7 +124,7 @@ impl<'a> ShapePlanKey<'a> {
         script: harfrust::Script,
         language: Option<harfrust::Language>,
         features: &'a [harfrust::Feature],
-        normalized_coords: &'a [harfrust::NormalizedCoord],
+        normalized_coords: &'a [harfrust::font::NormalizedCoord],
     ) -> Self {
         Self {
             font_blob_id,
