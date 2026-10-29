@@ -89,59 +89,6 @@ pub fn spacing() -> Vec<Benchmark> {
         .collect()
 }
 
-/// Benchmark repeatedly justifying an already line-broken layout.
-pub fn repeated_justification() -> [Benchmark; 1] {
-    const DISPLAY_SCALE: f32 = 1.0;
-    const QUANTIZE: bool = true;
-    const MAX_ADVANCE: f32 = 200.0 * DISPLAY_SCALE;
-
-    let sample = get_samples()
-        .iter()
-        .find(|sample| sample.name == "latin" && sample.modification == "8000 characters")
-        .expect("the Latin 8000-character benchmark sample should exist");
-
-    [benchmark_fn(
-        format!(
-            "Repeated Justification - {} {}",
-            sample.name, sample.modification
-        ),
-        move |b| {
-            let text = &sample.text;
-            let mut layout = with_contexts(|font_cx, layout_cx| {
-                let mut builder = layout_cx.ranged_builder(font_cx, text, DISPLAY_SCALE, QUANTIZE);
-                builder.push_default(FontFamily::from(FONT_FAMILY_LIST));
-
-                let mut layout: Layout<ColorBrush> = builder.build(text);
-                layout.break_all_lines(Some(MAX_ADVANCE));
-                layout
-            });
-
-            b.iter(move || {
-                layout.align(Alignment::Justify, AlignmentOptions::default());
-
-                // Pass to black box so the optimizer cannot optimize alignment away.
-                black_box(
-                    layout
-                        .lines()
-                        .flat_map(|line| line.runs())
-                        .map(|run| run.advance())
-                        .sum::<f32>(),
-                );
-                layout.align(Alignment::Start, AlignmentOptions::default());
-
-                // Pass to black box so the optimizer cannot optimize alignment away.
-                black_box(
-                    layout
-                        .lines()
-                        .flat_map(|line| line.runs())
-                        .map(|run| run.advance())
-                        .sum::<f32>(),
-                )
-            })
-        },
-    )]
-}
-
 /// Benchmark breaking a layout into lines.
 ///
 /// This is part of the work that'd be performed as, e.g., a window is being resized.
