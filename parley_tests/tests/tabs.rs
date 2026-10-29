@@ -14,8 +14,9 @@
 use crate::test_name;
 use crate::util::{ColorBrush, TestEnv};
 use parley::{
-    Alignment, AlignmentOptions, Cluster, ClusterSide, IndentOptions, Layout, PositionedLayoutItem,
-    StyleProperty, TabSize, TextWrapMode, WhiteSpaceCollapse,
+    Alignment, AlignmentOptions, Cluster, ClusterSide, IndentOptions, InlineBox, InlineBoxKind,
+    Layout, PositionedLayoutItem, StyleProperty, TabSize, TextWrapMode, VerticalAlign,
+    WhiteSpaceCollapse, YieldData,
 };
 
 fn nearly_eq(actual: f32, expected: f32) {
@@ -306,6 +307,105 @@ fn tab_resized_when_relayout_moves_it() {
     layout.break_all_lines(None);
     assert_eq!(layout.len(), 1);
     nearly_eq(glyph_xs(&layout, 0)[7], 16. * space);
+}
+
+/// Guards against `BreakLines::revert_to` dropping the tabs placed before the saved state, or
+/// keeping the ones placed after it, when the state was saved in the middle of a line (here at an
+/// out-of-flow box, which yields control). Source: an invariant of the side table, each line owns
+/// exactly the entries of its own tabs; the same text laid out without the detour is the
+/// reference.
+#[test]
+fn tab_advances_kept_up_to_a_revert_in_the_middle_of_a_line() {
+    let mut env = TestEnv::new(test_name!(), None);
+    let text = "a	b	c";
+    let make_layout = |env: &mut TestEnv| {
+        let mut builder = env.ranged_builder(text);
+        builder.push_default(StyleProperty::TabSize(TabSize::new(80.)));
+        builder.push_inline_box(InlineBox {
+            id: 1,
+            kind: InlineBoxKind::CustomOutOfFlow,
+            index: 3,
+            width: 0.,
+            height: 0.,
+            baseline: None,
+            vertical_align: VerticalAlign::BASELINE,
+        });
+        builder.build(text)
+    };
+    let mut expected = make_layout(&mut env);
+    expected.break_all_lines(None);
+
+    let mut layout = make_layout(&mut env);
+    let mut breaker = layout.break_lines();
+    breaker.state_mut().set_layout_max_advance(f32::INFINITY);
+    breaker.state_mut().set_line_max_advance(f32::INFINITY);
+    // The breaker yields at the box, after the first tab.
+    let Some(YieldData::InlineBoxBreak(data)) = breaker.break_next() else {
+        panic!("expected the breaker to yield at the out-of-flow box");
+    };
+    // Save the state there, finish the line (placing the second tab), then go back to it.
+    let saved = breaker.state().clone();
+    breaker.state_mut().append_inline_box_to_line(
+        data.advance,
+        f32::NEG_INFINITY,
+        f32::NEG_INFINITY,
+    );
+    breaker.break_next();
+    breaker.revert_to(saved);
+    let Some(YieldData::InlineBoxBreak(data)) = breaker.break_next() else {
+        panic!("expected the breaker to yield at the out-of-flow box again");
+    };
+    breaker.state_mut().append_inline_box_to_line(
+        data.advance,
+        f32::NEG_INFINITY,
+        f32::NEG_INFINITY,
+    );
+    breaker.break_remaining(f32::INFINITY);
+
+    let (actual, expected_xs) = (glyph_xs(&layout, 0), glyph_xs(&expected, 0));
+    assert_eq!(actual.len(), expected_xs.len());
+    for (actual, expected) in actual.into_iter().zip(expected_xs) {
+        nearly_eq(actual, expected);
+    }
+    nearly_eq(layout.width(), expected.width());
+}
+
+/// Guards against a tab being recorded twice when a maximum line height yield interrupts the
+/// breaker at the tab and the caller retries it. Source: the same text laid out without the
+/// interruption is the reference (in debug builds, the side table also asserts it is sorted).
+#[test]
+fn tab_sized_once_when_retried_after_a_max_height_yield() {
+    let mut env = TestEnv::new(test_name!(), None);
+    let text = "a	b";
+    let make_layout = |env: &mut TestEnv| {
+        let mut builder = env.ranged_builder(text);
+        builder.push_default(StyleProperty::TabSize(TabSize::new(80.)));
+        // A tall "a" makes the line exceed the maximum height set below.
+        builder.push(StyleProperty::FontSize(64.), 0..1);
+        builder.build(text)
+    };
+    let mut expected = make_layout(&mut env);
+    expected.break_all_lines(None);
+
+    let mut layout = make_layout(&mut env);
+    let mut breaker = layout.break_lines();
+    breaker.state_mut().set_layout_max_advance(f32::INFINITY);
+    breaker.state_mut().set_line_max_advance(f32::INFINITY);
+    breaker.state_mut().set_line_max_height(20.);
+    assert!(matches!(
+        breaker.break_next(),
+        Some(YieldData::MaxHeightExceeded(_))
+    ));
+    // Give the line room and retry.
+    breaker.state_mut().set_line_max_height(f32::INFINITY);
+    breaker.break_remaining(f32::INFINITY);
+
+    let (actual, expected_xs) = (glyph_xs(&layout, 0), glyph_xs(&expected, 0));
+    assert_eq!(actual.len(), expected_xs.len());
+    for (actual, expected) in actual.into_iter().zip(expected_xs) {
+        nearly_eq(actual, expected);
+    }
+    nearly_eq(layout.width(), expected.width());
 }
 
 /// Guards against `break_next_with_length`, which has its own copy of the breaker's atom loop,

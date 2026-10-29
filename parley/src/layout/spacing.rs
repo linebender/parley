@@ -140,6 +140,23 @@ impl Spacing {
 
         gaps
     }
+
+    /// The total advance of `atom` under this spacing alone, i.e., its shaped advance plus its
+    /// gaps, without any of the line's layout-time spacing (see [`EffectiveSpacing`]).
+    ///
+    /// This is what the line breaker measures atoms by: a line's justification doesn't exist
+    /// yet, and it sizes tabs itself.
+    #[inline(always)]
+    pub(crate) fn atom_advance(self, atom: &Atom<'_>) -> f32 {
+        let first_character = atom.characters()[0];
+        atom.advance()
+            + self
+                .gaps(
+                    first_character.whitespace,
+                    first_character.flags.is_default_ignorable(),
+                )
+                .total()
+    }
 }
 
 /// Justification to apply to a single line.
