@@ -18,7 +18,6 @@ tango_benchmarks!(
     iterate_glyph_runs(),
     content_widths(),
     spacing(),
-    repeated_justification(),
     line_breaking(),
     long_line(),
     page(),
