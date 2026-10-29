@@ -191,10 +191,10 @@ impl<B: Brush> Layout<B> {
         }
     }
 
-    /// Returns the line containing `byte_index`, and the x-coordinate of the primary caret there.
+    /// Returns the line containing `byte_index` and the x-coordinate of the primary caret there.
     ///
     /// The primary caret is where text in the paragraph's direction would be inserted. Where the
-    /// text direction changes, this is the position a bidi neutral would take.
+    /// text direction changes, this would be the position of a bidi neutral.
     ///
     /// This can be useful to, e.g., anchor things to the text that don't take part in layout.
     ///
@@ -230,8 +230,8 @@ impl<B: Brush> Layout<B> {
                 let right = trailing != cluster.is_rtl();
                 cluster.visual_offset()? + if right { cluster.advance() } else { 0. }
             }
-            // If there's no neighbor, place the caret at the line's start edge (trailing) or end
-            // edge (leading).
+            // If there's no neighbor, place the caret at the line's start edge if we're trailing,
+            // or end edge if we're leading.
             None => {
                 let metrics = line.metrics();
                 let left = metrics.offset + metrics.inline_min_coord;
