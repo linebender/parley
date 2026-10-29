@@ -1213,6 +1213,55 @@ fn layout_impl_send_sync() {
     assert_send_sync::<Layout<()>>();
 }
 
+/// Guards against the glyph run iterator misplacing an inline box's spacing gap, or the glyphs
+/// after it, with and without a tab before the box (the box and the tab are both atoms without
+/// glyphs). Source: CSS letter spacing is applied after the box, so the next glyph starts at the
+/// box's right edge plus the spacing.
+#[test]
+fn inline_box_spacing_moves_the_following_glyphs() {
+    let mut env = TestEnv::new(test_name!(), None);
+    for text in ["a\u{fffc}b", "a\t\u{fffc}b"] {
+        for spacing in [0., 3.] {
+            let mut builder = env.ranged_builder(text);
+            builder.push_default(StyleProperty::LetterSpacing(spacing));
+            builder.push_inline_box(InlineBox {
+                id: 0,
+                kind: InlineBoxKind::InFlow,
+                index: text.find('\u{fffc}').unwrap(),
+                width: 20.,
+                height: 10.,
+                baseline: None,
+                vertical_align: VerticalAlign::BASELINE,
+            });
+            let mut layout = builder.build(text);
+            layout.break_all_lines(None);
+            let line = layout.get(0).unwrap();
+            let items: Vec<_> = line.items().collect();
+            let box_x = items
+                .iter()
+                .find_map(|item| match item {
+                    PositionedLayoutItem::InlineBox(inline_box) => Some(inline_box.x),
+                    PositionedLayoutItem::GlyphRun(_) => None,
+                })
+                .unwrap();
+            let b_x = items
+                .iter()
+                .filter_map(|item| match item {
+                    PositionedLayoutItem::GlyphRun(run) => Some(run.positioned_glyphs()),
+                    PositionedLayoutItem::InlineBox(_) => None,
+                })
+                .flatten()
+                .last()
+                .unwrap()
+                .x;
+            assert!(
+                (b_x - (box_x + 20. + spacing)).abs() < 1e-3,
+                "{text:?}, spacing {spacing}: box at {box_x}, b at {b_x}"
+            );
+        }
+    }
+}
+
 #[test]
 fn shaping_context_across_items() {
     let mut env = TestEnv::new(test_name!(), None);
