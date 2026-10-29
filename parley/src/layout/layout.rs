@@ -198,7 +198,8 @@ impl<B: Brush> Layout<B> {
     ///
     /// This can be useful to, e.g., anchor things to the text that don't take part in layout.
     ///
-    /// Returns `None` if the layout hasn't been broken into lines.
+    /// Returns `None` if the layout hasn't been broken into lines. See [`Self::break_lines`] and
+    /// [`Self::break_all_lines`].
     pub fn primary_caret(&self, byte_index: usize) -> Option<(Line<'_, B>, f32)> {
         let byte_index = byte_index.min(self.data.text_len);
 
