@@ -10,7 +10,7 @@ use crate::test_name;
 use crate::util::TestEnv;
 use parley::VerticalAlign;
 use parley::style::FontFamily;
-use parley::{Alignment, AlignmentOptions, FloatedBox, InlineBox, StyleProperty, YieldData};
+use parley::{Alignment, AlignmentOptions, InlineBox, StyleProperty, YieldData};
 
 #[test]
 fn break_by_length_basic() {
