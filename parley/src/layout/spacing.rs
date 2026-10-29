@@ -121,7 +121,18 @@ impl Spacing {
     /// [tab-size]: https://www.w3.org/TR/css-text-4/#tab-size-property
     #[inline(always)]
     pub(crate) fn gaps(self, whitespace: Whitespace, is_default_ignorable: bool) -> Gaps {
-        if whitespace == Whitespace::Newline || whitespace == Whitespace::Tab {
+        self.gaps_with_tabs::<true>(whitespace, is_default_ignorable)
+    }
+
+    /// [`Self::gaps`], for text known to contain no tabs when `TABS` is false, which then skips
+    /// the tab check. Only the content width measurer, which is compiled both ways, uses this.
+    #[inline(always)]
+    pub(crate) fn gaps_with_tabs<const TABS: bool>(
+        self,
+        whitespace: Whitespace,
+        is_default_ignorable: bool,
+    ) -> Gaps {
+        if whitespace == Whitespace::Newline || (TABS && whitespace == Whitespace::Tab) {
             return Gaps::ZERO;
         }
 

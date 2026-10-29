@@ -416,6 +416,28 @@ fn content_widths_tabs() {
     }
 }
 
+/// Guards against the measurer losing, or keeping too long, the extra max-content hanging advance
+/// that a hanging tab leaves behind when the whitespace after it continues into another run.
+/// Source: the layout itself, through `assert_content_widths_match_layout`.
+#[test]
+fn content_widths_tabs_followed_by_a_run_without_tabs() {
+    let mut env = TestEnv::new(test_name!(), None);
+    for text in ["AA AA\t  ", "AA AA\t B  ", "AA AA\t B \n"] {
+        let mut builder = env.ranged_builder(text);
+        builder.push_default(StyleProperty::WhiteSpaceCollapse(
+            WhiteSpaceCollapse::Collapse,
+        ));
+        builder.push_default(StyleProperty::TabSize(TabSize::new(40.)));
+        // A font size change after the tab starts a new run.
+        builder.push(
+            StyleProperty::FontSize(24.),
+            text.find('\t').unwrap() + 1..text.len(),
+        );
+        let mut layout = builder.build(text);
+        assert_content_widths_match_layout(&mut layout);
+    }
+}
+
 #[test]
 fn content_widths_text_indent() {
     struct IndentCase {
