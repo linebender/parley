@@ -250,11 +250,11 @@ impl<'a> EffectiveSpacing<'a> {
     /// The gaps around `atom`.
     #[inline(always)]
     pub(crate) fn gaps(self, atom: &Atom<'_>) -> Gaps {
-        let first_character = atom.characters()[0];
-        let whitespace = first_character.whitespace;
+        let first_cluster = atom.shaped_clusters()[0];
+        let whitespace = first_cluster.whitespace();
         let mut gaps = self
             .spacing
-            .gaps(whitespace, first_character.flags.is_default_ignorable());
+            .gaps(whitespace, first_cluster.is_default_ignorable());
 
         if whitespace == Whitespace::Tab {
             // A tab's advance depends on its horizontal position, calculated in line breaking.
@@ -281,8 +281,9 @@ impl<'a> EffectiveSpacing<'a> {
     pub(crate) fn grapheme_advance(self, atom: &Atom<'_>, grapheme: Grapheme, is_rtl: bool) -> f32 {
         let gaps = self.gaps(atom);
 
-        // TODO: perhaps spacing should not be applied if the grapheme `continues_before` /
-        // `continues_after`. The same then should hold true in `gaps` computed for an atom.
+        // TODO: perhaps spacing should not be applied if the grapheme `Grapheme::continues_before`
+        // / `Grapheme::continues_after`. The same then should hold true in `gaps` computed for an
+        // atom.
         let (owns_before, owns_after) = if is_rtl {
             (grapheme.is_atom_end(), grapheme.is_atom_start())
         } else {

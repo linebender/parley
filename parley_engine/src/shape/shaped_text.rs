@@ -119,8 +119,9 @@ impl FontMetrics {
         };
 
         Self {
-            ascent: metrics.ascent,
-            descent: -metrics.descent,
+            // Normalize ascender and descender to magnitudes, as a hack to deal with fonts with mixed-up signs.
+            ascent: metrics.ascent.abs(),
+            descent: metrics.descent.abs(),
             leading: metrics.leading,
             underline_offset,
             underline_size,
@@ -310,12 +311,13 @@ impl ShapedText {
         text: &str,
         range: TextRange,
         segment: &Segment,
+        is_item_start: bool,
         options: &ShapeOptions<'_>,
         char_info: &[CharInfo],
         char_style_indices: &[u16],
         font: &FontInstance,
-        glyph_buffer: &harfrust::GlyphBuffer,
-        normalized_coords: &[harfrust::NormalizedCoord],
+        glyph_buffer: &harfrust::Buffer,
+        normalized_coords: &[harfrust::font::NormalizedCoord],
     ) {
         debug_assert_eq!(
             range.char_range.len(),
@@ -392,10 +394,12 @@ impl ShapedText {
                 grapheme_start: info.is_grapheme_start(),
             });
         }
-        // TODO: we force a grapheme break at the start of the run, as itemization could have split
-        // a grapheme into two. Ideally, grapheme segmentation should be performed after
-        // itemization, at which case this will always be true.
-        self.characters[characters_start].grapheme_start = true;
+        // TODO: we force a grapheme break at the start of an item, as itemization could have split
+        // a grapheme into two. Ideally, grapheme segmentation would be reset at item boundaries
+        // instead, at which point this will always be true.
+        if is_item_start && range.char_range.start == segment.range.char_range.start {
+            self.characters[characters_start].grapheme_start = true;
+        }
 
         let glyphs_start = self.glyphs.len();
         if segment.bidi_level.is_ltr() {
@@ -653,7 +657,23 @@ mod tests {
         shape::CharCluster,
     };
 
-    use super::{ShapedText, Whitespace};
+    use super::{FontMetrics, ShapedText, Whitespace};
+  
+
+    #[test]
+    fn font_descent_is_a_non_negative_distance() {
+        // Franklin ITC is an example of a font with a positive descender.
+        for (descent, expected) in [(-6.0, 6.0), (0.0, 0.0), (6.0, 6.0)] {
+            let metrics = skrifa::metrics::Metrics {
+                ascent: 18.0,
+                descent,
+                ..Default::default()
+            };
+            let font_metrics = FontMetrics::from_skrifa_metrics(&metrics, 24.0);
+            assert_eq!(font_metrics.ascent, 18.0);
+            assert_eq!(font_metrics.descent, expected);
+        }
+    }
 
     const ROBOTO: &[u8] =
         include_bytes!("../../../parley_dev/assets/fonts/roboto_fonts/Roboto-Regular.ttf");
@@ -799,17 +819,17 @@ mod tests {
         assert_eq!(clusters[0].chars_range(), 1..2);
     }
 
-    /// [U+0600 U+0623 U+064F] is a single grapheme in text-wide segmentation, but U+0600 has
-    /// bidi class AN while the following characters resolve to a different bidi level, so
-    /// itemization splits the grapheme into the items [U+0600] [U+0623 U+064F]. The item
-    /// boundary forces a grapheme start on U+0623.
+    /// [U+0600 U+0623 U+064F] is a single grapheme, but U+0600 has bidi class AN while the
+    /// following characters resolve to a different bidi level, so the grapheme is split over the
+    /// segments [U+0600] [U+0623 U+064F]. Segment boundaries don't force a grapheme boundary:
+    /// the grapheme spans across two shaped runs.
     #[test]
-    fn one_grapheme_split_across_items() {
+    fn one_grapheme_split_across_segments() {
         let shaped = shape_with_font("\u{0600}\u{0623}\u{064F}", NOTO_KUFI_ARABIC);
 
         let grapheme_starts: Vec<bool> =
             shaped.characters.iter().map(|c| c.grapheme_start).collect();
-        assert_eq!(grapheme_starts, [true, true, false]);
+        assert_eq!(grapheme_starts, [true, false, false]);
 
         let clusters: Vec<(u32, u32, bool)> = shaped
             .shaped_clusters
@@ -822,7 +842,38 @@ mod tests {
                 )
             })
             .collect();
-        assert_eq!(clusters, [(0, 1, true), (1, 3, true)]);
+        assert_eq!(clusters, [(0, 1, true), (1, 3, false)]);
+
+        assert_eq!(shaped.runs().len(), 2);
+        let (first, second) = (shaped.run_slice(0), shaped.run_slice(1));
+        assert!(!first.grapheme_continues_before());
+        assert!(first.grapheme_continues_after());
+        assert!(second.grapheme_continues_before());
+        assert!(!second.grapheme_continues_after());
+
+        // The runs' atoms and graphemes stop at the run edges, and report the continuation.
+        let atom = first.atoms_start().next().unwrap();
+        assert_eq!(atom.char_range(), 0..1);
+        assert!(!atom.grapheme_continues_before());
+        assert!(atom.grapheme_continues_after());
+        let atom = second.atoms_end().prev().unwrap();
+        assert_eq!(atom.char_range(), 1..3);
+        assert!(atom.grapheme_continues_before());
+        assert!(!atom.grapheme_continues_after());
+
+        let grapheme = first.graphemes_start().next().unwrap();
+        assert_eq!(grapheme.char_range(), 0..1);
+        assert!(!grapheme.continues_before());
+        assert!(grapheme.continues_after());
+        let grapheme = second.graphemes_end().prev().unwrap();
+        assert_eq!(grapheme.char_range(), 1..3);
+        assert!(grapheme.continues_before());
+        assert!(!grapheme.continues_after());
+        // And walking the other way.
+        let grapheme = first.graphemes_end().prev().unwrap();
+        assert!(!grapheme.continues_before() && grapheme.continues_after());
+        let grapheme = second.graphemes_start().next().unwrap();
+        assert!(grapheme.continues_before() && !grapheme.continues_after());
     }
 
     /// "ffi" is three graphemes but shapes into one cluster.
@@ -928,7 +979,7 @@ mod tests {
         }
     }
 
-    /// An itemization boundary forces a cluster break in shaping, and must force a grapheme start.
+    /// An item boundary forces a grapheme boundary.
     #[test]
     fn item_boundaries_force_grapheme_start() {
         // Two regional indicators forming a single flag grapheme...
@@ -982,6 +1033,10 @@ mod tests {
         let grapheme_starts: Vec<bool> =
             shaped.characters.iter().map(|c| c.grapheme_start).collect();
         assert_eq!(grapheme_starts, [true, true]);
+
+        assert_eq!(shaped.runs().len(), 2);
+        assert!(!shaped.run_slice(0).grapheme_continues_after());
+        assert!(!shaped.run_slice(1).grapheme_continues_before());
 
         // But note that, had we had three regional indicator symbols, like `[R0 R1 R2]` itemized as
         // `[R0] [R1 R2]`, the last pair should form a single grapheme. We don't do that currently.
