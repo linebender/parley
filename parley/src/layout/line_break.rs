@@ -1464,7 +1464,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         // Tabs are sized to their tab stop, as in `break_next`.
                         if whitespace == Whitespace::Tab {
                             let style =
-                                &self.layout.data.styles[first_character.style_index as usize];
+                                &self.layout.data.styles[first_cluster.style_index as usize];
                             advance = self.state.size_and_push_tab(
                                 &mut self.lines.tab_advances,
                                 atom.shaped_clusters_range().start,

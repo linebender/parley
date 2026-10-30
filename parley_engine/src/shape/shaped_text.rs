@@ -658,7 +658,6 @@ mod tests {
     };
 
     use super::{FontMetrics, ShapedText, Whitespace};
-  
 
     #[test]
     fn font_descent_is_a_non_negative_distance() {
