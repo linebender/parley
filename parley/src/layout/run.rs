@@ -125,14 +125,22 @@ impl<'a, B: Brush> Run<'a, B> {
         &self.shaped.font_metrics
     }
 
+    /// The spacing effective for this run on its line: the run's own spacing plus the line's
+    /// justification and tab advances. A run not scoped to a line has no layout-time spacing.
     #[inline]
-    pub(crate) fn line_spacing(&self) -> EffectiveSpacing {
-        let justification = if self.line_data.is_some() {
-            self.layout.data.lines[self.line_index as usize].justification
+    pub(crate) fn line_spacing(&self) -> EffectiveSpacing<'a> {
+        let (justification, tab_advances) = if self.line_data.is_some() {
+            let data = &self.layout.data;
+            let line = &data.lines[self.line_index as usize];
+            (
+                line.justification,
+                &data.tab_advances
+                    [line.tab_advances.start as usize..line.tab_advances.end as usize],
+            )
         } else {
-            Justification::NONE
+            (Justification::NONE, &[][..])
         };
-        EffectiveSpacing::new(self.data.spacing, justification)
+        EffectiveSpacing::new(self.data.spacing, justification, tab_advances)
     }
 
     /// Returns the advance for the run.
@@ -268,7 +276,7 @@ pub(crate) struct Glyphs<'a> {
     slice: ShapedSlice<'a>,
     is_rtl: bool,
     /// The spacing to apply, if any. Without spacing, atoms are not tracked.
-    spacing: Option<EffectiveSpacing>,
+    spacing: Option<EffectiveSpacing<'a>>,
     /// The shaped clusters not yet visited: all of `slice`'s clusters without spacing, otherwise
     /// those of the current atom. Visited in logical order for LTR text and in reverse for RTL.
     shaped_clusters: Range<u32>,
@@ -284,7 +292,7 @@ pub(crate) struct Glyphs<'a> {
 }
 
 impl<'a> Glyphs<'a> {
-    fn new(slice: ShapedSlice<'a>, is_rtl: bool, spacing: EffectiveSpacing) -> Self {
+    fn new(slice: ShapedSlice<'a>, is_rtl: bool, spacing: EffectiveSpacing<'a>) -> Self {
         let clusters = slice.shaped_clusters_range();
         Self {
             slice,

@@ -4,7 +4,8 @@
 use crate::inline_box::LayoutInlineBox;
 use crate::layout::spacing::{Justification, Spacing};
 use crate::layout::style_metrics::{BoxMetrics, StyleMetrics, inline_box_placement};
-use crate::layout::whitespace::whitespace_hangs;
+use crate::layout::tab::tab_advance;
+use crate::layout::whitespace::whitespace_hangs_with_tabs;
 use crate::layout::{ContentWidths, LineMetrics, Style};
 use crate::resolve::ResolvedStyle;
 use crate::style::Brush;
@@ -97,6 +98,24 @@ pub(crate) struct LineData {
     /// Empty for lines with only baseline-relative content because the root aligned subtree
     /// for each line trivially has an offset of 0
     pub(crate) aligned_subtree_offsets: Range<u32>,
+    /// This line's entries in [`LayoutData::tab_advances`]. Empty for lines without tabs.
+    pub(crate) tab_advances: Range<u32>,
+}
+
+/// The advance of a tab on a line, computed by the line breaker when it placed the tab.
+///
+/// A tab shapes to no glyphs and no advance (see [`Whitespace::Tab`]). Its advance is the
+/// distance from where it lands to the next tab stop (see [`tab_advance`]), so it depends on the
+/// line breaking: the line breaker computes it as it places the tab and records it here, per
+/// line, rather than in the shaped text, whose advances are independent of layout. Everything
+/// that reads the line back adds it to the tab's shaped advance through
+/// [`EffectiveSpacing`](crate::layout::spacing::EffectiveSpacing), like justification.
+#[derive(Clone, Copy, Debug, PartialEq)]
+pub(crate) struct TabAdvance {
+    /// The tab's shaped cluster, as an index into [`ShapedText::shaped_clusters`].
+    pub(crate) cluster: u32,
+    /// The distance from where the tab starts to its tab stop.
+    pub(crate) advance: f32,
 }
 
 /// Position of an [independent aligned subtree] rooted at a span with
@@ -197,6 +216,9 @@ pub(crate) struct LayoutData<B: Brush> {
     pub(crate) base_level: BidiLevel,
     /// The length of the text in the layout
     pub(crate) text_len: usize,
+    /// Whether the text contains a tab (U+0009). Tabs need sizing when the content widths are
+    /// measured, which a layout without them skips.
+    pub(crate) has_tabs: bool,
 
     // Output of style resolution (input to line breaking)
     pub(crate) styles: Vec<Style<B>>,
@@ -218,6 +240,10 @@ pub(crate) struct LayoutData<B: Brush> {
     ///
     /// Each line owns a contiguous slice ([`LineData::aligned_subtree_offsets`]).
     pub(crate) aligned_subtree_offsets: Vec<AlignedSubtreeOffset>,
+    /// The advance of each tab in the layout, in logical order (and so sorted by cluster index).
+    ///
+    /// Each line owns a contiguous slice ([`LineData::tab_advances`]).
+    pub(crate) tab_advances: Vec<TabAdvance>,
     /// The width constraint that was used to line break the layout
     pub(crate) layout_max_advance: f32,
     /// The computed width of the layout excluding hanging whitespace
@@ -243,6 +269,7 @@ impl<B: Brush> Default for LayoutData<B> {
             quantize: true,
             base_level: BidiLevel::new(0),
             text_len: 0,
+            has_tabs: false,
             width: 0.,
             full_width: 0.,
             height: 0.,
@@ -259,6 +286,7 @@ impl<B: Brush> Default for LayoutData<B> {
             layout_max_advance: 0.0,
             indent_amount: 0.0,
             indent_options: IndentOptions::default(),
+            tab_advances: Vec::new(),
         }
     }
 }
@@ -269,6 +297,7 @@ impl<B: Brush> LayoutData<B> {
         self.quantize = true;
         self.base_level = BidiLevel::new(0);
         self.text_len = 0;
+        self.has_tabs = false;
         self.width = 0.;
         self.full_width = 0.;
         self.height = 0.;
@@ -284,6 +313,7 @@ impl<B: Brush> LayoutData<B> {
         self.lines.clear();
         self.line_items.clear();
         self.aligned_subtree_offsets.clear();
+        self.tab_advances.clear();
         self.alignment = None;
     }
 
@@ -416,7 +446,14 @@ impl<B: Brush> LayoutData<B> {
     /// - min-content width: any conditionally-hanging suffix hangs in full, so all hanging
     ///   whitespace hangs in full.
     pub(crate) fn calculate_content_widths(&self) -> ContentWidths {
-        ContentWidthsMeasurer::new(self.indent_amount, self.indent_options).measure(self)
+        let measurer = ContentWidthsMeasurer::new(self.indent_amount, self.indent_options);
+        // Tabs are sized by their position on the line, so each constraint sees different tab
+        // advances. The measurer is compiled twice so a layout without tabs doesn't carry that.
+        if self.has_tabs {
+            measurer.measure::<B, true>(self)
+        } else {
+            measurer.measure::<B, false>(self)
+        }
     }
 }
 
@@ -432,10 +469,16 @@ struct ContentWidthsMeasurer {
     /// box is not included in the layout.
     line_has_content: bool,
 
-    /// The running advance of whitespace that would hang if a line ended here. Can exceed
-    /// `running_min_width` when the hanging whitespace started before the last break
-    /// opportunity, in which case the line consists entirely of hanging whitespace.
-    running_hanging_whitespace: f32,
+    /// The running advance of whitespace that would hang if a line ended here, under the
+    /// min-content constraint. Can exceed `running_min_width` when the hanging whitespace started
+    /// before the last break opportunity, in which case the line consists entirely of hanging
+    /// whitespace.
+    running_hanging: f32,
+
+    /// How much more of it hangs under the max-content constraint. Only tabs make the two
+    /// constraints differ, as a tab's advance depends on its position on the line, so this stays
+    /// zero without `TABS` (see [`Self::measure`]).
+    running_max_hanging_extra: f32,
 
     /// Whether that running whitespace hangs conditionally before a forced break (following CSS
     /// Text 4 § 4.3.2, that's the case for `WhiteSpaceCollapse::Preserve`). Conditionally hanging
@@ -459,7 +502,8 @@ impl ContentWidthsMeasurer {
             max_width: 0.,
             running_min_width: first_line_indent,
             running_max_width: first_line_indent,
-            running_hanging_whitespace: 0.,
+            running_hanging: 0.,
+            running_max_hanging_extra: 0.,
             hangs_conditionally: false,
             text_wrap_mode: TextWrapMode::Wrap,
             soft_indent: indent_options.indent_following_soft_wrap_break(indent_amount),
@@ -481,7 +525,7 @@ impl ContentWidthsMeasurer {
         }
         self.min_width = self
             .min_width
-            .max(self.running_min_width - self.running_hanging_whitespace);
+            .max(self.running_min_width - self.running_hanging);
         self.running_min_width = self.soft_indent;
     }
 
@@ -492,22 +536,33 @@ impl ContentWidthsMeasurer {
     ///
     /// [css-inline-formatting]: https://www.w3.org/TR/CSS22/visuren.html#inline-formatting
     #[inline(always)]
-    fn hard_break(&mut self) {
+    fn hard_break<const TABS: bool>(&mut self) {
         self.min_width = self
             .min_width
-            .max(self.running_min_width - self.running_hanging_whitespace);
+            .max(self.running_min_width - self.running_hanging);
         if !self.hangs_conditionally {
-            self.running_max_width -= self.running_hanging_whitespace;
+            self.running_max_width -= self.running_hanging;
+            if TABS {
+                self.running_max_width -= self.running_max_hanging_extra;
+            }
         }
         self.max_width = self.max_width.max(self.running_max_width);
-        self.running_hanging_whitespace = 0.0;
+        self.running_hanging = 0.0;
+        if TABS {
+            self.running_max_hanging_extra = 0.0;
+        }
         self.line_has_content = false;
         self.running_min_width = self.hard_indent;
         self.running_max_width = self.hard_indent;
     }
 
-    #[inline(always)]
-    fn measure<B: Brush>(mut self, layout_data: &LayoutData<B>) -> ContentWidths {
+    /// Measures the layout. With `TABS`, tabs are sized to their stops; without it, the layout
+    /// must not contain tabs (see [`LayoutData::has_tabs`]).
+    //
+    // Not inlined, so that each of the two copies is a function of its own (keeping the hot loop
+    // of the common, tab-free copy compact).
+    #[inline(never)]
+    fn measure<B: Brush, const TABS: bool>(mut self, layout_data: &LayoutData<B>) -> ContentWidths {
         for item in &layout_data.items {
             match item.kind {
                 LayoutItemKind::TextRun => {
@@ -521,7 +576,7 @@ impl ContentWidthsMeasurer {
                     let is_rtl = item.bidi_level.is_rtl();
 
                     if run_spacing.is_zero() {
-                        self.measure_text_run::<B, false>(
+                        self.measure_text_run::<B, false, TABS>(
                             &layout_data.styles,
                             slice,
                             run_spacing,
@@ -529,7 +584,7 @@ impl ContentWidthsMeasurer {
                             is_rtl,
                         );
                     } else {
-                        self.measure_text_run::<B, true>(
+                        self.measure_text_run::<B, true, TABS>(
                             &layout_data.styles,
                             slice,
                             run_spacing,
@@ -546,7 +601,7 @@ impl ContentWidthsMeasurer {
         // The end of a layout is considered to be a forced line break as per CSS Text 4 § 5, so
         // whitespace can hang conditionally.
         if self.line_has_content {
-            self.hard_break();
+            self.hard_break::<TABS>();
         }
 
         // Negative-width inline boxes (e.g. negative margins) can make the max-content width
@@ -571,8 +626,11 @@ impl ContentWidthsMeasurer {
     /// With `SPACED`, each atom's spacing gap is added to the cluster on its visual end, i.e., its
     /// logically last cluster for LTR and its logically first cluster for RTL. The gap then hangs
     /// with that cluster, as in `atom_hanging_advance`. Without `SPACED`, `spacing` is ignored.
+    ///
+    /// With `TABS`, tabs are sized to their stop from each constraint's running width. Without
+    /// it, the run must not contain tabs, and nothing tab-related is touched.
     #[inline(always)]
-    fn measure_text_run<B: Brush, const SPACED: bool>(
+    fn measure_text_run<B: Brush, const SPACED: bool, const TABS: bool>(
         &mut self,
         styles: &[Style<B>],
         slice: ShapedSlice<'_>,
@@ -604,14 +662,14 @@ impl ContentWidthsMeasurer {
                 // `Whitespace::Newline` are forced breaks. Note newlines have no advance.
                 if whitespace == Whitespace::Newline {
                     // Newlines hang, so whitespace before them keeps hanging.
-                    self.hard_break();
+                    self.hard_break::<TABS>();
                     empty_at = i + 1;
                     skip_atom = true;
                     continue;
                 }
                 if SPACED {
                     gap = spacing
-                        .gaps(whitespace, cluster.is_default_ignorable())
+                        .gaps_with_tabs::<TABS>(whitespace, cluster.is_default_ignorable())
                         .after;
                 }
             } else if skip_atom {
@@ -620,7 +678,24 @@ impl ContentWidthsMeasurer {
                 continue;
             }
 
-            let mut advance = cluster.advance;
+            // The cluster's advance under the min-content constraint, and how much more it
+            // advances under the max-content constraint (only a tab's advance differs).
+            let (mut advance, max_extra) = if TABS && whitespace == Whitespace::Tab {
+                let min = tab_advance(
+                    self.running_min_width,
+                    style.tab_size,
+                    style.tab_skip_threshold,
+                );
+                let max = tab_advance(
+                    self.running_max_width,
+                    style.tab_size,
+                    style.tab_skip_threshold,
+                );
+                (min, max - min)
+            } else {
+                debug_assert_ne!(whitespace, Whitespace::Tab, "tabs need `TABS`");
+                (cluster.advance, 0.)
+            };
             if SPACED {
                 let owns_gap = if is_rtl {
                     is_atom_start
@@ -635,27 +710,36 @@ impl ContentWidthsMeasurer {
             }
             self.running_min_width += advance;
             self.running_max_width += advance;
+            if TABS {
+                self.running_max_width += max_extra;
+            }
 
             // A cluster hangs if all of its characters hang. Its first character is checked via the
             // cached flags so the common case never touches `characters`.
             let hangs = can_hang
-                && whitespace_hangs(whitespace, style)
+                && whitespace_hangs_with_tabs::<B, TABS>(whitespace, style)
                 && (cluster.char_len() == 1
                     || slice
                         .characters_in(cluster.chars_range())
                         .iter()
                         .all(|character| {
-                            whitespace_hangs(
+                            whitespace_hangs_with_tabs::<B, TABS>(
                                 character.whitespace,
                                 &styles[character.style_index as usize],
                             )
                         }));
             if hangs {
-                self.running_hanging_whitespace += advance;
+                self.running_hanging += advance;
+                if TABS {
+                    self.running_max_hanging_extra += max_extra;
+                }
                 self.hangs_conditionally =
                     style.white_space_collapse == WhiteSpaceCollapse::Preserve;
             } else {
-                self.running_hanging_whitespace = 0.0;
+                self.running_hanging = 0.0;
+                if TABS {
+                    self.running_max_hanging_extra = 0.0;
+                }
             }
         }
         self.line_has_content = empty_at != clusters.len();

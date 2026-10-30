@@ -7,7 +7,7 @@ use crate::util::TestEnv;
 use crate::{test_name, util::ColorBrush};
 use parley::{
     Alignment, AlignmentOptions, ContentWidths, IndentOptions, InlineBox, InlineBoxKind, Layout,
-    LineBreak, StyleProperty, TextWrapMode, VerticalAlign, WhiteSpaceCollapse,
+    LineBreak, StyleProperty, TabSize, TextWrapMode, VerticalAlign, WhiteSpaceCollapse,
 };
 
 /// Checks that calculated content widths agree with actual line breaking.
@@ -346,6 +346,96 @@ fn content_widths_trailing_whitespace_by_collapse_mode() {
         "Max content width {} should be the widest word's width {word_width}",
         widths.max,
     );
+}
+
+/// Guards against the content width measurer and the line breaker disagreeing on tab advances,
+/// in either constraint, with indents, and in mixed-direction text. Source: the layout itself,
+/// through `assert_content_widths_match_layout`.
+#[test]
+fn content_widths_tabs() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    // Tabs are sized by their position on the line, so the min- and max-content widths see
+    // different tab advances: under min-content, every tab ends a line and hangs; under
+    // max-content, each tab reaches the next stop.
+    let space = single_line_width(&mut env, " ");
+    let tab_size = 8. * space;
+    let aa = single_line_width(&mut env, "AA");
+    let bb_cc = single_line_width(&mut env, "BB CC");
+    let dd = single_line_width(&mut env, "DD");
+    // Tabs advance at least half a space. The first tab reaches the first stop; "BB CC" then
+    // ends between the second stop (minus half a space) and the third, so the second tab reaches
+    // the third stop.
+    let tab_size = TabSize::new(tab_size).with_skip_threshold(space / 2.);
+    assert!(aa < tab_size.size);
+    assert!(bb_cc >= tab_size.size - space / 2. && bb_cc < 2. * tab_size.size - space / 2.);
+
+    let text = "AA\tBB CC\tDD";
+    let mut builder = env.ranged_builder(text);
+    builder.push_default(StyleProperty::TabSize(tab_size));
+    let mut layout = builder.build(text);
+    let widths = assert_content_widths_match_layout(&mut layout);
+    let widest_word = ["AA", "BB", "CC", "DD"]
+        .into_iter()
+        .map(|word| single_line_width(&mut env, word))
+        .fold(0., f32::max);
+    assert!(
+        (widths.min - widest_word).abs() < 1e-3,
+        "Min content width {} should be the widest word {widest_word}, with the tabs hanging",
+        widths.min
+    );
+    let expected_max = 3. * tab_size.size + dd;
+    assert!(
+        (widths.max - expected_max).abs() < 1e-3,
+        "Max content width {} should reach the third stop then DD ({expected_max})",
+        widths.max
+    );
+
+    // Tab stops are measured from the indented line start, and a tab at the start of a line
+    // takes a full tab size.
+    for text in ["AA\tBB", "\tAA BB", "AA\n\tBB"] {
+        let mut builder = env.ranged_builder(text);
+        builder.push_default(StyleProperty::TabSize(tab_size));
+        let mut layout = builder.build(text);
+        layout.set_text_indent(10., IndentOptions::default());
+        assert_content_widths_match_layout(&mut layout);
+    }
+
+    // Tabs in mixed-direction text are positioned along the logical advance, both when breaking
+    // lines and when measuring.
+    for text in [
+        "abc\t\u{627}\u{627}\u{627} \u{628}\u{628}\u{628}\tdef",
+        "\u{627}\u{627}\u{627}\tabc\t\u{628}\u{628}\u{628}",
+    ] {
+        let mut builder = env.ranged_builder(text);
+        builder.push_default(StyleProperty::TabSize(
+            TabSize::new(4. * space).with_skip_threshold(space / 2.),
+        ));
+        let mut layout = builder.build(text);
+        assert_content_widths_match_layout(&mut layout);
+    }
+}
+
+/// Guards against the measurer losing, or keeping too long, the extra max-content hanging advance
+/// that a hanging tab leaves behind when the whitespace after it continues into another run.
+/// Source: the layout itself, through `assert_content_widths_match_layout`.
+#[test]
+fn content_widths_tabs_followed_by_a_run_without_tabs() {
+    let mut env = TestEnv::new(test_name!(), None);
+    for text in ["AA AA\t  ", "AA AA\t B  ", "AA AA\t B \n"] {
+        let mut builder = env.ranged_builder(text);
+        builder.push_default(StyleProperty::WhiteSpaceCollapse(
+            WhiteSpaceCollapse::Collapse,
+        ));
+        builder.push_default(StyleProperty::TabSize(TabSize::new(40.)));
+        // A font size change after the tab starts a new run.
+        builder.push(
+            StyleProperty::FontSize(24.),
+            text.find('\t').unwrap() + 1..text.len(),
+        );
+        let mut layout = builder.build(text);
+        assert_content_widths_match_layout(&mut layout);
+    }
 }
 
 #[test]

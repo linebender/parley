@@ -59,15 +59,25 @@ impl WhiteSpaceCollapse {
 // https://github.com/linebender/parley/pull/762#discussion_r3923722770.
 #[inline(always)]
 pub(crate) fn whitespace_hangs<B: Brush>(whitespace: Whitespace, style: &Style<B>) -> bool {
+    whitespace_hangs_with_tabs::<B, true>(whitespace, style)
+}
+
+/// [`whitespace_hangs`], for text known to contain no tabs when `TABS` is false, which then skips
+/// the tab check. Only the content width measurer, which is compiled both ways, uses this.
+#[inline(always)]
+pub(crate) fn whitespace_hangs_with_tabs<B: Brush, const TABS: bool>(
+    whitespace: Whitespace,
+    style: &Style<B>,
+) -> bool {
+    let space_hangs = |style: &Style<B>| match style.white_space_collapse {
+        WhiteSpaceCollapse::BreakSpaces => false,
+        WhiteSpaceCollapse::Preserve => style.text_wrap_mode == TextWrapMode::Wrap,
+        _ => true,
+    };
     match whitespace {
         Whitespace::Newline => true,
-        Whitespace::Space | Whitespace::IdeographicSpace | Whitespace::Tab => {
-            match style.white_space_collapse {
-                WhiteSpaceCollapse::BreakSpaces => false,
-                WhiteSpaceCollapse::Preserve => style.text_wrap_mode == TextWrapMode::Wrap,
-                _ => true,
-            }
-        }
+        Whitespace::Space | Whitespace::IdeographicSpace => space_hangs(style),
+        Whitespace::Tab if TABS => space_hangs(style),
         _ => false,
     }
 }
@@ -84,7 +94,7 @@ pub(crate) fn atom_hanging_advance<B: Brush>(
     slice: ShapedSlice<'_>,
     atom: &Atom<'_>,
     styles: &[Style<B>],
-    spacing: EffectiveSpacing,
+    spacing: EffectiveSpacing<'_>,
     is_rtl: bool,
 ) -> (f32, bool) {
     let gaps = spacing.gaps(atom);

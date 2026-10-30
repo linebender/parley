@@ -7,12 +7,17 @@ use crate::{
 };
 use parley::{
     Alignment, AlignmentOptions, BaseDirection, BreakReason, InlineBox, InlineBoxKind, Layout,
-    OverflowWrap, StyleProperty, TextWrapMode, VerticalAlign, WhiteSpaceCollapse, WordBreak,
+    OverflowWrap, StyleProperty, TabSize, TextWrapMode, VerticalAlign, WhiteSpaceCollapse,
+    WordBreak,
 };
 
 fn nearly_eq(actual: f32, expected: f32) {
     assert!((actual - expected).abs() < 1e-3, "{actual} != {expected}");
 }
+
+/// The distance between tab stops. Tabs take no space by default, so the tests that use tabs as
+/// whitespace give them stops to advance to.
+const TAB_SIZE: f32 = 20.;
 
 /// A layout of `text` with the given whitespace and wrapping modes.
 fn build(
@@ -24,6 +29,7 @@ fn build(
     let mut builder = env.ranged_builder(text);
     builder.push_default(StyleProperty::WhiteSpaceCollapse(collapse));
     builder.push_default(StyleProperty::TextWrapMode(wrap));
+    builder.push_default(StyleProperty::TabSize(TabSize::new(TAB_SIZE)));
     builder.build(text)
 }
 
@@ -34,6 +40,7 @@ fn advance(env: &mut TestEnv, text: &str) -> f32 {
         WhiteSpaceCollapse::Preserve,
     ));
     builder.push_default(StyleProperty::TextWrapMode(TextWrapMode::NoWrap));
+    builder.push_default(StyleProperty::TabSize(TabSize::new(TAB_SIZE)));
     let mut layout: Layout<ColorBrush> = builder.build(text);
     layout.break_all_lines(None);
     layout.full_width()

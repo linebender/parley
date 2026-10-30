@@ -363,7 +363,7 @@ impl<'a, B: Brush> GlyphRun<'a, B> {
 #[derive(Clone)]
 struct AtomIter<'a> {
     atoms: Atoms<'a>,
-    spacing: EffectiveSpacing,
+    spacing: EffectiveSpacing<'a>,
     is_rtl: bool,
     /// The next atom in visual order, if it has been peeked but not yet consumed.
     peeked: Option<Atom<'a>>,
@@ -403,8 +403,11 @@ impl<'a> AtomIter<'a> {
         self.peeked = None;
     }
 
-    /// The number of glyphs in `atom` and the sum of their advances (including spacing gaps),
-    /// matching what [`Run::glyphs_in`] yields for the atom's clusters.
+    /// The number of glyphs in `atom` and its advance including spacing gaps.
+    ///
+    /// A tab has no glyphs but does have an advance (its gap), which [`Run::glyphs_in`] can't
+    /// yield as there is no glyph to attach it to; the glyph run iterator moves the next glyph run
+    /// along by it instead.
     #[inline]
     fn measure(&self, atom: &Atom<'a>) -> (usize, f32) {
         let glyph_count: usize = atom
@@ -413,7 +416,7 @@ impl<'a> AtomIter<'a> {
             .map(|cluster| usize::from(cluster.glyph_len()))
             .sum();
         let mut advance = atom.advance();
-        if glyph_count != 0 && !self.spacing.is_zero() {
+        if !self.spacing.is_zero() {
             advance += self.spacing.gaps(atom).total();
         }
         (glyph_count, advance)
@@ -467,13 +470,15 @@ impl<'a, B: Brush> Iterator for GlyphRunIter<'a, B> {
 
                     // Styles are uniform within an atom, so glyph runs always end on atom
                     // boundaries and the iterator only needs to resume at atom granularity.
-                    // Atoms without glyphs don't take part.
+                    // Atoms without glyphs don't take part, but a tab's advance still moves what
+                    // follows it.
                     let mut advance = 0.0;
                     let mut glyph_count = 0;
                     // The style index and shaped cluster range of the glyph run being accumulated.
                     let mut glyph_run: Option<(u16, Range<u32>)> = None;
                     while let Some(atom) = atoms.peek() {
                         let (atom_glyph_count, atom_advance) = atoms.measure(&atom);
+                        // The common case first: an atom with glyphs joins the glyph run.
                         if atom_glyph_count != 0 {
                             let atom_style_index = atom.characters()[0].style_index;
                             let atom_clusters = atom.shaped_clusters_range();
@@ -503,11 +508,18 @@ impl<'a, B: Brush> Iterator for GlyphRunIter<'a, B> {
                                 &self.line.layout.data.inline_boxes,
                                 atom.characters()[0].text_byte_start as usize,
                             );
-                            // The object's advance is its box's width.
-                            let gaps = atoms.spacing.gaps(&atom);
-                            let x = self.offset + gaps.before;
-                            self.offset += atom_advance + gaps.total();
+                            // The object's advance is its box's width plus its spacing gaps.
+                            let x = self.offset + atoms.spacing.gaps(&atom).before;
+                            self.offset += atom_advance;
                             return Some(self.positioned_inline_box(box_index, x));
+                        } else if atom_advance != 0. {
+                            // A glyph run positions its glyphs by their advances alone, so an
+                            // advance without glyphs (a tab's) can't sit inside one: end the
+                            // glyph run being accumulated, and shift the next one.
+                            if glyph_run.is_some() {
+                                break;
+                            }
+                            self.offset += atom_advance;
                         }
                         atoms.consume();
                     }

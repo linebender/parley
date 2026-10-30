@@ -106,6 +106,57 @@ impl LineHeight {
     }
 }
 
+/// The distance between tab stops, and how close to its next stop a tab may land before it skips
+/// to the one after. See [`StyleProperty::TabSize`].
+#[derive(Debug, Clone, Copy, PartialEq)]
+pub struct TabSize {
+    /// The distance between tab stops, in layout units.
+    pub size: f32,
+    /// The skip threshold, in layout units: a tab whose next stop is closer than this skips to the
+    /// stop after it, one stop at most. `None` uses half the root style's font size (`0.5em`).
+    pub skip_threshold: Option<f32>,
+}
+
+impl TabSize {
+    /// Tab stops every `size` layout units, with the default skip threshold.
+    pub const fn new(size: f32) -> Self {
+        Self {
+            size,
+            skip_threshold: None,
+        }
+    }
+
+    /// The same tab stops, skipping a stop that is closer than `skip_threshold` layout units.
+    pub const fn with_skip_threshold(self, skip_threshold: f32) -> Self {
+        Self {
+            size: self.size,
+            skip_threshold: Some(skip_threshold),
+        }
+    }
+
+    pub(crate) fn nearly_eq(self, other: Self) -> bool {
+        nearly_eq(self.size, other.size)
+            && match (self.skip_threshold, other.skip_threshold) {
+                (Some(a), Some(b)) => nearly_eq(a, b),
+                (None, None) => true,
+                _ => false,
+            }
+    }
+
+    pub(crate) fn scale(self, scale: f32) -> Self {
+        Self {
+            size: self.size * scale,
+            skip_threshold: self.skip_threshold.map(|x| x * scale),
+        }
+    }
+}
+
+impl Default for TabSize {
+    fn default() -> Self {
+        Self::new(0.)
+    }
+}
+
 /// Which reference of a span (or [`InlineBox`]) is aligned with the same reference of its
 /// *parent* span (the enclosing style span, or the root style for top-level content). Mirrors the
 /// CSS `alignment-baseline` property.
@@ -277,6 +328,12 @@ pub enum StyleProperty<'a, B: Brush> {
     TextWrapMode(TextWrapMode),
     /// Whitespace collapsing and hanging behavior.
     WhiteSpaceCollapse(WhiteSpaceCollapse),
+    /// The distance between tab stops, in layout units. Corresponds to providing a length as
+    /// [`tab-size`](https://developer.mozilla.org/en-US/docs/Web/CSS/Reference/Properties/tab-size)
+    /// in CSS. Defaults to 0.0, so tabs have no effect on the text.
+    ///
+    /// A tab too close to its next stop skips to the one after it; see [`TabSize::skip_threshold`].
+    TabSize(TabSize),
 }
 
 /// Unresolved styles.
@@ -334,6 +391,8 @@ pub struct TextStyle<'family, 'settings, B: Brush> {
     pub text_wrap_mode: TextWrapMode,
     /// Whitespace collapsing and hanging behavior.
     pub white_space_collapse: WhiteSpaceCollapse,
+    /// The distance between tab stops.
+    pub tab_size: TabSize,
 }
 
 impl<B: Brush> Default for TextStyle<'static, 'static, B> {
@@ -365,6 +424,7 @@ impl<B: Brush> Default for TextStyle<'static, 'static, B> {
             overflow_wrap: OverflowWrap::default(),
             text_wrap_mode: TextWrapMode::default(),
             white_space_collapse: WhiteSpaceCollapse::default(),
+            tab_size: TabSize::default(),
         }
     }
 }
@@ -450,6 +510,12 @@ impl<B: Brush> From<LineBreak> for StyleProperty<'_, B> {
 impl<B: Brush> From<OverflowWrap> for StyleProperty<'_, B> {
     fn from(value: OverflowWrap) -> Self {
         StyleProperty::OverflowWrap(value)
+    }
+}
+
+impl<B: Brush> From<TabSize> for StyleProperty<'_, B> {
+    fn from(value: TabSize) -> Self {
+        Self::TabSize(value)
     }
 }
 

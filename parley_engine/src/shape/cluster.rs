@@ -102,6 +102,13 @@ pub enum Whitespace {
     OtherSpaceSeparator = 4,
 
     /// Horizontal tab.
+    ///
+    /// Parley Engine shapes a tab to no glyphs and a zero advance, like a [newline](Self::Newline),
+    /// and does not determine its advance: that is the distance to the next tab stop, which
+    /// depends on where the tab lands on a line. Layout engines which wish to draw tabs must
+    /// compute each tab's advance themselves; see for example [CSS `tab-size`][tab-size].
+    ///
+    /// [tab-size]: https://www.w3.org/TR/css-text-4/#tab-size-property
     Tab = 5,
 
     /// Newline (CR, LF, CRLF, LS, or PS).

@@ -537,26 +537,30 @@ fn process_shaped_clusters<'a>(
         shaped_clusters: &mut Vec<ShapedCluster>,
     ) {
         let first_character = &characters[cluster.characters_start];
-        let is_newline = first_character.whitespace == Whitespace::Newline;
+        let is_glyphless_control = matches!(
+            first_character.whitespace,
+            Whitespace::Newline | Whitespace::Tab
+        );
         let is_inline_object = first_character.flags.is_inline_object();
         debug_assert!(
             !is_inline_object || char_end - cluster.characters_start == 1,
             "an inline object must be a cluster of its own"
         );
-        let (glyph_offset, glyph_len, inline_glyph, advance) = if is_newline || is_inline_object {
-            // Elide glyphs and advances of newlines and inline objects. Note that inline objects'
-            // advances can be set later by the user.
-            (cluster.glyphs_start as u32, 0, false, 0.)
-        } else if let Some(inline_glyph) = cluster.inline_glyph.take() {
-            (inline_glyph.id, 1, true, cluster.advance)
-        } else {
-            (
-                cluster.glyphs_start as u32,
-                cluster.glyphs as u8,
-                false,
-                cluster.advance,
-            )
-        };
+        let (glyph_offset, glyph_len, inline_glyph, advance) =
+            if is_glyphless_control || is_inline_object {
+                // Elide glyphs and advances of newlines, tabs and inline objects. Note that inline
+                // objects' advances can be set later by the user.
+                (cluster.glyphs_start as u32, 0, false, 0.)
+            } else if let Some(inline_glyph) = cluster.inline_glyph.take() {
+                (inline_glyph.id, 1, true, cluster.advance)
+            } else {
+                (
+                    cluster.glyphs_start as u32,
+                    cluster.glyphs as u8,
+                    false,
+                    cluster.advance,
+                )
+            };
 
         shaped_clusters.push(ShapedCluster {
             chars_range: (cluster.characters_start as u32, char_end as u32),
@@ -653,7 +657,7 @@ mod tests {
         shape::CharCluster,
     };
 
-    use super::{FontMetrics, ShapedText};
+    use super::{FontMetrics, ShapedText, Whitespace};
 
     #[test]
     fn font_descent_is_a_non_negative_distance() {
@@ -895,18 +899,82 @@ mod tests {
     }
 
     #[test]
-    fn newlines_removed() {
-        for newline in ["\n", "\r", "\u{2028}", "\u{2029}"] {
-            let shaped = shape_with_font(&alloc::format!("a{newline}b"), ROBOTO);
+    fn newlines_and_tabs_removed() {
+        for font in [ROBOTO, NOTO_COLOR_EMOJI] {
+            for control in ["\n", "\r", "\u{2028}", "\u{2029}", "\t"] {
+                let shaped = shape_with_font(&alloc::format!("a{control}b"), font);
+                let cluster = shaped
+                    .shaped_clusters
+                    .iter()
+                    .find(|cluster| cluster.chars_range().start == 1)
+                    .unwrap();
+                let expected = if control == "\t" {
+                    Whitespace::Tab
+                } else {
+                    Whitespace::Newline
+                };
+                assert_eq!(cluster.whitespace(), expected);
+                assert_eq!(cluster.glyph_len(), 0, "{control:?} glyphs are removed");
+                assert_eq!(cluster.advance, 0., "{control:?} advance is set to 0");
+            }
+        }
+    }
 
-            let index = shaped
-                .shaped_clusters
-                .iter()
-                .position(|cluster| cluster.chars_range().start == 1)
-                .unwrap();
-            let newline_cluster = &shaped.shaped_clusters[index];
-            assert_eq!(newline_cluster.glyph_len(), 0, "newline glyphs are removed");
-            assert_eq!(newline_cluster.advance, 0., "newline advance is set to 0");
+    /// A tab is always its own grapheme, as UAX #29 breaks before and after a control character,
+    /// so a combining mark after a tab never attaches to it; so is a newline, apart from CRLF,
+    /// which is one grapheme of two clusters. Grapheme boundaries don't bound shaping clusters,
+    /// though: `HarfRust` merges a default-ignorable character that it removes (rather than
+    /// replacing it with the font's invisible glyph, which the Noto Color Emoji subset lacks) into
+    /// the cluster before it, which can be a tab or a newline. Such a cluster still has no glyphs
+    /// and no advance, and its whitespace class is still that of the control, so it is handled
+    /// like a bare tab or newline.
+    #[test]
+    fn marks_and_joiners_after_a_tab_leave_it_glyphless() {
+        for font in [ROBOTO, NOTO_COLOR_EMOJI] {
+            for control in ["\t", "\n", "\r\n"] {
+                for follower in ["\u{301}", "\u{200D}"] {
+                    let text = alloc::format!("a{control}{follower}b");
+                    let shaped = shape_with_font(&text, font);
+                    let after = u32::try_from(1 + control.chars().count()).unwrap();
+                    // The character after the control starts a grapheme of its own.
+                    assert!(shaped.characters[after as usize].grapheme_start, "{text:?}");
+                    // Each character of the control starts a cluster of its own (CR and LF each
+                    // do), and none of them has glyphs or an advance.
+                    let controls: Vec<_> = shaped
+                        .shaped_clusters
+                        .iter()
+                        .filter(|cluster| (1..after).contains(&cluster.chars_range().start))
+                        .collect();
+                    assert_eq!(controls.len(), (after - 1) as usize, "{text:?}");
+                    assert_eq!(controls[0].chars_range().start, 1, "{text:?}");
+                    let expected_whitespace = if control == "\t" {
+                        Whitespace::Tab
+                    } else {
+                        Whitespace::Newline
+                    };
+                    for cluster in controls {
+                        assert_eq!(cluster.whitespace(), expected_whitespace, "{text:?}");
+                        assert_eq!(cluster.glyph_len(), 0, "{text:?}");
+                        assert_eq!(cluster.advance, 0., "{text:?}");
+                    }
+                    // A combining mark is never merged into a control's cluster. A removed joiner
+                    // may be; either way "b" starts the next cluster with glyphs.
+                    if follower == "\u{301}" {
+                        let last_control = shaped
+                            .shaped_clusters
+                            .iter()
+                            .find(|cluster| cluster.chars_range().start == after - 1)
+                            .unwrap();
+                        assert_eq!(last_control.chars_range().end, after, "{text:?}");
+                    }
+                    let b = shaped
+                        .shaped_clusters
+                        .iter()
+                        .find(|cluster| cluster.chars_range().start == after + 1)
+                        .unwrap();
+                    assert_eq!(b.glyph_len(), 1, "{text:?}");
+                }
+            }
         }
     }
 

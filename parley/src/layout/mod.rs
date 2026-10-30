@@ -10,6 +10,7 @@ mod line_break;
 mod run;
 mod spacing;
 pub(crate) mod style_metrics;
+mod tab;
 mod whitespace;
 
 // TODO - Add to allowed lint set?
@@ -67,6 +68,12 @@ pub struct Style<B: Brush> {
     pub(crate) text_wrap_mode: TextWrapMode,
     /// Per-cluster whitespace collapsing and hanging behavior.
     pub(crate) white_space_collapse: WhiteSpaceCollapse,
+    /// The distance between tab stops, in layout units (see
+    /// [`StyleProperty::TabSize`](crate::StyleProperty::TabSize)).
+    pub(crate) tab_size: f32,
+    /// How close to its next stop a tab may land before it skips to the one after, in layout units
+    /// (see [`TabSize::skip_threshold`](crate::TabSize::skip_threshold)).
+    pub(crate) tab_skip_threshold: f32,
     /// The locale of the text, if any.
     ///
     /// This is useful for consumers exposing the text to assistive technologies,
