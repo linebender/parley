@@ -275,18 +275,8 @@ fn shape_segment(
         harfrust::Direction::LeftToRight
     };
     let hb_script = script_to_harfrust(segment.script);
-    let language = options
-        .language
-        .as_ref()
-        .and_then(|lang| lang.as_str().parse::<harfrust::Language>().ok());
-    scx.features.clear();
-    scx.features.extend(options.features.iter().map(|feature| {
-        harfrust::Feature::new(
-            harfrust::Tag::new(&feature.tag.to_bytes()),
-            feature.value as u32,
-            ..,
-        )
-    }));
+    let language = language_to_harfrust(options.language.as_ref());
+    features_to_harfrust(options.features, &mut scx.features);
 
     // Shape a run of the segment with a single font, appending it to `shaped_text`.
     let mut shape_run = |font: &FontInstance, range: TextRange| {
@@ -472,6 +462,21 @@ fn variations_iter<'a>(
             tag: harfrust::Tag::new(&variation.tag.to_bytes()),
             value: variation.value,
         }))
+}
+
+pub(crate) fn language_to_harfrust(language: Option<&Language>) -> Option<harfrust::Language> {
+    language.and_then(|lang| lang.as_str().parse::<harfrust::Language>().ok())
+}
+
+pub(crate) fn features_to_harfrust(features: &[FontFeature], out: &mut Vec<harfrust::Feature>) {
+    out.clear();
+    out.extend(features.iter().map(|feature| {
+        harfrust::Feature::new(
+            harfrust::Tag::new(&feature.tag.to_bytes()),
+            feature.value as u32,
+            ..,
+        )
+    }));
 }
 
 pub(crate) fn script_to_harfrust(script: fontique::Script) -> harfrust::Script {
