@@ -191,6 +191,61 @@ impl<B: Brush> Layout<B> {
         }
     }
 
+    /// Returns the line containing `byte_index` and the x-coordinate of the primary caret there.
+    ///
+    /// The primary caret is where text in the paragraph's direction would be inserted. Where the
+    /// text direction changes, this would be the position of a bidi neutral.
+    ///
+    /// This can be useful to, e.g., anchor things to the text that don't take part in layout.
+    ///
+    /// Returns `None` if the layout hasn't been broken into lines. See [`Self::break_lines`] and
+    /// [`Self::break_all_lines`].
+    pub fn primary_caret(&self, byte_index: usize) -> Option<(Line<'_, B>, f32)> {
+        let byte_index = byte_index.min(self.data.text_len);
+
+        // The last line starting at or before `byte_index`.
+        let index = self
+            .data
+            .lines
+            .partition_point(|line| line.text_range.start <= byte_index);
+        let line = self.get(index.checked_sub(1)?)?;
+
+        let cluster_at = |byte_index| {
+            line.runs()
+                .find_map(|run| run.cluster_at_text_byte(byte_index))
+        };
+        let before = byte_index.checked_sub(1).and_then(cluster_at);
+        let after = cluster_at(byte_index);
+        let [before_level, after_level] = [before, after]
+            .map(|cluster| cluster.map_or(self.data.base_level, |c| c.run.shaped.bidi_level));
+
+        // A bidi-neutral would take the lower of its neighbors' bidi levels, so it sits against
+        // that neighbor.
+        //
+        // We're either at the trailing edge of the character before, or the leading edge of the
+        // character after. Trailing is right in LTR, leading is left in LTR. Vice-versa for RTL.
+        let trailing = before_level <= after_level;
+        let neighbor = if trailing { before } else { after };
+        let x = match neighbor {
+            Some(cluster) => {
+                let right = trailing != cluster.is_rtl();
+                cluster.visual_offset()? + if right { cluster.advance() } else { 0. }
+            }
+            // If there's no neighbor, place the caret at the line's start edge if we're trailing,
+            // or end edge if we're leading.
+            None => {
+                let metrics = line.metrics();
+                let left = metrics.offset + metrics.inline_min_coord;
+                if trailing != self.is_rtl() {
+                    left
+                } else {
+                    left + line.runs().map(|run| run.advance()).sum::<f32>()
+                }
+            }
+        };
+        Some((line, x))
+    }
+
     /// Returns an iterator over the lines in the layout.
     pub fn lines(
         &self,

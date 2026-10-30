@@ -12,7 +12,10 @@ use crate::{
     test_name,
     util::{ColorBrush, CursorTest, TestEnv, env::create_font_context},
 };
-use parley::{Affinity, Cluster, ClusterPath, Cursor, LayoutContext, Selection};
+use parley::{
+    Affinity, Alignment, AlignmentOptions, BaseDirection, Cluster, ClusterPath, Cursor,
+    LayoutContext, Selection,
+};
 
 #[test]
 fn cursor_previous_visual() {
@@ -156,4 +159,51 @@ fn cluster_navigation_hard_breaks_and_trailing_newline() {
 #[test]
 fn cluster_navigation_multi_character_graphemes() {
     check_cluster_navigation("e\u{0301}x 🇳🇱 a\r\nb", None);
+}
+
+#[test]
+fn primary_caret_position() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    for text in ["aaa bbb", "aaa ببب"] {
+        // These are some positions where the caret lands exactly on one edge of the line.
+        //
+        // Returns the start of the caret's line, and which edge of the line's content the caret is
+        // at, if either.
+        let mut position = |direction, index, wrap: bool| {
+            let mut builder = env.ranged_builder(text);
+            builder.set_base_direction(direction);
+            let mut layout = builder.build(text);
+            layout.break_all_lines(wrap.then(|| layout.calculate_content_widths().min));
+            layout.align(Alignment::Start, AlignmentOptions::default());
+            let (line, x) = layout.primary_caret(index).unwrap();
+            let left = line.metrics().offset + line.metrics().inline_min_coord;
+            let edges = [(left, "left"), (left + line.metrics().advance, "right")];
+            let edge = edges.into_iter().find(|(edge, _)| (edge - x).abs() < 1e-3);
+            (line.text_range().start, edge.map(|(_, side)| side))
+        };
+        assert_eq!(position(BaseDirection::Ltr, 0, false), (0, Some("left")));
+        assert_eq!(
+            position(BaseDirection::Ltr, text.len(), false),
+            (0, Some("right"))
+        );
+        assert_eq!(position(BaseDirection::Rtl, 0, false), (0, Some("right")));
+        assert_eq!(
+            position(BaseDirection::Rtl, text.len(), false),
+            (0, Some("left"))
+        );
+        assert_eq!(position(BaseDirection::Ltr, 4, true), (4, Some("left")));
+    }
+
+    // In an LTR paragraph, between an RTL word and a space, the caret sits against the space.
+    let text = "ببب aaa";
+    let mut builder = env.ranged_builder(text);
+    builder.set_base_direction(BaseDirection::Ltr);
+    let mut layout = builder.build(text);
+    layout.break_all_lines(None);
+    let space = Cluster::from_byte_index(&layout, 6).unwrap();
+    assert_eq!(
+        layout.primary_caret(6).unwrap().1,
+        space.visual_offset().unwrap()
+    );
 }
