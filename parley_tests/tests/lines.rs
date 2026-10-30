@@ -10,8 +10,8 @@ use crate::test_name;
 use crate::util::{ColorBrush, TestEnv};
 use parley::VerticalAlign;
 use parley::{
-    Affinity, Alignment, AlignmentOptions, BoundingBox, Brush, Cursor, InlineBox, InlineBoxKind,
-    Layout, Line, LineHeight, Selection, StyleProperty,
+    Affinity, Alignment, AlignmentOptions, BoundingBox, Brush, Cursor, InlineBox, Layout, Line,
+    LineHeight, Selection, StyleProperty,
 };
 use peniko::kurbo::Size;
 
@@ -144,7 +144,6 @@ fn build_layout<A: Into<Option<f32>>>(
 
     builder.push_inline_box(InlineBox {
         id: 0,
-        kind: InlineBoxKind::InFlow,
         index: boxes.next().unwrap(),
         width: 50.0,
         height: 5.0,
@@ -153,7 +152,6 @@ fn build_layout<A: Into<Option<f32>>>(
     });
     builder.push_inline_box(InlineBox {
         id: 1,
-        kind: InlineBoxKind::InFlow,
         index: boxes.next().unwrap(),
         width: 50.0,
         height: 3.0,
@@ -532,7 +530,6 @@ fn lines_negative_leading_inline_box_grows_line_box() {
     builder.push_default(LineHeight::Absolute(line_height_px));
     builder.push_inline_box(InlineBox {
         id: 0,
-        kind: InlineBoxKind::InFlow,
         index: 5,
         width: 12.0,
         height: box_height,

@@ -61,8 +61,8 @@ See the [examples](https://github.com/linebender/parley/tree/main/examples) dire
 
 ```rust
 use parley::{
-   Alignment, AlignmentOptions, FontContext, FontWeight, InlineBox, InlineBoxKind, Layout,
-   LayoutContext, LineHeight, PositionedLayoutItem, StyleProperty, VerticalAlign,
+   Alignment, AlignmentOptions, FontContext, FontWeight, InlineBox, Layout, LayoutContext,
+   LineHeight, PositionedLayoutItem, StyleProperty, VerticalAlign,
 };
 
 // Create a FontContext (font database) and LayoutContext (scratch space).
@@ -83,7 +83,7 @@ builder.push(StyleProperty::FontWeight(FontWeight::new(600.0)), 0..4);
 
 // Add a box to be laid out inline with the text, in place of the U+FFFC OBJECT REPLACEMENT
 // CHARACTER
-builder.push_inline_box(InlineBox { id: 0, kind: InlineBoxKind::InFlow, index: 5, width: 50.0, height: 50.0, baseline: None, vertical_align: VerticalAlign::BASELINE });
+builder.push_inline_box(InlineBox { id: 0, index: 5, width: 50.0, height: 50.0, baseline: None, vertical_align: VerticalAlign::BASELINE });
 
 // Build the builder into a Layout
 let mut layout: Layout<()> = builder.build(&TEXT);

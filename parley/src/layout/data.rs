@@ -1,6 +1,7 @@
 // Copyright 2021 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+use crate::FloatedBox;
 use crate::inline_box::LayoutInlineBox;
 use crate::layout::spacing::{Justification, Spacing};
 use crate::layout::style_metrics::{BoxMetrics, StyleMetrics, inline_box_placement};
@@ -146,15 +147,10 @@ impl LineData {
 
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct LineItemData {
-    /// Whether the item is a run or an out-of-flow box
-    pub(crate) kind: LayoutItemKind,
-    /// The index of the run or out-of-flow box in the runs or `inline_boxes` vec
+    /// The index of the run in the runs vec
     pub(crate) index: usize,
     /// Bidi level for the item (used for reordering)
     pub(crate) bidi_level: BidiLevel,
-
-    // Fields that only apply to text runs (Ignored for boxes)
-    // TODO: factor this out?
     /// Range of the source text.
     pub(crate) text_range: Range<usize>,
     /// This run's shaped clusters on this line, as a range into [`ShapedText::shaped_clusters`].
@@ -168,22 +164,6 @@ impl LineItemData {
     pub(crate) fn is_rtl(&self) -> bool {
         self.bidi_level.is_rtl()
     }
-}
-
-#[derive(Debug, Clone, Copy, PartialEq, Eq)]
-pub(crate) enum LayoutItemKind {
-    TextRun,
-    OutOfFlowBox,
-}
-
-#[derive(Debug, Clone, PartialEq)]
-pub(crate) struct LayoutItem {
-    /// Whether the item is a run or an out-of-flow box
-    pub(crate) kind: LayoutItemKind,
-    /// The index of the run or out-of-flow box in the runs or `inline_boxes` vec
-    pub(crate) index: usize,
-    /// Bidi level for the item (used for reordering)
-    pub(crate) bidi_level: BidiLevel,
 }
 
 #[derive(Clone, Debug, PartialEq)]
@@ -202,11 +182,11 @@ pub(crate) struct LayoutData<B: Brush> {
     pub(crate) styles: Vec<Style<B>>,
     pub(crate) style_metrics: Vec<StyleMetrics>,
     pub(crate) inline_boxes: Vec<LayoutInlineBox>,
+    pub(crate) floated_boxes: Vec<FloatedBox>,
 
     // Output of shaping (input to line breaking)
     pub(crate) shaped_text: ShapedText,
     pub(crate) runs: Vec<RunData>,
-    pub(crate) items: Vec<LayoutItem>,
 
     // Output of line breaking
     /// The lines in the
@@ -249,9 +229,9 @@ impl<B: Brush> Default for LayoutData<B> {
             styles: Vec::new(),
             style_metrics: Vec::new(),
             inline_boxes: Vec::new(),
+            floated_boxes: Vec::new(),
             shaped_text: ShapedText::new(),
             runs: Vec::new(),
-            items: Vec::new(),
             lines: Vec::new(),
             line_items: Vec::new(),
             aligned_subtree_offsets: Vec::new(),
@@ -278,23 +258,19 @@ impl<B: Brush> LayoutData<B> {
         self.styles.clear();
         self.style_metrics.clear();
         self.inline_boxes.clear();
+        self.floated_boxes.clear();
         self.shaped_text.clear();
         self.runs.clear();
-        self.items.clear();
         self.lines.clear();
         self.line_items.clear();
         self.aligned_subtree_offsets.clear();
         self.alignment = None;
     }
 
-    /// Place inline box `index`, which must be an inline object: its width becomes the advance of
-    /// its object, and its baseline offset is resolved.
+    /// Place inline box `index`: its width becomes the advance of its object, and its baseline
+    /// offset is resolved.
     pub(crate) fn place_inline_object(&mut self, index: usize) {
         let layout_box = &mut self.inline_boxes[index];
-        debug_assert!(
-            layout_box.is_inline_object(),
-            "box {index} is not an inline object"
-        );
         layout_box.baseline_offset = inline_box_placement(
             &layout_box.inline_box,
             layout_box.parent_style_index,
@@ -308,15 +284,7 @@ impl<B: Brush> LayoutData<B> {
         }
     }
 
-    /// Push an out-of-flow box to the list of items
-    pub(crate) fn push_out_of_flow_box(&mut self, index: usize, bidi_level: BidiLevel) {
-        self.items.push(LayoutItem {
-            kind: LayoutItemKind::OutOfFlowBox,
-            index,
-            bidi_level,
-        });
-    }
-    /// Processes a shaped run into [`RunData`] and a [`LayoutItem`].
+    /// Processes a shaped run into [`RunData`].
     ///
     /// `char_styles` are the style indices of the text's characters.
     #[expect(clippy::cast_possible_truncation, reason = "deferred")]
@@ -391,11 +359,6 @@ impl<B: Brush> LayoutData<B> {
         };
 
         self.runs.push(run);
-        self.items.push(LayoutItem {
-            kind: LayoutItemKind::TextRun,
-            index: self.runs.len() - 1,
-            bidi_level: shaped_run.bidi_level,
-        });
     }
 
     /// Calculates the min- and max-content widths of the layout.
@@ -508,38 +471,33 @@ impl ContentWidthsMeasurer {
 
     #[inline(always)]
     fn measure<B: Brush>(mut self, layout_data: &LayoutData<B>) -> ContentWidths {
-        for item in &layout_data.items {
-            match item.kind {
-                LayoutItemKind::TextRun => {
-                    let slice = layout_data.shaped_text.run_slice(item.index as u32);
-                    let run_spacing = layout_data.runs[item.index].spacing;
-                    // Trailing whitespace can only hang if it ends up at the line's end edge after
-                    // bidi reordering. We don't currently apply UAX #9 L1 (resetting trailing
-                    // whitespace to paragraph level), so only logically-last items that match the
-                    // paragraph level are guaranteed to be at that edge.
-                    let can_hang = item.bidi_level == layout_data.base_level;
-                    let is_rtl = item.bidi_level.is_rtl();
+        for (run_idx, run) in layout_data.runs.iter().enumerate() {
+            let slice = layout_data.shaped_text.run_slice(run_idx as u32);
+            let run_spacing = run.spacing;
+            let bidi_level = layout_data.shaped_text.runs()[run_idx].bidi_level;
+            // Trailing whitespace can only hang if it ends up at the line's end edge after
+            // bidi reordering. We don't currently apply UAX #9 L1 (resetting trailing
+            // whitespace to paragraph level), so only logically-last items that match the
+            // paragraph level are guaranteed to be at that edge.
+            let can_hang = bidi_level == layout_data.base_level;
+            let is_rtl = bidi_level.is_rtl();
 
-                    if run_spacing.is_zero() {
-                        self.measure_text_run::<B, false>(
-                            &layout_data.styles,
-                            slice,
-                            run_spacing,
-                            can_hang,
-                            is_rtl,
-                        );
-                    } else {
-                        self.measure_text_run::<B, true>(
-                            &layout_data.styles,
-                            slice,
-                            run_spacing,
-                            can_hang,
-                            is_rtl,
-                        );
-                    }
-                }
-                // Out-of-flow boxes take up no space.
-                LayoutItemKind::OutOfFlowBox => {}
+            if run_spacing.is_zero() {
+                self.measure_text_run::<B, false>(
+                    &layout_data.styles,
+                    slice,
+                    run_spacing,
+                    can_hang,
+                    is_rtl,
+                );
+            } else {
+                self.measure_text_run::<B, true>(
+                    &layout_data.styles,
+                    slice,
+                    run_spacing,
+                    can_hang,
+                    is_rtl,
+                );
             }
         }
 
