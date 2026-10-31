@@ -7,8 +7,6 @@ use std::borrow::Cow;
 
 use crate::test_name;
 use crate::util::{TestEnv, samples};
-use parley::AlignmentOptions;
-use parley::layout::Alignment;
 use parley::setting::Tag;
 use parley::style::{FontFeature, FontFeatures, FontVariation, FontVariations, StyleProperty};
 
@@ -35,7 +33,6 @@ fn style_variations_weight_axis() {
         builder.push_default(StyleProperty::FontVariations(variations));
         let mut layout = builder.build(text);
         layout.break_all_lines(None);
-        layout.align(Alignment::Start, AlignmentOptions::default());
 
         env.with_name(&format!("wght_{weight}"))
             .check_layout_snapshot(&layout);
@@ -61,7 +58,6 @@ fn style_variations_width_axis() {
         builder.push_default(StyleProperty::FontVariations(variations));
         let mut layout = builder.build(text);
         layout.break_all_lines(None);
-        layout.align(Alignment::Start, AlignmentOptions::default());
 
         env.with_name(&format!("wdth_{width}"))
             .check_layout_snapshot(&layout);
@@ -92,7 +88,6 @@ fn style_variations_multiple_axes() {
     builder.push_default(StyleProperty::FontVariations(variations));
     let mut layout = builder.build(text);
     layout.break_all_lines(None);
-    layout.align(Alignment::Start, AlignmentOptions::default());
 
     env.check_layout_snapshot(&layout);
 }
@@ -116,7 +111,6 @@ fn style_features_ligatures_on() {
     builder.push_default(StyleProperty::FontFeatures(features));
     let mut layout = builder.build(text);
     layout.break_all_lines(None);
-    layout.align(Alignment::Start, AlignmentOptions::default());
 
     env.check_layout_snapshot(&layout);
 }
@@ -136,7 +130,6 @@ fn style_features_ligatures_off() {
     builder.push_default(StyleProperty::FontFeatures(features));
     let mut layout = builder.build(text);
     layout.break_all_lines(None);
-    layout.align(Alignment::Start, AlignmentOptions::default());
 
     env.check_layout_snapshot(&layout);
 }
@@ -156,7 +149,6 @@ fn style_features_small_caps() {
     builder.push_default(StyleProperty::FontFeatures(features));
     let mut layout = builder.build(text);
     layout.break_all_lines(None);
-    layout.align(Alignment::Start, AlignmentOptions::default());
 
     env.check_layout_snapshot(&layout);
 }
@@ -169,7 +161,6 @@ fn style_features_ligatures_ltr_cluster_details() {
     let builder = env.ranged_builder(text);
     let mut layout = builder.build(text);
     layout.break_all_lines(Some(100.0));
-    layout.align(Alignment::Start, AlignmentOptions::default());
 
     let line = layout.lines().next().unwrap();
     let item = line.items().next().unwrap();
@@ -216,7 +207,6 @@ fn style_features_ligatures_rtl_cluster_details() {
     let builder = env.ranged_builder(text);
     let mut layout = builder.build(text);
     layout.break_all_lines(Some(100.0));
-    layout.align(Alignment::Start, AlignmentOptions::default());
 
     let line = layout.lines().next().unwrap();
     let item = line.items().next().unwrap();
@@ -267,7 +257,6 @@ fn style_locale_arabic() {
     builder.push_default(StyleProperty::Locale(Some("ar".parse().unwrap())));
     let mut layout = builder.build(text);
     layout.break_all_lines(None);
-    layout.align(Alignment::Start, AlignmentOptions::default());
 
     env.check_layout_snapshot(&layout);
 }
@@ -282,7 +271,6 @@ fn style_locale_mixed_bidi() {
     builder.push_default(StyleProperty::Locale(Some("ar".parse().unwrap())));
     let mut layout = builder.build(text);
     layout.break_all_lines(None);
-    layout.align(Alignment::Start, AlignmentOptions::default());
 
     env.with_name("ar").check_layout_snapshot(&layout);
 
@@ -291,7 +279,6 @@ fn style_locale_mixed_bidi() {
     builder_en.push_default(StyleProperty::Locale(Some("en".parse().unwrap())));
     let mut layout_en = builder_en.build(text);
     layout_en.break_all_lines(None);
-    layout_en.align(Alignment::Start, AlignmentOptions::default());
 
     env.with_name("en").check_layout_snapshot(&layout_en);
 }

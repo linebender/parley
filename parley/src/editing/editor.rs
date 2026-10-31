@@ -107,10 +107,9 @@ where
     // Not all operations on `PlainEditor` need to operate on a
     // clean layout, and not all operations trigger a layout.
     layout_dirty: bool,
-    // TODO: We could avoid redoing the full text layout if only
-    // linebreaking or alignment were changed.
+    // TODO: We could avoid redoing the full text analysis if only
+    // dimensions or alignment were changed.
     // linebreak_dirty: bool,
-    // alignment_dirty: bool,
     alignment: Alignment,
     base_direction: BaseDirection,
     generation: Generation,
@@ -1207,9 +1206,9 @@ where
             builder.push(StyleProperty::Underline(true), preedit_range.clone());
         }
         builder.build_into(&mut self.layout, &self.buffer);
-        self.layout.break_all_lines(self.width);
         self.layout
-            .align(self.alignment, AlignmentOptions::default());
+            .set_alignment(self.alignment, AlignmentOptions::default());
+        self.layout.break_all_lines(self.width);
         self.selection = self.selection.refresh(&self.layout);
         self.layout_dirty = false;
         self.generation.nudge();

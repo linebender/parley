@@ -3,7 +3,6 @@
 
 use crate::IndentOptions;
 use crate::InlineBox;
-use crate::layout::alignment::align;
 use crate::layout::data::LayoutData;
 use crate::layout::style_metrics::StyleMetrics;
 use crate::layout::{
@@ -88,9 +87,10 @@ impl<B: Brush> Layout<B> {
         self.data.text_len
     }
 
-    /// Returns the alignment that was applied to the layout by [`Layout::align`].
+    /// Returns the alignment that was active when lines were most recently broken.
     ///
-    /// Returns `None` if the layout has not been aligned since it was last built.
+    /// This returns `None` if [`Layout::break_all_lines`] or [`Layout::break_lines`] have
+    /// not been called since it was last built or [cleared](Self::clear).
     pub fn alignment(&self) -> Option<Alignment> {
         self.data.alignment
     }
@@ -267,14 +267,33 @@ impl<B: Brush> Layout<B> {
     /// available width for line breaking and offsetting content during alignment. Negative
     /// values cause the line to protrude beyond the start edge.
     ///
-    /// This must be called before [`Layout::break_all_lines`] or [`Layout::break_lines`],
-    /// and before [`Layout::align`].
+    /// This must be called before [`Layout::break_all_lines`] or [`Layout::break_lines`].
+    /// The text indentation is reset to zero when the layout is [cleared](Self::clear) or built into.
     pub fn set_text_indent(&mut self, amount: f32, options: IndentOptions) {
         self.data.indent_amount = amount;
         self.data.indent_options = options;
     }
 
+    /// Set the alignment for the layout.
+    ///
+    /// This only takes effect the next time [`Layout::break_all_lines`] or [`Layout::break_lines`] is called.
+    /// The currently active value can be read as [`Self::alignment`].
+    ///
+    /// If a finite `max_advance` is supplied to `Layout::break_all_lines` then alignment will be applied
+    /// relative to that width. Otherwise alignment will be applied relative to the width of the
+    /// longest line as computed by line breaking.
+    ///
+    /// If line-specific `offset` and `max_advance` are set using the advanced methods on the `BreakLines`
+    /// struct then each line will be aligned individually within its line box.
+    ///
+    /// The alignment to be used is reset to [`Alignment::Start`] when the layout is [cleared](Self::clear) or built into.
+    pub fn set_alignment(&mut self, alignment: Alignment, options: AlignmentOptions) {
+        self.data.alignment_setting = alignment;
+        self.data.alignment_options = options;
+    }
+
     /// Returns line breaker to compute lines for the layout.
+    // TODO: You must call [`BreakLines::finish`]?
     pub fn break_lines(&mut self) -> BreakLines<'_, B> {
         BreakLines::new(self)
     }
@@ -283,21 +302,6 @@ impl<B: Brush> Layout<B> {
     pub fn break_all_lines(&mut self, max_advance: Option<f32>) {
         self.break_lines()
             .break_remaining(max_advance.unwrap_or(f32::MAX));
-    }
-
-    /// Apply alignment to the layout.
-    ///
-    /// You must perform line breaking prior to aligning, through [`Layout::break_lines`] or
-    /// [`Layout::break_all_lines`].
-    ///
-    /// If a finite `max_advance` is supplied to `Layout::break_all_lines` then that width will be applied
-    /// relative to that width. Otherwise alignment will be applied relative to the width of the
-    /// longest line as computed by line breaking.
-    ///
-    /// If line-specific `offset` and `max_advance` are set using the advanced methods on the `BreakLines`
-    /// struct then each line will be aligned individually within its line box.
-    pub fn align(&mut self, alignment: Alignment, options: AlignmentOptions) {
-        align(&mut self.data, alignment, options);
     }
 
     /// Returns the index and `Line` object for the line containing the

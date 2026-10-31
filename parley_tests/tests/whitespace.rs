@@ -86,7 +86,8 @@ fn hanging_across_collapse_mode_boundary() {
             nearly_eq(line.metrics().hanging_advance, hanging);
             nearly_eq(layout.width(), full - hanging);
             // Overflowing lines aren't aligned by default.
-            layout.align(Alignment::Right, AlignmentOptions::default());
+            layout.set_alignment(Alignment::Right, AlignmentOptions::default());
+            layout.break_all_lines(Some(width));
             nearly_eq(
                 layout.get(0).unwrap().metrics().offset,
                 (width - full + hanging).max(0.),
@@ -255,9 +256,11 @@ fn break_spaces_retains_advance_at_forced_breaks_and_block_end() {
                 nearly_eq(line.metrics().advance, full);
                 nearly_eq(line.metrics().hanging_advance, 0.);
                 nearly_eq(layout.calculate_content_widths().max, full);
-                layout.align(Alignment::Right, AlignmentOptions::default());
+                layout.set_alignment(Alignment::Right, AlignmentOptions::default());
+                layout.break_all_lines(Some(full + 20.));
                 nearly_eq(layout.get(0).unwrap().metrics().offset, 20.);
-                layout.align(Alignment::Center, AlignmentOptions::default());
+                layout.set_alignment(Alignment::Center, AlignmentOptions::default());
+                layout.break_all_lines(Some(full + 20.));
                 nearly_eq(layout.get(0).unwrap().metrics().offset, 10.);
             }
         }

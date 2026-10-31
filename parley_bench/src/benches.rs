@@ -37,7 +37,6 @@ pub fn defaults() -> Vec<Benchmark> {
 
                             let mut layout: Layout<ColorBrush> = builder.build(text);
                             layout.break_all_lines(Some(MAX_ADVANCE));
-                            layout.align(Alignment::Start, AlignmentOptions::default());
 
                             black_box(layout);
                         });
@@ -78,7 +77,6 @@ pub fn spacing() -> Vec<Benchmark> {
 
                             let mut layout: Layout<ColorBrush> = builder.build(text);
                             layout.break_all_lines(Some(MAX_ADVANCE));
-                            layout.align(Alignment::Start, AlignmentOptions::default());
 
                             black_box(layout);
                         });
@@ -87,59 +85,6 @@ pub fn spacing() -> Vec<Benchmark> {
             )
         })
         .collect()
-}
-
-/// Benchmark repeatedly justifying an already line-broken layout.
-pub fn repeated_justification() -> [Benchmark; 1] {
-    const DISPLAY_SCALE: f32 = 1.0;
-    const QUANTIZE: bool = true;
-    const MAX_ADVANCE: f32 = 200.0 * DISPLAY_SCALE;
-
-    let sample = get_samples()
-        .iter()
-        .find(|sample| sample.name == "latin" && sample.modification == "8000 characters")
-        .expect("the Latin 8000-character benchmark sample should exist");
-
-    [benchmark_fn(
-        format!(
-            "Repeated Justification - {} {}",
-            sample.name, sample.modification
-        ),
-        move |b| {
-            let text = &sample.text;
-            let mut layout = with_contexts(|font_cx, layout_cx| {
-                let mut builder = layout_cx.ranged_builder(font_cx, text, DISPLAY_SCALE, QUANTIZE);
-                builder.push_default(FontFamily::from(FONT_FAMILY_LIST));
-
-                let mut layout: Layout<ColorBrush> = builder.build(text);
-                layout.break_all_lines(Some(MAX_ADVANCE));
-                layout
-            });
-
-            b.iter(move || {
-                layout.align(Alignment::Justify, AlignmentOptions::default());
-
-                // Pass to black box so the optimizer cannot optimize alignment away.
-                black_box(
-                    layout
-                        .lines()
-                        .flat_map(|line| line.runs())
-                        .map(|run| run.advance())
-                        .sum::<f32>(),
-                );
-                layout.align(Alignment::Start, AlignmentOptions::default());
-
-                // Pass to black box so the optimizer cannot optimize alignment away.
-                black_box(
-                    layout
-                        .lines()
-                        .flat_map(|line| line.runs())
-                        .map(|run| run.advance())
-                        .sum::<f32>(),
-                )
-            })
-        },
-    )]
 }
 
 /// Benchmark breaking a layout into lines.
@@ -160,7 +105,6 @@ pub fn line_breaking() -> Vec<Benchmark> {
 
     fn break_lines(layout: &mut Layout<ColorBrush>, max_advance: Option<f32>) {
         layout.break_all_lines(max_advance);
-        layout.align(Alignment::Start, AlignmentOptions::default());
         black_box((layout.len(), layout.width(), layout.height()));
     }
 
@@ -269,8 +213,8 @@ fn build_wrapped_layout<'a>(
 ) -> Layout<ColorBrush> {
     const WRAPPED_MAX_ADVANCE: f32 = 200.;
     let mut layout = build_layout(text, styles);
+    layout.set_alignment(alignment, AlignmentOptions::default());
     layout.break_all_lines(Some(WRAPPED_MAX_ADVANCE));
-    layout.align(alignment, AlignmentOptions::default());
     layout
 }
 
@@ -568,7 +512,6 @@ fn build_unwrapped_layout<'a>(
 ) -> Layout<ColorBrush> {
     let mut layout = build_layout(text, styles);
     layout.break_all_lines(None);
-    layout.align(Alignment::Start, AlignmentOptions::default());
     layout
 }
 
@@ -585,8 +528,8 @@ pub fn long_line() -> Vec<Benchmark> {
             builder.push_default(FontFamily::from(FONT_FAMILY_LIST));
 
             let mut layout: Layout<ColorBrush> = builder.build(text);
+            layout.set_alignment(alignment, AlignmentOptions::default());
             layout.break_all_lines(max_advance);
-            layout.align(alignment, AlignmentOptions::default());
 
             black_box(layout);
         });
@@ -640,7 +583,6 @@ pub fn page() -> Vec<Benchmark> {
             .iter_mut()
             .map(|layout| {
                 layout.break_all_lines(Some(max_advance));
-                layout.align(Alignment::Start, AlignmentOptions::default());
                 layout.len()
             })
             .sum()

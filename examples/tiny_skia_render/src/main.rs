@@ -11,8 +11,8 @@
 
 use parley::VerticalAlign;
 use parley::{
-    Alignment, AlignmentOptions, FontContext, FontWeight, GenericFamily, GlyphRun, InlineBox,
-    InlineBoxKind, Layout, LayoutContext, LineHeight, PositionedLayoutItem, StyleProperty,
+    FontContext, FontWeight, GenericFamily, GlyphRun, InlineBox, InlineBoxKind, Layout,
+    LayoutContext, LineHeight, PositionedLayoutItem, StyleProperty,
 };
 use skrifa::{
     GlyphId, MetadataProvider, OutlineGlyph,
@@ -102,7 +102,6 @@ fn main() {
 
     // Perform layout (including bidi resolution and shaping) with start alignment
     layout.break_all_lines(max_advance);
-    layout.align(Alignment::Start, AlignmentOptions::default());
     let width = layout.width().ceil() as u32;
     let height = layout.height().ceil() as u32;
     let padded_width = width + padding * 2;

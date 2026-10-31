@@ -7,7 +7,7 @@ use crate::{
     util::{ColorBrush, draw_layout, render_to_pixmap, samples::LOREM_IPSUM},
 };
 use parley::VerticalAlign;
-use parley::{Alignment, AlignmentOptions, InlineBox, InlineBoxKind, Layout, YieldData};
+use parley::{InlineBox, InlineBoxKind, Layout, YieldData};
 use peniko::{Color, kurbo::Rect};
 use taffy::{Clear, FloatContext, FloatDirection};
 
@@ -67,7 +67,6 @@ fn float_simple() {
     let mut layout = builder.build(text);
 
     layout_floats(&mut layout, &mut floated_boxes, 300.0);
-    layout.align(Alignment::Start, AlignmentOptions::default());
 
     render_and_check_float_layout(&mut env, &layout, &floated_boxes);
 }
