@@ -224,7 +224,7 @@ impl<B: Brush> Layout<B> {
     /// This only takes effect the next time [`Layout::break_all_lines`] or [`Layout::break_lines`] is called.
     /// The currently active value can be read as [`Self::alignment`].
     ///
-    /// If a finite `max_advance` is supplied to `Layout::break_all_lines` then that width will be applied
+    /// If a finite `max_advance` is supplied to `Layout::break_all_lines` then alignment will be applied
     /// relative to that width. Otherwise alignment will be applied relative to the width of the
     /// longest line as computed by line breaking.
     ///
