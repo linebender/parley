@@ -6,8 +6,7 @@
 use crate::test_name;
 use crate::util::{ColorBrush, TestEnv};
 use parley::{
-    Alignment, AlignmentOptions, BreakReason, CHROMIUM_LINE_BREAK_OVERRIDE, OverflowWrap,
-    StyleProperty, TextWrapMode, WordBreak,
+    BreakReason, CHROMIUM_LINE_BREAK_OVERRIDE, OverflowWrap, StyleProperty, TextWrapMode, WordBreak,
 };
 use peniko::color::palette::css;
 
@@ -49,7 +48,6 @@ fn test_wrap_with_custom_text(
 
     let mut layout = builder.build(text);
     layout.break_all_lines(Some(wrap_width));
-    layout.align(Alignment::Start, AlignmentOptions::default());
 
     env.check_layout_snapshot(&layout);
 }
@@ -143,7 +141,6 @@ fn overflow_wrap_anywhere_min_content_width() {
     let mut layout = builder.build(text);
 
     layout.break_all_lines(Some(layout.calculate_content_widths().min));
-    layout.align(Alignment::Start, AlignmentOptions::default());
     env.check_layout_snapshot(&layout);
 }
 
@@ -158,7 +155,6 @@ fn overflow_wrap_break_word_min_content_width() {
     let mut layout = builder.build(text);
 
     layout.break_all_lines(Some(layout.calculate_content_widths().min));
-    layout.align(Alignment::Start, AlignmentOptions::default());
     env.check_layout_snapshot(&layout);
 }
 
@@ -225,7 +221,6 @@ fn word_break_break_all_min_content_width() {
     let mut layout = builder.build(text);
 
     layout.break_all_lines(Some(layout.calculate_content_widths().min));
-    layout.align(Alignment::Start, AlignmentOptions::default());
     // This snapshot will have slightly different line wrapping than the corresponding overflow-wrap test. This is to be
     // expected and matches browser/CSS behavior.
     env.check_layout_snapshot(&layout);
@@ -260,7 +255,6 @@ fn word_break_keep_all() {
         let mut layout = builder.build(text);
 
         layout.break_all_lines(Some(wrap_width));
-        layout.align(Alignment::Start, AlignmentOptions::default());
         env.with_name(name).check_layout_snapshot(&layout);
     };
 
@@ -452,7 +446,6 @@ fn wrap_url_breaks_after_slash() {
 
     let mut layout = env.ranged_builder(text).build(text);
     layout.break_all_lines(Some(150.0));
-    layout.align(Alignment::Start, AlignmentOptions::default());
 
     assert!(layout.len() > 1);
 
@@ -483,7 +476,6 @@ fn wrap_url_override_no_break_after_slash() {
     builder.set_line_break_override(Some(&CHROMIUM_LINE_BREAK_OVERRIDE));
     let mut layout = builder.build(text);
     layout.break_all_lines(Some(wrap_width));
-    layout.align(Alignment::Start, AlignmentOptions::default());
 
     assert_eq!(layout.len(), 1);
 

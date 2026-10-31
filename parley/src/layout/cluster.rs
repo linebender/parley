@@ -548,7 +548,7 @@ mod tests {
 
     type Brush = ();
 
-    fn create_unaligned_layout() -> Layout<Brush> {
+    fn create_layout(alignment: Alignment) -> Layout<Brush> {
         let mut layout_ctx = LayoutContext::new();
         // TODO: Use a test font
         let mut font_ctx = FontContext::new();
@@ -556,13 +556,13 @@ mod tests {
         let mut builder = layout_ctx.ranged_builder(&mut font_ctx, text, 1.0, true);
         builder.push_default(StyleProperty::FontSize(10.));
         let mut layout = builder.build(text);
+        layout.set_alignment(alignment, AlignmentOptions::default());
         layout.break_all_lines(None);
         layout
     }
 
     fn cluster_from_position_with_alignment(alignment: Alignment) {
-        let mut layout = create_unaligned_layout();
-        layout.align(alignment, AlignmentOptions::default());
+        let layout = create_layout(alignment);
         assert_eq!(
             layout.len(),
             1,

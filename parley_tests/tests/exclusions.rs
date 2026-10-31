@@ -24,9 +24,8 @@ mod circle {
 
         let mut layout = builder.build(text);
 
+        layout.set_alignment(Alignment::Justify, AlignmentOptions::default());
         apply_circle_breaking(&mut layout, diameter, line_height);
-
-        layout.align(Alignment::Justify, AlignmentOptions::default());
 
         env.rendering_config()
             .size
@@ -111,9 +110,8 @@ mod waterfall {
 
             let mut layout = builder.build(text);
 
+            layout.set_alignment(alignment, AlignmentOptions::default());
             apply_waterfall_breaking(&mut layout, layout_width, line_width, step);
-
-            layout.align(alignment, AlignmentOptions::default());
 
             env.with_name(test_case_name).check_layout_snapshot(&layout);
         }
@@ -176,9 +174,8 @@ mod zigzag {
 
             let mut layout = builder.build(text);
 
+            layout.set_alignment(alignment, AlignmentOptions::default());
             apply_zigzag_breaking(&mut layout, width, offset);
-
-            layout.align(alignment, AlignmentOptions::default());
 
             env.with_name(test_case_name).check_layout_snapshot(&layout);
         }
