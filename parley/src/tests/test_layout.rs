@@ -18,8 +18,8 @@ fn clear_resets_to_new() {
     builder.push_default(FontFamily::from(FONT_FAMILY_LIST));
     let mut layout = builder.build(TEXT);
     layout.set_text_indent(10., IndentOptions::default());
+    layout.set_alignment(Alignment::Center, AlignmentOptions::default());
     layout.break_all_lines(Some(50.));
-    layout.align(Alignment::Center, AlignmentOptions::default());
     assert!(layout.lines().len() > 1);
     assert!(layout.width() > 0.);
     assert!(layout.height() > 0.);

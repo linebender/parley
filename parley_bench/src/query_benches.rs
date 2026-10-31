@@ -5,7 +5,7 @@
 
 use crate::benches::build_layout;
 use crate::{ColorBrush, get_samples};
-use parley::{Affinity, Alignment, AlignmentOptions, Cursor, Layout, Selection};
+use parley::{Affinity, Cursor, Layout, Selection};
 use std::hint::black_box;
 use tango_bench::{Benchmark, benchmark_fn};
 
@@ -19,7 +19,6 @@ const WIDE_MAX_ADVANCE: f32 = 10. * MAX_ADVANCE;
 fn build_and_break(text: &str, max_advance: Option<f32>) -> Layout<ColorBrush> {
     let mut layout = build_layout(text, []);
     layout.break_all_lines(max_advance);
-    layout.align(Alignment::Start, AlignmentOptions::default());
     layout
 }
 

@@ -61,7 +61,7 @@ See the [examples](https://github.com/linebender/parley/tree/main/examples) dire
 
 ```rust
 use parley::{
-   Alignment, AlignmentOptions, FontContext, FontWeight, InlineBox, InlineBoxKind, Layout,
+   FontContext, FontWeight, InlineBox, InlineBoxKind, Layout,
    LayoutContext, LineHeight, PositionedLayoutItem, StyleProperty, VerticalAlign,
 };
 
@@ -91,7 +91,6 @@ let mut layout: Layout<()> = builder.build(&TEXT);
 // Run line-breaking and alignment on the Layout
 const MAX_WIDTH : Option<f32> = Some(100.0);
 layout.break_all_lines(MAX_WIDTH);
-layout.align(Alignment::Start, AlignmentOptions::default());
 
 // Inspect computed layout (see examples for more details)
 let width = layout.width();
