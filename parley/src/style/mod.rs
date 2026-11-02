@@ -58,7 +58,7 @@ pub enum CollapsedSpace {
 
 impl CollapsedSpace {
     /// The collapsed space as a string.
-    pub const fn as_str(self) -> &'static str {
+    pub(crate) const fn as_str(self) -> &'static str {
         match self {
             Self::Space => " ",
             Self::IdeographicSpace => "\u{3000}",
