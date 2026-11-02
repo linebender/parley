@@ -17,8 +17,8 @@ use super::style::{
 use crate::font::FontContext;
 use crate::style::TextStyle;
 use crate::util::nearly_eq;
+use crate::{CollapsedSpace, TextWrapMode, WhiteSpaceCollapse, WordBreak};
 use crate::{LineBreak, LineHeight, OverflowWrap, VerticalAlign, layout};
-use crate::{TextWrapMode, WhiteSpaceCollapse, WordBreak};
 use core::borrow::Borrow;
 use core::ops::Range;
 use fontique::FamilyId;
@@ -169,6 +169,7 @@ impl ResolveContext {
             StyleProperty::OverflowWrap(value) => OverflowWrap(*value),
             StyleProperty::TextWrapMode(value) => TextWrapMode(*value),
             StyleProperty::WhiteSpaceCollapse(value) => WhiteSpaceCollapse(*value),
+            StyleProperty::CollapsedSpace(value) => CollapsedSpace(*value),
         }
     }
 
@@ -210,6 +211,7 @@ impl ResolveContext {
             overflow_wrap: raw_style.overflow_wrap,
             text_wrap_mode: raw_style.text_wrap_mode,
             white_space_collapse: raw_style.white_space_collapse,
+            collapsed_space: raw_style.collapsed_space,
         }
     }
 
@@ -400,6 +402,8 @@ pub(crate) enum ResolvedProperty<B: Brush> {
     TextWrapMode(TextWrapMode),
     /// Whitespace collapsing and hanging behavior.
     WhiteSpaceCollapse(WhiteSpaceCollapse),
+    /// The character that collapsible whitespace collapses to.
+    CollapsedSpace(CollapsedSpace),
 }
 
 /// Flattened group of style properties.
@@ -448,6 +452,8 @@ pub(crate) struct ResolvedStyle<B: Brush> {
     pub(crate) text_wrap_mode: TextWrapMode,
     /// Whitespace collapsing and hanging behavior.
     pub(crate) white_space_collapse: WhiteSpaceCollapse,
+    /// The character that collapsible whitespace collapses to.
+    pub(crate) collapsed_space: CollapsedSpace,
 }
 
 impl<B: Brush> ResolvedStyle<B> {
@@ -481,6 +487,7 @@ impl<B: Brush> ResolvedStyle<B> {
             OverflowWrap(value) => self.overflow_wrap = value,
             TextWrapMode(value) => self.text_wrap_mode = value,
             WhiteSpaceCollapse(value) => self.white_space_collapse = value,
+            CollapsedSpace(value) => self.collapsed_space = value,
         }
     }
 
@@ -513,6 +520,7 @@ impl<B: Brush> ResolvedStyle<B> {
             OverflowWrap(value) => self.overflow_wrap == *value,
             TextWrapMode(value) => self.text_wrap_mode == *value,
             WhiteSpaceCollapse(value) => self.white_space_collapse == *value,
+            CollapsedSpace(value) => self.collapsed_space == *value,
         }
     }
 
