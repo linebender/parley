@@ -44,8 +44,8 @@ pub struct AlignmentOptions {
     /// line that ends in an explicit line break. This corresponds to the CSS `text-align-last`
     /// property.
     ///
-    /// If set to `None`, those lines use the alignment passed as the first argument to [`Layout::set_alignment`],
-    /// except that [`Alignment::Justify`] falls back to [`Alignment::Start`]. This is the behavior of
+    /// If set to `None`, those lines use the alignment passed to [`Layout::set_alignment`], except that
+    ///  [`Alignment::Justify`] falls back to [`Alignment::Start`]. This is the behavior of
     /// `text-align-last: auto`.
     ///
     /// [`Layout::set_alignment`]: crate::Layout::set_alignment
