@@ -55,6 +55,7 @@
 //!         char_end: char_count.try_into().unwrap(),
 //!         options: ShapeOptions {
 //!             font_size: 16.0,
+//!             point_size: 16.0,
 //!             language: None,
 //!             features: &[],
 //!             variations: &[],

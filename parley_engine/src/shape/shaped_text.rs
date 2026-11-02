@@ -755,6 +755,7 @@ mod tests {
             char_end: text.chars().count().try_into().unwrap(),
             options: ShapeOptions {
                 font_size: 32.0,
+                point_size: 32.0,
                 language: None,
                 features: &[],
                 variations: &[],
@@ -936,6 +937,7 @@ mod tests {
                 char_end: 1,
                 options: ShapeOptions {
                     font_size: 32.0,
+                    point_size: 32.0,
                     language: None,
                     features: &[],
                     variations: &[],
@@ -945,6 +947,7 @@ mod tests {
                 char_end: text.chars().count().try_into().unwrap(),
                 options: ShapeOptions {
                     font_size: 32.0,
+                    point_size: 32.0,
                     language: None,
                     features: &[],
                     variations: &[],
