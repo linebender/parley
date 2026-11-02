@@ -90,7 +90,7 @@ impl<B: Brush> Layout<B> {
     /// Returns the alignment that was active when lines were most recently broken.
     ///
     /// This returns `None` if [`Layout::break_all_lines`] or [`Layout::break_lines`] have
-    /// not been called since it was last built or [cleared](Self::clear).
+    /// not been called since the layout was last built or [cleared](Self::clear).
     pub fn alignment(&self) -> Option<Alignment> {
         self.data.alignment
     }
