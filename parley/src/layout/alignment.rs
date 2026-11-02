@@ -65,11 +65,10 @@ impl Default for AlignmentOptions {
     }
 }
 
-/// Align the layout. This applies to the full layout at a time (rather than to individual lines as we go),
-/// because the alignment implicitly uses the widest width in the layout if no max advance was provided.
+/// Align the layout. This applies to the full layout at a time, because the alignment implicitly
+///  uses the widest width in the layout if no max advance was provided.
 ///
-/// TODO: if we ever end up getting rid of multi-paragraph layout, can we avoid that; is this what
-/// `calculate_content_widths` is for instead?
+/// TODO: Evaluate whether aligning a line at a time might be faster (better cache locality?).
 pub(crate) fn align<B: Brush>(layout: &mut LayoutData<B>) {
     let alignment = layout.alignment_setting;
     let options = layout.alignment_options;
