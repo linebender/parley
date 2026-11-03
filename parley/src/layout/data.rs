@@ -552,8 +552,9 @@ impl ContentWidthsMeasurer {
         }
 
         // The end of a layout is considered to be a forced line break as per CSS Text 4 § 5, so
-        // whitespace can hang conditionally.
-        if self.line_has_content {
+        // whitespace can hang conditionally. We consider an empty layout to still have at least one
+        // line (that way it gets, e.g., indentation).
+        if self.line_has_content || layout_data.items.is_empty() {
             self.hard_break();
         }
 
