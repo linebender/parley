@@ -476,8 +476,6 @@ fn build_into_layout<B: Brush>(
     layout.data.base_level = lcx.analysis.paragraph_level();
     layout.data.text_len = text.len();
 
-    // Characters not covered by any style run (e.g. the space substituted for empty text during
-    // analysis) use the root style.
     lcx.char_style_indices.clear();
     lcx.char_style_indices
         .resize(lcx.analysis.char_info().len(), 0);

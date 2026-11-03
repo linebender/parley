@@ -1095,18 +1095,9 @@ impl<'a, B: Brush> BreakLines<'a, B> {
             None => self.prev_state = Some(self.state.clone()),
         }
 
-        // HACK: ignore max_advance for empty layouts
-        // Prevents crash when width is too small (https://github.com/linebender/parley/issues/186)
-        let max_advance =
-            if self.layout.data.text_len == 0 && self.layout.data.inline_boxes.is_empty() {
-                f32::MAX
-            } else {
-                self.state.line_max_advance
-            };
-
         let line_indent = self.resolve_indent();
 
-        let max_advance = max_advance - line_indent;
+        let max_advance = self.state.line_max_advance - line_indent;
 
         // Iterate over remaining runs in the Layout
         let item_count = self.layout.data.items.len();
@@ -1326,9 +1317,6 @@ impl<'a, B: Brush> BreakLines<'a, B> {
             }
         }
 
-        if self.state.line.items.end == 0 {
-            self.state.line.items.end = 1;
-        }
         self.done = true;
         self.start_new_line(BreakReason::None, max_advance, line_indent)
     }
@@ -1436,9 +1424,6 @@ impl<'a, B: Brush> BreakLines<'a, B> {
         }
 
         // Commit the final line (only reached if content remains after all break_next_with_length calls)
-        if self.state.line.items.end == 0 {
-            self.state.line.items.end = 1;
-        }
         self.done = true;
         self.start_new_line(BreakReason::None, f32::MAX, line_indent);
         Some(())
@@ -1465,13 +1450,8 @@ impl<'a, B: Brush> BreakLines<'a, B> {
     }
 
     /// Consumes the line breaker and finalizes all line computations.
-    pub fn finish(mut self) {
-        if self.layout.data.text_len == 0
-            && let Some(line) = self.lines.line_items.first_mut()
-        {
-            line.text_range = 0..0;
-            line.shaped_cluster_range = 0..0;
-        }
+    pub fn finish(self) {
+        // TODO: kept because of the related todo on `BreakLine`'s drop impl.
     }
 
     #[inline]
@@ -1668,13 +1648,6 @@ impl<B: Brush> Drop for BreakLines<'_, B> {
                     line.metrics.inline_max_coord = layout_width;
                 }
             }
-        }
-
-        // Don't include the last line's line_height in the layout's height if the last line is empty
-        if let Some(last_line) = self.lines.lines.last()
-            && last_line.item_range.is_empty()
-        {
-            height -= last_line.metrics.line_height as f64;
         }
 
         // Save the computed widths/height to the layout

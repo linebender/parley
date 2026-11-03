@@ -665,8 +665,6 @@ fn builders_empty_text_after_styled_layout_reuses_context() {
     let (layout, _) = builder.build();
     assert_eq!(layout.styles().len(), 2);
 
-    // The empty layout is shaped with a substitute space, which must use the root style rather
-    // than a stale style index left over from the previous layout.
     let builder = lcx.ranged_builder(&mut fcx, "", 1.0, true);
     let mut layout = builder.build("");
     layout.break_all_lines(None);

@@ -16,8 +16,6 @@ pub(crate) fn analyze_text<B: Brush>(
     line_break_override: Option<&LineBreakOverrideFn>,
     data_sources: &parley_engine::AnalysisDataSources<'_>,
 ) {
-    let text = if text.is_empty() { " " } else { text };
-
     // Collect the style runs' line break configurations. Gaps use the default configuration, so
     // only non-default configurations need an entry, and adjacent equal configurations are merged.
     //
