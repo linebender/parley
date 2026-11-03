@@ -6,8 +6,8 @@
 use crate::util::TestEnv;
 use crate::{test_name, util::ColorBrush};
 use parley::{
-    Alignment, AlignmentOptions, ContentWidths, IndentOptions, InlineBox, InlineBoxKind, Layout,
-    LineBreak, StyleProperty, TextWrapMode, VerticalAlign, WhiteSpaceCollapse,
+    ContentWidths, IndentOptions, InlineBox, InlineBoxKind, Layout, LineBreak, StyleProperty,
+    TextWrapMode, VerticalAlign, WhiteSpaceCollapse,
 };
 
 /// Checks that calculated content widths agree with actual line breaking.
@@ -222,7 +222,6 @@ fn inbox_content_width() {
             ..
         } = layout.calculate_content_widths();
         layout.break_all_lines(Some(min_content_width));
-        layout.align(Alignment::Start, AlignmentOptions::default());
 
         env.with_name("full_width").check_layout_snapshot(&layout);
     }
@@ -245,7 +244,6 @@ fn inbox_content_width() {
             ..
         } = layout.calculate_content_widths();
         layout.break_all_lines(Some(max_content_width));
-        layout.align(Alignment::Start, AlignmentOptions::default());
 
         assert!(
             layout.width() <= max_content_width,

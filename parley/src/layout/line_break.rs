@@ -1645,6 +1645,8 @@ impl<'a, B: Brush> BreakLines<'a, B> {
 
 impl<B: Brush> Drop for BreakLines<'_, B> {
     fn drop(&mut self) {
+        // TODO: Maybe move all of this into `finish`?
+
         // Compute the overall width and height of the entire layout
         // The "width" excludes hanging whitespace. The "full_width" includes it.
         let mut layout_width = 0_f32;
@@ -1683,6 +1685,8 @@ impl<B: Brush> Drop for BreakLines<'_, B> {
 
         // Save the computed lines to the layout
         self.lines.swap(&mut self.layout.data);
+
+        crate::layout::alignment::align(&mut self.layout.data);
     }
 }
 

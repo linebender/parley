@@ -208,6 +208,14 @@ pub(crate) struct LayoutData<B: Brush> {
     pub(crate) runs: Vec<RunData>,
     pub(crate) items: Vec<LayoutItem>,
 
+    // Settings for line breaking and alignment
+    pub(crate) alignment_setting: super::Alignment,
+    pub(crate) alignment_options: super::AlignmentOptions,
+    /// The text-indent amount in layout units.
+    pub(crate) indent_amount: f32,
+    /// Options controlling text-indent behavior.
+    pub(crate) indent_options: IndentOptions,
+
     // Output of line breaking
     /// The lines in the
     pub(crate) lines: Vec<LineData>,
@@ -228,12 +236,8 @@ pub(crate) struct LayoutData<B: Brush> {
     pub(crate) height: f32,
 
     // Output of alignment
-    /// The alignment that was applied to the layout, if any.
+    /// The alignment that was applied when the layout was line broken, if any.
     pub(crate) alignment: Option<super::Alignment>,
-    /// The text-indent amount in layout units.
-    pub(crate) indent_amount: f32,
-    /// Options controlling text-indent behavior (each-line, hanging).
-    pub(crate) indent_options: IndentOptions,
 }
 
 impl<B: Brush> Default for LayoutData<B> {
@@ -255,6 +259,8 @@ impl<B: Brush> Default for LayoutData<B> {
             lines: Vec::new(),
             line_items: Vec::new(),
             aligned_subtree_offsets: Vec::new(),
+            alignment_setting: super::Alignment::default(),
+            alignment_options: super::AlignmentOptions::default(),
             alignment: None,
             layout_max_advance: 0.0,
             indent_amount: 0.0,
@@ -284,6 +290,8 @@ impl<B: Brush> LayoutData<B> {
         self.lines.clear();
         self.line_items.clear();
         self.aligned_subtree_offsets.clear();
+        self.alignment_setting = super::Alignment::default();
+        self.alignment_options = super::AlignmentOptions::default();
         self.alignment = None;
     }
 

@@ -6,7 +6,7 @@ use crate::{
     util::{ColorBrush, TestEnv},
 };
 use parley::VerticalAlign;
-use parley::{Alignment, AlignmentOptions, InlineBox, InlineBoxKind, Layout, PositionedLayoutItem};
+use parley::{InlineBox, InlineBoxKind, Layout, PositionedLayoutItem};
 
 #[test]
 fn out_of_flow_box_has_no_effect_on_layout() {
@@ -40,11 +40,9 @@ fn out_of_flow_box_has_no_effect_on_layout() {
     // Perform line breaking and alignment
     let mut layout_ref = layout_ref;
     layout_ref.break_all_lines(Some(100.0));
-    layout_ref.align(Alignment::Start, AlignmentOptions::default());
 
     let mut layout_oof = layout_oof;
     layout_oof.break_all_lines(Some(100.0));
-    layout_oof.align(Alignment::Start, AlignmentOptions::default());
 
     // Layout dimensions and line count should be unaffected
     assert_eq!(layout_ref.width(), layout_oof.width());

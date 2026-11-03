@@ -8,9 +8,8 @@ use std::borrow::Cow;
 use crate::test_name;
 use crate::util::{ColorBrush, TestEnv, samples};
 use fontique::FontInfoOverride;
-use parley::layout::Alignment;
 use parley::style::StyleProperty;
-use parley::{AlignmentOptions, FontWeight, Layout};
+use parley::{FontWeight, Layout};
 
 /// Helper to build a layout with a single font size applied
 fn build_with_font_size(env: &mut TestEnv, text: &str, size: f32) -> Layout<ColorBrush> {
@@ -18,7 +17,6 @@ fn build_with_font_size(env: &mut TestEnv, text: &str, size: f32) -> Layout<Colo
     builder.push_default(StyleProperty::FontSize(size));
     let mut layout = builder.build(text);
     layout.break_all_lines(None);
-    layout.align(Alignment::Start, AlignmentOptions::default());
     layout
 }
 
@@ -67,7 +65,6 @@ fn style_font_weight_values() {
         builder.push_default(StyleProperty::FontWeight(weight));
         let mut layout = builder.build(text);
         layout.break_all_lines(None);
-        layout.align(Alignment::Start, AlignmentOptions::default());
 
         env.with_name(name).check_layout_snapshot(&layout);
     }
@@ -126,7 +123,6 @@ fn style_font_weight_uses_variable_axis_default() {
 
     let mut layout = builder.build(TEXT);
     layout.break_all_lines(None);
-    layout.align(Alignment::Start, AlignmentOptions::default());
 
     env.check_layout_snapshot(&layout);
 }
@@ -155,7 +151,6 @@ fn style_font_width_values() {
         builder.push_default(StyleProperty::FontWidth(width));
         let mut layout = builder.build(text);
         layout.break_all_lines(None);
-        layout.align(Alignment::Start, AlignmentOptions::default());
 
         env.with_name(name).check_layout_snapshot(&layout);
     }
@@ -185,7 +180,6 @@ fn style_font_style_values() {
         builder.push_default(StyleProperty::FontStyle(style));
         let mut layout = builder.build(text);
         layout.break_all_lines(None);
-        layout.align(Alignment::Start, AlignmentOptions::default());
 
         env.with_name(name).check_layout_snapshot(&layout);
     }
@@ -207,7 +201,6 @@ fn style_font_family_named() {
     builder.push_default(StyleProperty::FontFamily(FontFamily::named("Roboto")));
     let mut layout = builder.build(text);
     layout.break_all_lines(None);
-    layout.align(Alignment::Start, AlignmentOptions::default());
 
     env.with_name("roboto").check_layout_snapshot(&layout);
 }

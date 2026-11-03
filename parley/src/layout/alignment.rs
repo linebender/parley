@@ -34,7 +34,7 @@ pub enum Alignment {
 }
 
 /// Additional options to fine tune alignment
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct AlignmentOptions {
     /// If set to `true`, "end" and "center" alignment will apply even if the line contents are
     /// wider than the alignment width. If it is set to `false`, all overflowing lines will be
@@ -44,11 +44,11 @@ pub struct AlignmentOptions {
     /// line that ends in an explicit line break. This corresponds to the CSS `text-align-last`
     /// property.
     ///
-    /// If set to `None`, those lines use the alignment passed to [`Layout::align`], except that
-    /// [`Alignment::Justify`] falls back to [`Alignment::Start`]. This is the behavior of
+    /// If set to `None`, those lines use the alignment passed to [`Layout::set_alignment`], except that
+    ///  [`Alignment::Justify`] falls back to [`Alignment::Start`]. This is the behavior of
     /// `text-align-last: auto`.
     ///
-    /// [`Layout::align`]: crate::Layout::align
+    /// [`Layout::set_alignment`]: crate::Layout::set_alignment
     pub last_line_alignment: Option<Alignment>,
 }
 
@@ -65,12 +65,13 @@ impl Default for AlignmentOptions {
     }
 }
 
-/// Align the layout.
-pub(crate) fn align<B: Brush>(
-    layout: &mut LayoutData<B>,
-    alignment: Alignment,
-    options: AlignmentOptions,
-) {
+/// Align the layout. This applies to the full layout at a time, because the alignment implicitly
+///  uses the widest width in the layout if no max advance was provided.
+///
+/// TODO: Evaluate whether aligning a line at a time might be faster (better cache locality?).
+pub(crate) fn align<B: Brush>(layout: &mut LayoutData<B>) {
+    let alignment = layout.alignment_setting;
+    let options = layout.alignment_options;
     layout.alignment = Some(alignment);
 
     let is_rtl = layout.base_level.is_rtl();

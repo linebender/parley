@@ -12,10 +12,7 @@ use crate::{
     test_name,
     util::{ColorBrush, CursorTest, TestEnv, env::create_font_context},
 };
-use parley::{
-    Affinity, Alignment, AlignmentOptions, BaseDirection, Cluster, ClusterPath, Cursor,
-    LayoutContext, Selection,
-};
+use parley::{Affinity, BaseDirection, Cluster, ClusterPath, Cursor, LayoutContext, Selection};
 
 #[test]
 fn cursor_previous_visual() {
@@ -175,7 +172,6 @@ fn primary_caret_position() {
             builder.set_base_direction(direction);
             let mut layout = builder.build(text);
             layout.break_all_lines(wrap.then(|| layout.calculate_content_widths().min));
-            layout.align(Alignment::Start, AlignmentOptions::default());
             let (line, x) = layout.primary_caret(index).unwrap();
             let left = line.metrics().offset + line.metrics().inline_min_coord;
             let edges = [(left, "left"), (left + line.metrics().advance, "right")];

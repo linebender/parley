@@ -9,7 +9,7 @@
 use crate::test_name;
 use crate::util::TestEnv;
 use parley::style::FontFamily;
-use parley::{Alignment, AlignmentOptions, Layout, StyleProperty};
+use parley::{Layout, StyleProperty};
 use peniko::kurbo::Affine;
 
 use super::util::ColorBrush;
@@ -113,7 +113,6 @@ fn draw_underline_descenders() {
         builder.push_default(StyleProperty::FontSize(24.0));
         let mut layout = builder.build(text);
         layout.break_all_lines(None);
-        layout.align(Alignment::Start, AlignmentOptions::default());
         layout
     });
 }
@@ -147,7 +146,6 @@ fn draw_bitmap_emoji() {
         builder.push_default(StyleProperty::FontSize(24.0));
         let mut layout = builder.build(text);
         layout.break_all_lines(None);
-        layout.align(Alignment::Start, AlignmentOptions::default());
         layout
     });
 }
@@ -166,7 +164,6 @@ fn draw_colr_emoji() {
         builder.push_default(StyleProperty::FontSize(24.0));
         let mut layout = builder.build(text);
         layout.break_all_lines(None);
-        layout.align(Alignment::Start, AlignmentOptions::default());
         layout
     });
 }
@@ -200,7 +197,6 @@ fn draw_colr_emoji_with_presentation_style() {
 
         let mut layout = builder.build(text);
         layout.break_all_lines(None);
-        layout.align(Alignment::Start, AlignmentOptions::default());
         layout
     });
 }
@@ -231,7 +227,6 @@ fn draw_colr_emoji_with_presentation_style_without_setting_default_font() {
 
         let mut layout = builder.build(text);
         layout.break_all_lines(None);
-        layout.align(Alignment::Start, AlignmentOptions::default());
         layout
     });
 }

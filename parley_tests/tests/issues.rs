@@ -23,7 +23,6 @@ fn issue_489() {
         let builder = env.ranged_builder(text);
         let mut layout = builder.build(text);
         layout.break_all_lines(Some(200.0));
-        layout.align(Alignment::Start, AlignmentOptions::default());
 
         assert!(layout.is_rtl());
     }
@@ -34,7 +33,6 @@ fn issue_489() {
         let builder = env.ranged_builder(text);
         let mut layout = builder.build(text);
         layout.break_all_lines(Some(200.0));
-        layout.align(Alignment::Start, AlignmentOptions::default());
 
         assert!(!layout.is_rtl());
 
@@ -82,8 +80,8 @@ And, finally, yet another sentence."#;
     ] {
         let builder = env.ranged_builder(text);
         let mut layout = builder.build(text);
+        layout.set_alignment(Alignment::Justify, AlignmentOptions::default());
         layout.break_all_lines(Some(150.0));
-        layout.align(Alignment::Justify, AlignmentOptions::default());
         env.with_name(test_case_name).check_layout_snapshot(&layout);
     }
 }
@@ -114,7 +112,6 @@ Third line that ends with newlines\n\n";
     assert!(content_widths.max != 0.0);
 
     layout.break_all_lines(Some(content_widths.max));
-    layout.align(Alignment::Start, AlignmentOptions::default());
     env.with_name("max_context_with_mandatory_breaks")
         .check_layout_snapshot(&layout);
 }
@@ -171,7 +168,6 @@ fn issue_748_language_subtags() {
 
     let mut layout = builder.build(text);
     layout.break_all_lines(None);
-    layout.align(Alignment::Start, AlignmentOptions::default());
     env.check_layout_snapshot(&layout);
 }
 
@@ -200,7 +196,6 @@ fn inline_boxes_after_newline_max_content_width() {
     let content_widths = layout.calculate_content_widths();
 
     layout.break_all_lines(Some(content_widths.max));
-    layout.align(Alignment::Start, AlignmentOptions::default());
     assert!(
         layout.width() <= content_widths.max,
         "Layout should never be wider than the max content width (width: {}, max: {})",
