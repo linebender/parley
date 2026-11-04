@@ -336,6 +336,7 @@ fn test_word_boundaries_complex_script_without_dictionary() {
 
 #[test]
 fn test_blank() {
+    // This analyzes empty text, so there's no character information at all.
     verify_analysis("", |_| {})
         .expect_soft_wrap_opportunity_list(vec![])
         .expect_word_boundary_list(vec![])
