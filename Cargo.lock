@@ -1257,7 +1257,7 @@ dependencies = [
 
 [[package]]
 name = "fontique"
-version = "0.12.0"
+version = "0.13.0"
 dependencies = [
  "hashbrown",
  "linebender_resource_handle",
@@ -2739,7 +2739,7 @@ dependencies = [
 
 [[package]]
 name = "parley"
-version = "0.12.0"
+version = "0.13.0"
 dependencies = [
  "bytemuck",
  "core_maths",
@@ -2767,7 +2767,7 @@ dependencies = [
 
 [[package]]
 name = "parley_data"
-version = "0.12.0"
+version = "0.13.0"
 dependencies = [
  "icu_collections",
  "icu_properties",
@@ -2788,11 +2788,11 @@ version = "0.0.0"
 
 [[package]]
 name = "parley_emoji"
-version = "0.12.0"
+version = "0.13.0"
 
 [[package]]
 name = "parley_engine"
-version = "0.12.0"
+version = "0.13.0"
 dependencies = [
  "fontique",
  "harfrust",
