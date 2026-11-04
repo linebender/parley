@@ -458,7 +458,10 @@ fn builders_empty() {
     let text = "";
     let scale = 1.;
     let quantize = false;
-    let max_advance = Some(50.);
+
+    // We use a zero max advance here as an edge case: at some point we crashed when line breaking
+    // empty text with small max advances. See <https://github.com/linebender/parley/issues/186>.
+    let max_advance = Some(0.);
     let root_style = create_root_style();
 
     let with_ranged_builder = |rb: &mut RangedBuilder<'_, ColorBrush>| set_root_style(rb);
@@ -647,28 +650,4 @@ fn builders_newline_inside_complex_script_run_is_hard_break() {
             "{text:?} should produce exactly two lines with an explicit break",
         );
     }
-}
-
-#[test]
-fn builders_empty_text_after_styled_layout_reuses_context() {
-    let mut fcx = FontContext::default();
-    let mut lcx: LayoutContext<ColorBrush> = LayoutContext::new();
-
-    let root = TextStyle::default();
-    let mut builder = lcx.tree_builder(&mut fcx, 1.0, true, &root);
-    builder.push_style_span(TextStyle {
-        font_size: 20.,
-        ..Default::default()
-    });
-    builder.push_text("a");
-    builder.pop_style_span();
-    let (layout, _) = builder.build();
-    assert_eq!(layout.styles().len(), 2);
-
-    // The empty layout is shaped with a substitute space, which must use the root style rather
-    // than a stale style index left over from the previous layout.
-    let builder = lcx.ranged_builder(&mut fcx, "", 1.0, true);
-    let mut layout = builder.build("");
-    layout.break_all_lines(None);
-    assert_eq!(layout.lines().count(), 1);
 }

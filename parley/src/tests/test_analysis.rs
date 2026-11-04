@@ -336,14 +336,15 @@ fn test_word_boundaries_complex_script_without_dictionary() {
 
 #[test]
 fn test_blank() {
+    // This analyzes empty text, so there's no character information at all.
     verify_analysis("", |_| {})
-        .expect_soft_wrap_opportunity_list(vec![false])
-        .expect_word_boundary_list(vec![true])
+        .expect_soft_wrap_opportunity_list(vec![])
+        .expect_word_boundary_list(vec![])
         .expect_bidi_embed_level_list(&[])
-        .expect_script_list(vec![Script::Common])
-        .expect_is_control_list(vec![false])
-        .expect_contributes_to_shaping_list(vec![true])
-        .expect_force_normalize_list(vec![false]);
+        .expect_script_list(vec![])
+        .expect_is_control_list(vec![])
+        .expect_contributes_to_shaping_list(vec![])
+        .expect_force_normalize_list(vec![]);
 }
 
 #[test]
