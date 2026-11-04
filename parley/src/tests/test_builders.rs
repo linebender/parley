@@ -458,7 +458,10 @@ fn builders_empty() {
     let text = "";
     let scale = 1.;
     let quantize = false;
-    let max_advance = Some(50.);
+
+    // We use a zero max advance here as an edge case: at some point we crashed when line breaking
+    // empty text with small max advances. See <https://github.com/linebender/parley/issues/186>.
+    let max_advance = Some(0.);
     let root_style = create_root_style();
 
     let with_ranged_builder = |rb: &mut RangedBuilder<'_, ColorBrush>| set_root_style(rb);
