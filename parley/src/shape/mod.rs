@@ -53,8 +53,6 @@ pub(crate) fn shape_text<'a, B: Brush>(
     layout: &mut Layout<B>,
     style_features: &'a mut Vec<SmallVec<[FontFeature; 8]>>,
 ) {
-    // Resolved font sizes include the display scale, but size-dependent shaping (such as `trak`)
-    // must use the unscaled point size.
     let scale = layout.data.scale;
 
     // Do nothing if there is no text or styles (there should always be a default style)
@@ -170,6 +168,8 @@ pub(crate) fn shape_text<'a, B: Brush>(
                 options: ShapeOptions {
                     language: item_style.locale,
                     font_size: item_style.font_size,
+                    // TODO: Keep the logical font size in `ResolvedStyle` instead of
+                    // dividing the scale back out.
                     point_size: item_style.font_size / scale,
                     features: &style_features[item_style_index as usize],
                     variations: rcx.variations(item_style.font_variations).unwrap_or(&[]),
