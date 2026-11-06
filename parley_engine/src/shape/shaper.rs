@@ -23,7 +23,14 @@ use crate::{
 #[derive(Debug)]
 pub struct ShapeOptions<'a> {
     /// The font size to shape the item with.
+    ///
+    /// This is a number of device/physical points, i.e. the logical font size
+    /// multiplied by any active scale factor.
     pub font_size: f32,
+    /// The logical font size in points (CSS pixels), i.e. ignoring any scale factor.
+    ///
+    /// Used by size-dependent shaping, such as the AAT `trak` table's tracking.
+    pub point_size: f32,
     /// The language to shape the item with.
     pub language: Option<Language>,
     /// The font features to shape the item with.
@@ -372,7 +379,7 @@ fn shape_segment(
             HarfShapeOptions::new()
                 .plan(Some(shaper_plan))
                 .features(&scx.features)
-                .point_size(Some(options.font_size)),
+                .point_size(Some(options.point_size)),
         )
         .expect("buffer direction and script match the shape plan");
 
