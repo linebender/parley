@@ -4,6 +4,7 @@
 //! Unicode bidirectional algorithm.
 
 use alloc::vec::Vec;
+use core::ops::Range;
 use icu_properties::props::{BidiClass, BidiMirroringGlyph, BidiPairedBracketType};
 use parlance::{BaseDirection, BidiLevel};
 
@@ -47,8 +48,7 @@ impl BidiResolver {
         self.base_level = BidiLevel::new(0);
     }
 
-    /// Resolves a paragraph with the specified base direction and
-    /// precomputed types.
+    /// Resolves text with the specified base direction and precomputed types.
     pub(crate) fn resolve(
         &mut self,
         chars: impl Iterator<Item = (char, (BidiClass, BidiMirroringGlyph))>,
@@ -78,35 +78,45 @@ impl BidiResolver {
             return;
         }
         self.types.extend_from_slice(&self.initial_types);
-        self.resolve_levels();
-        self.resolve_runs();
-        //self.dump_sequences();
-        for i in 0..self.runs.len() {
-            if self.runs[i].in_sequence {
-                continue;
-            }
-            self.types.truncate(len);
-            self.indices.clear();
-            let mut cur = i;
-            let level = self.runs[i].level;
-            let sos = self.runs[i].sos;
-            let mut eos;
-            loop {
-                let run = &self.runs[cur];
-                for i in run.start..run.end {
-                    let ty = self.types[i];
-                    if !is_removed_by_x9(ty) {
-                        self.types.push(ty);
-                        self.indices.push(i);
-                    }
+        self.levels.resize(len, BidiLevel::new(0));
+        let mut start = 0;
+        while start < len {
+            // Each paragraph is handled separately, see UAX #9 P1:
+            // <https://unicode.org/reports/tr9/#P1>.
+            let end = self.initial_types[start..]
+                .iter()
+                .position(|&t| t == BidiClass::ParagraphSeparator)
+                .map_or(len, |i| start + i + 1);
+            self.resolve_levels(start..end);
+            self.resolve_runs(start..end);
+            for i in 0..self.runs.len() {
+                if self.runs[i].in_sequence {
+                    continue;
                 }
-                eos = run.eos;
-                cur = match run.next {
-                    Some(i) => i,
-                    None => break,
-                };
+                self.types.truncate(len);
+                self.indices.clear();
+                let mut cur = i;
+                let level = self.runs[i].level;
+                let sos = self.runs[i].sos;
+                let mut eos;
+                loop {
+                    let run = &self.runs[cur];
+                    for i in run.start..run.end {
+                        let ty = self.types[i];
+                        if !is_removed_by_x9(ty) {
+                            self.types.push(ty);
+                            self.indices.push(i);
+                        }
+                    }
+                    eos = run.eos;
+                    cur = match run.next {
+                        Some(i) => i,
+                        None => break,
+                    };
+                }
+                self.resolve_sequence(level.to_u8(), sos, eos, self.indices.len());
             }
-            self.resolve_sequence(level.to_u8(), sos, eos, self.indices.len());
+            start = end;
         }
         for i in 0..len {
             let t = self.initial_types[i];
@@ -158,6 +168,7 @@ impl BidiResolver {
                 | BidiClass::LeftToRightIsolate
                 | BidiClass::FirstStrongIsolate => isolates += 1,
                 BidiClass::PopDirectionalIsolate if isolates > 0 => isolates -= 1,
+                BidiClass::ParagraphSeparator => isolates = 0,
                 BidiClass::LeftToRight | BidiClass::RightToLeft | BidiClass::ArabicLetter
                     if isolates == 0 =>
                 {
@@ -199,23 +210,20 @@ impl BidiResolver {
         0
     }
 
-    fn resolve_levels(&mut self) {
+    fn resolve_levels(&mut self, paragraph: Range<usize>) {
         let base = self.base_level;
-        let len = self.types.len();
-        self.levels.clear();
-        self.levels.resize(len, BidiLevel::new(0));
         let mut stack = Stack::new();
         let mut overflow_isolates = 0;
         let mut overflow_embedding = 0;
         let mut valid_isolates = 0;
         stack.push(base, BidiClass::OtherNeutral, false);
-        for i in 0..len {
+        for i in paragraph.clone() {
             let t = self.types[i];
             let tmask = mask(t);
             if tmask & EXPLICIT_MASK != 0 {
                 let is_isolate = tmask & ISOLATE_MASK != 0;
-                let is_rtl = if t == BidiClass::FirstStrongIsolate && i + 1 < len {
-                    Self::default_level_until_pdi(&self.types[i + 1..]) == 1
+                let is_rtl = if t == BidiClass::FirstStrongIsolate && i + 1 < paragraph.end {
+                    Self::default_level_until_pdi(&self.types[i + 1..paragraph.end]) == 1
                 } else {
                     tmask & RTL_MASK != 0
                 };
@@ -279,10 +287,6 @@ impl BidiResolver {
                     stack.pop();
                 }
             } else if t == BidiClass::ParagraphSeparator {
-                stack.depth = 1;
-                overflow_isolates = 0;
-                overflow_embedding = 0;
-                valid_isolates = 0;
                 self.levels[i] = base;
             } else if t != BidiClass::BoundaryNeutral {
                 self.levels[i] = stack.embedding_level();
@@ -293,22 +297,21 @@ impl BidiResolver {
         }
     }
 
-    fn resolve_runs(&mut self) {
-        let len = self.types.len();
+    fn resolve_runs(&mut self, paragraph: Range<usize>) {
         self.runs.clear();
-        let mut start = 0;
-        while start < len {
+        let mut start = paragraph.start;
+        while start < paragraph.end {
             if !is_removed_by_x9(self.types[start]) {
                 break;
             }
             start += 1;
         }
-        if start == len {
+        if start == paragraph.end {
             return;
         }
         let mut level = self.levels[start];
-        let mut offset = 0;
-        for i in start + 1..len {
+        let mut offset = paragraph.start;
+        for i in start + 1..paragraph.end {
             if is_removed_by_x9(self.types[i]) {
                 continue;
             }
@@ -318,8 +321,8 @@ impl BidiResolver {
                 level = self.levels[i];
             }
         }
-        if offset < len {
-            self.runs.push(Run::new(level, offset, len));
+        if offset < paragraph.end {
+            self.runs.push(Run::new(level, offset, paragraph.end));
         }
         for run in &mut self.runs {
             while run.start < run.end {
@@ -343,7 +346,7 @@ impl BidiResolver {
                 run.starts_with_pdi = true;
             }
             let mut prev_level = self.base_level;
-            for i in (0..run.start).rev() {
+            for i in (paragraph.start..run.start).rev() {
                 if !is_removed_by_x9(self.types[i]) {
                     prev_level = self.levels[i];
                     break;
@@ -355,7 +358,7 @@ impl BidiResolver {
                 run.eos = type_from_level(self.base_level.max(run.level));
             } else {
                 let mut next_level = self.base_level;
-                for i in run.end..len {
+                for i in run.end..paragraph.end {
                     if !is_removed_by_x9(self.types[i]) {
                         next_level = self.levels[i];
                         break;
