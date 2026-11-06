@@ -89,7 +89,6 @@ impl BidiResolver {
                 .map_or(len, |i| start + i + 1);
             self.resolve_levels(start..end);
             self.resolve_runs(start..end);
-            //self.dump_sequences();
             for i in 0..self.runs.len() {
                 if self.runs[i].in_sequence {
                     continue;
