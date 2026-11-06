@@ -29,10 +29,10 @@ fn plain_multiline_text() {
 fn newline_resets_bidi() {
     let mut env = TestEnv::new(test_name!(), None);
 
-    let text = "كتاب\n123-456";
+    let text = "\u{2068}!?\nكتاب!\n123-456";
     let builder = env.ranged_builder(text);
     let mut layout = builder.build(text);
-    layout.break_all_lines(None);
+    layout.break_all_lines(Some(100.));
 
     env.check_layout_snapshot(&layout);
 }
