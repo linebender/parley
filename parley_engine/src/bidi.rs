@@ -83,11 +83,7 @@ impl BidiResolver {
         while start < len {
             // Each paragraph is handled separately, see UAX #9 P1:
             // <https://unicode.org/reports/tr9/#P1>.
-            let end = self.initial_types[start..]
-                .iter()
-                .position(|&t| t == BidiClass::ParagraphSeparator)
-                .map_or(len, |i| start + i + 1);
-            self.resolve_levels(start..end);
+            let end = self.resolve_levels(start);
             self.resolve_runs(start..end);
             for i in 0..self.runs.len() {
                 if self.runs[i].in_sequence {
@@ -199,6 +195,7 @@ impl BidiResolver {
                         return 0;
                     }
                 }
+                BidiClass::ParagraphSeparator => return 0,
                 BidiClass::LeftToRight | BidiClass::RightToLeft | BidiClass::ArabicLetter
                     if isolates == 0 =>
                 {
@@ -210,20 +207,23 @@ impl BidiResolver {
         0
     }
 
-    fn resolve_levels(&mut self, paragraph: Range<usize>) {
+    /// Resolves the levels of the paragraph starting at `start`, and returns the exclusive index of
+    /// that paragraph's end.
+    fn resolve_levels(&mut self, start: usize) -> usize {
         let base = self.base_level;
+        let len = self.initial_types.len();
         let mut stack = Stack::new();
         let mut overflow_isolates = 0;
         let mut overflow_embedding = 0;
         let mut valid_isolates = 0;
         stack.push(base, BidiClass::OtherNeutral, false);
-        for i in paragraph.clone() {
+        for i in start..len {
             let t = self.types[i];
             let tmask = mask(t);
             if tmask & EXPLICIT_MASK != 0 {
                 let is_isolate = tmask & ISOLATE_MASK != 0;
-                let is_rtl = if t == BidiClass::FirstStrongIsolate && i + 1 < paragraph.end {
-                    Self::default_level_until_pdi(&self.types[i + 1..paragraph.end]) == 1
+                let is_rtl = if t == BidiClass::FirstStrongIsolate {
+                    Self::default_level_until_pdi(&self.initial_types[i + 1..]) == 1
                 } else {
                     tmask & RTL_MASK != 0
                 };
@@ -288,6 +288,7 @@ impl BidiResolver {
                 }
             } else if t == BidiClass::ParagraphSeparator {
                 self.levels[i] = base;
+                return i + 1;
             } else if t != BidiClass::BoundaryNeutral {
                 self.levels[i] = stack.embedding_level();
                 if stack.override_status() != BidiClass::OtherNeutral {
@@ -295,6 +296,7 @@ impl BidiResolver {
                 }
             }
         }
+        len
     }
 
     fn resolve_runs(&mut self, paragraph: Range<usize>) {
