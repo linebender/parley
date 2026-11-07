@@ -440,12 +440,7 @@ where
 
     /// Move the cursor to the start of the buffer.
     pub fn move_to_text_start(&mut self) {
-        self.refresh_layout();
-        self.editor.set_selection(self.editor.selection.move_lines(
-            &self.editor.layout,
-            isize::MIN,
-            false,
-        ));
+        self.move_to_byte(0);
     }
 
     /// Move the cursor to just after the previous hard line break (such as `\n`).
@@ -467,12 +462,7 @@ where
 
     /// Move the cursor to the end of the buffer.
     pub fn move_to_text_end(&mut self) {
-        self.refresh_layout();
-        self.editor.set_selection(self.editor.selection.move_lines(
-            &self.editor.layout,
-            isize::MAX,
-            false,
-        ));
+        self.move_to_byte(self.editor.buffer.len());
     }
 
     /// Move the cursor to just before the next hard line break (such as `\n`).
@@ -551,11 +541,7 @@ where
 
     /// Select the whole buffer.
     pub fn select_all(&mut self) {
-        self.refresh_layout();
-        self.editor.set_selection(
-            Selection::from_byte_index(&self.editor.layout, 0_usize, Affinity::default())
-                .move_lines(&self.editor.layout, isize::MAX, true),
-        );
+        self.select_byte_range(0, self.editor.buffer.len());
     }
 
     /// Collapse selection into caret.
@@ -565,12 +551,7 @@ where
 
     /// Move the selection focus point to the start of the buffer.
     pub fn select_to_text_start(&mut self) {
-        self.refresh_layout();
-        self.editor.set_selection(self.editor.selection.move_lines(
-            &self.editor.layout,
-            isize::MIN,
-            true,
-        ));
+        self.extend_selection_to_byte(0);
     }
 
     /// Move the selection focus point to just after the previous hard line break (such as `\n`).
@@ -592,12 +573,7 @@ where
 
     /// Move the selection focus point to the end of the buffer.
     pub fn select_to_text_end(&mut self) {
-        self.refresh_layout();
-        self.editor.set_selection(self.editor.selection.move_lines(
-            &self.editor.layout,
-            isize::MAX,
-            true,
-        ));
+        self.extend_selection_to_byte(self.editor.buffer.len());
     }
 
     /// Move the selection focus point to just before the next hard line break (such as `\n`).
