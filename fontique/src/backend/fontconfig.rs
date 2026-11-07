@@ -672,6 +672,8 @@ impl SystemFonts {
             }
         }
 
+        add_metric_compatible_aliases(&config, &mut name_map);
+
         // Populate the generic family map.
         let mut generic_families = GenericFamilyMap::default();
         for (generic_family, name) in GENERIC_FAMILY_NAMES.iter().copied() {
@@ -829,6 +831,87 @@ impl SystemFonts {
         }
 
         Some(FamilyInfo::new(name, font_infos))
+    }
+}
+
+/// Groups of metric-compatible families, from fontconfig's `30-metric-aliases.conf`.
+const METRIC_COMPATIBLE_FAMILIES: &[&[&str]] = &[
+    &[
+        "Arial",
+        "Helvetica",
+        "Arimo",
+        "Liberation Sans",
+        "Albany",
+        "Albany AMT",
+        "Nimbus Sans",
+        "Nimbus Sans L",
+        "TeX Gyre Heros",
+    ],
+    &[
+        "Arial Narrow",
+        "Helvetica Narrow",
+        "Liberation Sans Narrow",
+        "Nimbus Sans Narrow",
+    ],
+    &[
+        "Times New Roman",
+        "Times",
+        "Tinos",
+        "Liberation Serif",
+        "Thorndale",
+        "Thorndale AMT",
+        "Nimbus Roman",
+        "Nimbus Roman No9 L",
+        "TeX Gyre Termes",
+    ],
+    &[
+        "Courier New",
+        "Courier",
+        "Cousine",
+        "Liberation Mono",
+        "Cumberland",
+        "Cumberland AMT",
+        "Nimbus Mono PS",
+        "Nimbus Mono L",
+        "TeX Gyre Cursor",
+    ],
+    &["Cambria", "Caladea"],
+    &["Calibri", "Carlito"],
+];
+
+/// Makes uninstalled families resolve to the metric-compatible family fontconfig substitutes for
+/// them (e.g. Helvetica to Liberation Sans), as browsers do. Other substitutes fontconfig would
+/// pick for an unknown name, such as its default sans-serif font, are not aliased.
+fn add_metric_compatible_aliases(config: &Config, name_map: &mut FamilyNameMap) {
+    for group in METRIC_COMPATIBLE_FAMILIES {
+        for &name in *group {
+            if name_map.get(name).is_some() {
+                continue;
+            }
+            let Some(mut pattern) = Pattern::new() else {
+                return;
+            };
+            let Ok(c_name) = CString::new(name) else {
+                continue;
+            };
+            pattern.add_string(FC_FAMILY, &c_name);
+            config.substitute(&mut pattern, FcMatchPattern);
+            let Ok(font) = config.font_match(&pattern) else {
+                continue;
+            };
+            let Ok(matched) = font.get_string(FC_FAMILY, 0) else {
+                continue;
+            };
+            if !group
+                .iter()
+                .any(|member| member.eq_ignore_ascii_case(&matched))
+            {
+                continue;
+            }
+            if let Some(id) = name_map.get(&matched).map(FamilyName::id) {
+                name_map.add_alias(id, name);
+            }
+        }
     }
 }
 
