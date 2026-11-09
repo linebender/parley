@@ -751,7 +751,7 @@ pub(crate) fn analyze_text(
         .peekable();
 
     // Merge boundaries - line takes precedence over word
-    let mut lb_iter = line_boundary_positions.iter().peekable();
+    let mut lb_iter = line_boundary_positions.iter().copied().peekable();
     let mut prev_char = None;
     let mut prev_prev_char = None;
     // Whether the preceding character is a mandatory break.
@@ -767,45 +767,9 @@ pub(crate) fn analyze_text(
         .map(|(range, _)| range)
         .peekable();
     let boundary_iter = text.char_indices().map(|(byte_pos, ch)| {
-        // advance any stale word boundary positions
-        while let Some(&w) = wb_iter.peek() {
-            if w < byte_pos {
-                _ = wb_iter.next();
-            } else {
-                break;
-            }
-        }
-        // advance any stale grapheme boundary positions
-        while let Some(&g) = gb_iter.peek() {
-            if g < byte_pos {
-                _ = gb_iter.next();
-            } else {
-                break;
-            }
-        }
-        // advance any stale line boundary positions
-        while let Some(&l) = lb_iter.peek() {
-            if *l < byte_pos {
-                _ = lb_iter.next();
-            } else {
-                break;
-            }
-        }
-
-        let mut is_word = false;
-        if let Some(&w) = wb_iter.peek()
-            && w == byte_pos
-        {
-            is_word = true;
-            _ = wb_iter.next();
-        }
-        let mut is_grapheme_start = false;
-        if let Some(&g) = gb_iter.peek()
-            && g == byte_pos
-        {
-            is_grapheme_start = true;
-            _ = gb_iter.next();
-        }
+        let mut is_word = wb_iter.next_if_eq(&byte_pos).is_some();
+        let is_grapheme_start = gb_iter.next_if_eq(&byte_pos).is_some();
+        let is_icu_line = lb_iter.next_if_eq(&byte_pos).is_some();
         let properties = data_sources.properties(ch);
 
         // For characters requiring a dictionary for deciding word boundaries, apply
@@ -817,15 +781,6 @@ pub(crate) fn analyze_text(
         {
             is_word = true;
         }
-
-        let is_icu_line = if let Some(&l) = lb_iter.peek()
-            && *l == byte_pos
-        {
-            _ = lb_iter.next();
-            true
-        } else {
-            false
-        };
 
         // CSS Text 4 § 4.3.1 `break-spaces`: a soft wrap opportunity exists after each preserved
         // space or tab (but never directly before a mandatory break, UAX #14 LB6).
