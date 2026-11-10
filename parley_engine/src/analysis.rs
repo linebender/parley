@@ -676,7 +676,7 @@ pub(crate) fn analyze_text(
     // Line boundaries (word break naming refers to the line boundary determination config).
     //
     // This breaks text into sequences with similar line boundary config (part of style
-    // information). If this config is consistent for all text, we use a fast path through this.
+    // information).
     let mut segments = DenseLineBreaks::new(options.line_break, text.len());
     // `text` is non-empty (checked above), so there is always at least one segment.
     let first_segment = segments.next().unwrap();
@@ -689,35 +689,13 @@ pub(crate) fn analyze_text(
     for (substring_index, (substring, segmenter_key, last)) in contiguous_substrings.enumerate() {
         let line_segmenter = data_sources.line_segmenter(segmenter_key);
         let segmenter = line_segmenter.as_borrowed();
-        // Fast path for text with a single segmenter configuration.
-        if substring_index == 0 && last {
-            let mut lb_iter = segmenter.segment_str(substring);
-
-            let _first = lb_iter.next();
-            let second = lb_iter.next();
-            if second.is_none() {
-                continue;
-            }
-            let third = lb_iter.next();
-            if third.is_none() {
-                continue;
-            }
-
-            let iter = [second.unwrap(), third.unwrap()].into_iter().chain(lb_iter);
-
-            line_boundary_positions.extend(iter);
-            // Remove the unnecessary boundary at the end added by ICU4X.
-            line_boundary_positions.pop();
-            break;
-        }
-
         let line_boundaries_iter = segmenter.segment_str(substring);
         let mut substring_chars = substring.chars();
         if substring_index != 0 {
             global_offset -= substring_chars.next().unwrap().len_utf8();
         }
-        // There will always be at least two characters if we are not taking the fast path for
-        // a single word break style substring.
+        // Runs are never empty and substrings after the first one start with one character from the
+        // previous run (which we removed above), so at least one character remains.
         let last_len = substring_chars.next_back().unwrap().len_utf8();
 
         // Mark line boundaries (overriding word boundaries where present).
