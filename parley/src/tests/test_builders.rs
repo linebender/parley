@@ -547,6 +547,7 @@ fn ranged_builder_reuse_layout() {
 
     let mut builder = lcx.ranged_builder(&mut fcx, FIRST_TEXT, 1., false);
     builder.push_default(FontFamily::from(FONT_FAMILY_LIST));
+    builder.push_default(StyleProperty::WordSpacing(3.));
     builder.build_into(&mut layout, FIRST_TEXT);
     layout.break_all_lines(Some(MAX_ADVANCE));
 

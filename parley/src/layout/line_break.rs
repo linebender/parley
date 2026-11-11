@@ -1361,7 +1361,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                     let shaped_run = &self.layout.data.shaped_text.runs()[run_idx];
                     let run = Run::new(self.layout, 0, 0, run_idx, None);
                     let slice = run.full_slice();
-                    let spacing = run.line_spacing();
+                    let spacing = EffectiveSpacing::new(run.data.spacing, Justification::NONE);
                     let cluster_end = shaped_run.shaped_clusters_range.end;
 
                     for atom in slice.atoms_from(self.state.cluster_idx) {
@@ -1518,6 +1518,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                     bidi_level: BidiLevel::new(0),
                     shaped_cluster_range: cluster..cluster,
                     text_range: text..text,
+                    gaps_start: None,
                 });
                 line.item_range = run_index..run_index + 1;
             }
@@ -1708,6 +1709,7 @@ fn commit_line<B: Brush>(
                     // These properties are ignored for inline boxes. So we just put a dummy value.
                     shaped_cluster_range: 0..0,
                     text_range: 0..0,
+                    gaps_start: None,
                 });
 
                 last_item_kind = item.kind;
@@ -1762,6 +1764,7 @@ fn commit_line<B: Brush>(
                     bidi_level: shaped_run.bidi_level,
                     shaped_cluster_range: cluster_range,
                     text_range: item_text_range,
+                    gaps_start: None,
                 });
             }
         }

@@ -6,6 +6,7 @@ use crate::layout::data::BreakReason;
 use crate::layout::layout::Layout;
 use crate::layout::line::{Line, LineItem};
 use crate::layout::run::Run;
+use crate::layout::spacing::Gaps;
 use crate::style::Brush;
 
 use core::ops::Range;
@@ -184,8 +185,22 @@ impl<'a, B: Brush> Cluster<'a, B> {
     /// [`Self::is_ligature_continuation`]), the shaped cluster's advance is split evenly over the
     /// clusters it overlaps.
     pub fn advance(&self) -> f32 {
-        let spacing = self.run.line_spacing();
-        spacing.grapheme_advance(&self.atom, self.grapheme, self.is_rtl())
+        let gaps = self
+            .run
+            .gaps()
+            .map_or(Gaps::ZERO, |cluster_gaps| cluster_gaps.for_atom(&self.atom));
+
+        // TODO: perhaps spacing should not be applied if the grapheme `Grapheme::continues_before`
+        // / `Grapheme::continues_after`. The same then should hold true in `gaps` computed for an
+        // atom.
+        let (owns_before, owns_after) = if self.is_rtl() {
+            (self.grapheme.is_atom_end(), self.grapheme.is_atom_start())
+        } else {
+            (self.grapheme.is_atom_start(), self.grapheme.is_atom_end())
+        };
+        self.grapheme.advance()
+            + if owns_before { gaps.before } else { 0. }
+            + if owns_after { gaps.after } else { 0. }
     }
 
     /// Returns `true` if this is a right-to-left cluster.

@@ -6,7 +6,7 @@ use crate::layout::data::BreakReason;
 use crate::layout::data::{LayoutItemKind, LineData};
 use crate::layout::layout::Layout;
 use crate::layout::run::Run;
-use crate::layout::spacing::EffectiveSpacing;
+use crate::layout::spacing::{Gaps, RunGaps};
 use crate::layout::{SpanMetrics, Style};
 use crate::style::Brush;
 use crate::{BaselineShift, InlineBoxKind};
@@ -363,7 +363,7 @@ impl<'a, B: Brush> GlyphRun<'a, B> {
 #[derive(Clone)]
 struct AtomIter<'a> {
     atoms: Atoms<'a>,
-    spacing: EffectiveSpacing,
+    cluster_gaps: Option<RunGaps<'a>>,
     is_rtl: bool,
     /// The next atom in visual order, if it has been peeked but not yet consumed.
     peeked: Option<Atom<'a>>,
@@ -379,7 +379,7 @@ impl<'a> AtomIter<'a> {
             } else {
                 slice.atoms_start()
             },
-            spacing: run.line_spacing(),
+            cluster_gaps: run.gaps(),
             is_rtl,
             peeked: None,
         }
@@ -413,8 +413,15 @@ impl<'a> AtomIter<'a> {
             .map(|cluster| usize::from(cluster.glyph_len()))
             .sum();
         let mut advance = atom.advance();
-        if glyph_count != 0 && !self.spacing.is_zero() {
-            advance += self.spacing.gaps(atom).total();
+        if glyph_count != 0
+            && let Some(cluster_gaps) = self.cluster_gaps
+        {
+            advance = cluster_gaps
+                .for_cluster_range(atom.shaped_clusters_range())
+                .iter()
+                .zip(atom.shaped_clusters())
+                .map(|(entry, cluster)| cluster.advance + entry.total())
+                .sum();
         }
         (glyph_count, advance)
     }
@@ -504,7 +511,9 @@ impl<'a, B: Brush> Iterator for GlyphRunIter<'a, B> {
                                 atom.characters()[0].text_byte_start as usize,
                             );
                             // The object's advance is its box's width.
-                            let gaps = atoms.spacing.gaps(&atom);
+                            let gaps = atoms
+                                .cluster_gaps
+                                .map_or(Gaps::ZERO, |cluster_gaps| cluster_gaps.for_atom(&atom));
                             let x = self.offset + gaps.before;
                             self.offset += atom_advance + gaps.total();
                             return Some(self.positioned_inline_box(box_index, x));
