@@ -5,7 +5,7 @@
 
 use alloc::vec::Vec;
 use core::ops::Range;
-use parley_engine::shape::{ShapedCluster, Whitespace};
+use parley_engine::shape::Whitespace;
 use parley_engine::{Atom, ShapedSlice};
 
 /// Whether the whitespace is a word separator.
@@ -232,18 +232,11 @@ pub(crate) fn push_cluster_gaps(
             continue;
         }
         let clusters = atom.shaped_clusters();
-        // Currently, the glyph iterator only returns the advances when a shaped
-        // cluster outputs a glyph; we therefore put the spacing on the first/last cluster
-        // which emits glyph.
-        // TODO: A better fix would address this in GlyphRunIter and `Glyphs::next`.
-        let has_glyphs = |cluster: &ShapedCluster| cluster.glyph_len() != 0;
-        // Note: This unwrap_or also ensures that the inline object case works correctly, as they have no glyphs.
-        let first = clusters.iter().position(has_glyphs).unwrap_or(0);
-        let last = clusters
-            .iter()
-            .rposition(has_glyphs)
-            .unwrap_or(clusters.len() - 1);
-        let (first, last) = if is_rtl { (last, first) } else { (first, last) };
+        let (first, last) = if is_rtl {
+            (clusters.len() - 1, 0)
+        } else {
+            (0, clusters.len() - 1)
+        };
         let offset = (atom.shaped_clusters_range().start - base) as usize;
         entries[offset + first].before += gaps.before;
         entries[offset + last].after += gaps.after;

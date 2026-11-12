@@ -343,6 +343,8 @@ impl Iterator for Glyphs<'_> {
             }?;
             self.glyphs = self.slice.shaped_cluster_glyphs(cluster);
             if let Some(cluster_gaps) = self.gaps {
+                // TODO: if `self.shift` is non-zero at this point, then there was a shaped cluster without glyphs,
+                // and glyph rendering would fall out of sync with layout.
                 let index = (cluster - self.slice.shaped_clusters_range().start) as usize;
                 // TODO: These gaps are never made visible to the caller if
                 // this shaped cluster didn't contain any glyphs.
