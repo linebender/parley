@@ -158,7 +158,7 @@ pub(crate) fn align<B: Brush>(layout: &mut LayoutData<B>) {
                 .shaped_text
                 .run_slice(item.index as u32)
                 .narrow(item.shaped_cluster_range.clone());
-            item.gaps_start = Some(layout.cluster_gaps.len());
+            item.gaps_start = Some(layout.cluster_gaps.len() as u32);
             push_cluster_gaps(&mut layout.cluster_gaps, slice, spacing, item.is_rtl());
         }
     }

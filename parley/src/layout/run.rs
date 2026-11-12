@@ -130,7 +130,7 @@ impl<'a, B: Brush> Run<'a, B> {
         // A Run with no line_data only happens during line breaking, which doesn't call this method.
         // TODO: Maybe use a different data type than run in that case?
         let item = self.line_data.unwrap();
-        let start = item.gaps_start?;
+        let start = item.gaps_start? as usize;
         Some(RunGaps::new(
             &self.layout.data.cluster_gaps[start..start + item.shaped_cluster_range.len()],
             item.shaped_cluster_range.start,

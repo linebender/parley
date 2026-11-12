@@ -165,7 +165,7 @@ pub(crate) struct LineItemData {
     ///
     /// When there is no spacing or justification (i.e. no additional gaps), this is `None`.
     /// Note that this is only initialised during alignment.
-    pub(crate) gaps_start: Option<usize>,
+    pub(crate) gaps_start: Option<u32>,
 }
 
 impl LineItemData {
