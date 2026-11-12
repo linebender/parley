@@ -16,6 +16,96 @@ Every change to this file must be written by a human.
 
 This release has an [MSRV] of 1.88.
 
+## [0.13.0] - 2026-11-06
+
+This release has an [MSRV] of 1.88.
+
+### Added
+
+#### Parley
+
+- `set_dictionary_provider` on layout builders, to allow using non-embedded dictionaries for segmentation. ([#881][] by [@DJMcNab][])
+- `Layout::span_metrics` and `GlyphRun::span_metrics`, exposing the first-available-font metrics of any span, not only the root. ([#920][] by [@conor-93][])
+- `Layout::primary_caret` returns the line containing `byte_index` and the x-coordinate of the primary caret there. ([#939][] by [@tomcur][])  
+  The primary caret is where text in the paragraph's direction would be inserted. Where the text direction changes, this would be the position of a bidi neutral.
+- A new `CollapsedSpace` style. Allows whitespace to be collapsed to an ideographic space which is useful for implementing `text-transform: full-width`. ([#887][] by [@nicoburns][])
+
+#### Parley Engine
+
+- Breaking change: Added `AnalysisOptions::inline_objects`. ([#902][] by [@tomcur][])  
+  Inline objects (like images) can now be carried in the text as a U+FFFC OBJECT REPLACEMENT CHARACTER and listed in the analysis options. The soft wrap opportunities of each object can be specified separately. Each such object becomes a `ShapedCluster` of its own; those clusters' advances can be set using `ShapedText::set_inline_object_advance`.
+- Breaking change: `AnalysisDataSources`, which allows providing non-embedded data for segmentation. This now must be provided in `Analyzer::analyze`. ([#881][] by [@DJMcNab][])
+- Breaking change: `Shaper::shape_text` now takes a `produce_safe_to_concat_flags` argument. ([#876][] by [@tomcur][])  
+  When `true`, `ShapedCluster::is_safe_to_concat_before` reports whether the text can be changed on one side of the shaped cluster's start.
+- Breaking change: Added `ShapeOptions::point_size`, which is the logical font size, ignoring any scale factor. ([#942][] by [@nicoburns][])  
+  It is used for size-dependent shaping, such as tracking from the AAT `trak` table. `ShapeOptions::font_size` remains the scaled font size.
+- `ShapedRun` now stores the font features and the run's script and language the run was shaped with in `ShapedRun::{features_range, script, language}` and `ShapedText::features`. ([#879][] by [@tomcur][])
+
+### Changed
+
+#### Parley
+
+- Breaking change: `Layout::align` has been removed in favour of `Layout::set_alignment`. ([#941][] by [@DJMcNab][])  
+  You must now instead use `Layout::set_alignment` before line breaking:
+
+  ```diff
+     let mut layout = builder.build(...);
+  +  layout.set_alignment(Alignment::Center, AlignmentOptions::default());
+     layout.break_all_lines(Some(max_width));
+  -  layout.align(Alignment::Center, AlignmentOptions::default());
+  ```
+
+  `Start` alignment is now the default (it was previously implicitly `Left`), so an `align(Alignment::Start, AlignmentOptions::default)` call can be removed instead.
+- Breaking change: In-flow inline boxes are now represented in the text by a U+FFFC OBJECT REPLACEMENT CHARACTER. ([#902][] by [@tomcur][])  
+  Using the `TreeBuilder`, these characters are added automatically. Using `StyleRunBuilder` or `RangedBuilder`, the caller must add them. Each such box becomes its own `layout::Cluster`, so code that walks clusters will see the inline boxes.
+- Breaking change: `Layout::inline_boxes_mut` was replaced by `Layout::edit_inline_box`. ([#902][] by [@tomcur][])
+- Upgrade to `read-fonts` 0.46, `skrifa` 0.49, `harfrust` 0.15. ([#898][] by [@nicoburns][])
+
+#### Parley Engine
+
+- Breaking change: `ShapedRun` is now marked `#[non_exhaustive]`. ([#879][] by [@tomcur][])
+- Breaking change: `CharCluster::calculate_coverage` no longer takes an `AnalysisDataSources` parameter. ([#911][] by [@tomcur][])
+- Graphemes can now span across `ShapedSlice` edges. ([#927][] by [@tomcur][])  
+  This is useful if, e.g., a line break falls inside some exotic graphemes (like between a space and a combining mark). See `{Atom, ShapedSlice}::{grapheme_continues_before, grapheme_continues_after}` and `Grapheme::{continues_before, continues_after}`.
+
+#### Fontique
+
+- `fontique` no longer uses Fontconfig when targeting OpenHarmony (`target_env = "ohos"`); the dummy system backend is used instead. ([#913][] by [@springmin][])
+
+### Removed
+
+#### Parley Engine
+
+- Breaking change: `ShapedRun::advance` has been removed. ([#916][] by [@tomcur][])  
+  You can sum `text.run_slice(i).shaped_clusters().iter().map(|c| c.advance)` instead.
+- Breaking change: `CharacterFlags::new` is no longer public. ([#915][] by [@tomcur][])
+
+### Fixed
+
+#### Parley
+
+- Parley now correctly handles fonts with descent metrics encoded as a positive value. ([#877][] by [@nicoburns][])
+- `Cluster::visual_offset` now includes the offset caused by shifting through `BreakerState::set_line_x`. ([#933][] by [@tomcur][])  
+  This also corrects the geometry used and returned by `Cursor`.
+- Letter spacing no longer applies to some zero-width formatting characters. ([#924][] by [@DJMcNab][])
+- In-flow inline boxes in bidirectional text are now ordered as neutral characters, following CSS Writing Modes 4 § 2.4.3. ([#902][] by [@tomcur][])
+- The caret can now be placed on both sides of an in-flow inline box, and selection now spans a box exactly when it covers the box's character. ([#902][] by [@tomcur][])
+- Contextual shaping now correctly handles the presence of in-flow inline boxes: e.g., Arabic letters no longer join across a box. ([#902][] by [@tomcur][])
+- In-flow inline boxes added through `RangedBuilder` or `StyleRunBuilder` are now vertically aligned against the style span they are in. Previously, they were always aligned against the root style. ([#902][] by [@tomcur][])
+- Empty text is no longer laid out as a space, fixing, e.g., caret positions on empty text. ([#944][] by [@tomcur][])  
+  Note that empty text still gets a line, but it no longer has any runs, so `Line::runs` is empty for it.
+- Tracking from the AAT `trak` table is now looked up using the logical font size. Previously, it used the scaled font size, giving incorrect tracking when the layout's scale was not 1. ([#942][] by [@nicoburns][])
+
+#### Parley Engine
+
+- `ShapedCluster::is_safe_to_break_before` and `Atom::is_safe_to_break_before` now return whether the text can be broken logically before this shaped cluster without reshaping; previously they always returned `false`. ([#876][] by [@tomcur][])
+
+#### Fontique
+
+- Italic and oblique styles using a variable font's `slnt` axis now slant clockwise. Previously, the synthesized `slnt` value had the wrong sign, which would usually leave glyphs upright. ([#922][] by [@tomcur][])
+- Select the correct variable font width and style in synthesis when the axis defaults and declared attributes conflict. ([#921][] by [@tomcur][])
+- `FontInfo::style` now reports oblique angles with the correct sign. ([#923][] by [@tomcur][])
+
 ## [0.12.0] - 2026-10-09
 
 This release has an [MSRV] of 1.88.
@@ -706,6 +796,7 @@ This release has an [MSRV][] of 1.70.
 [@richardhozak]: https://github.com/richardhozak
 [@Soundcreates]: https://github.com/Soundcreates
 [@spirali]: https://github.com/spirali
+[@springmin]: https://github.com/springmin
 [@subotac]: https://github.com/subotac
 [@taj-p]: https://github.com/taj-p
 [@teolines]: https://github.com/teolines
@@ -921,12 +1012,35 @@ This release has an [MSRV][] of 1.70.
 [#866]: https://github.com/linebender/parley/pull/866
 [#867]: https://github.com/linebender/parley/pull/867
 [#872]: https://github.com/linebender/parley/pull/872
+[#876]: https://github.com/linebender/parley/pull/876
+[#877]: https://github.com/linebender/parley/pull/877
 [#878]: https://github.com/linebender/parley/pull/878
+[#879]: https://github.com/linebender/parley/pull/879
+[#881]: https://github.com/linebender/parley/pull/881
+[#887]: https://github.com/linebender/parley/pull/887
 [#889]: https://github.com/linebender/parley/pull/889
 [#892]: https://github.com/linebender/parley/pull/892
 [#893]: https://github.com/linebender/parley/pull/893
+[#898]: https://github.com/linebender/parley/pull/898
+[#902]: https://github.com/linebender/parley/pull/902
+[#911]: https://github.com/linebender/parley/pull/911
+[#913]: https://github.com/linebender/parley/pull/913
+[#915]: https://github.com/linebender/parley/pull/915
+[#916]: https://github.com/linebender/parley/pull/916
+[#920]: https://github.com/linebender/parley/pull/920
+[#921]: https://github.com/linebender/parley/pull/921
+[#922]: https://github.com/linebender/parley/pull/922
+[#923]: https://github.com/linebender/parley/pull/923
+[#924]: https://github.com/linebender/parley/pull/924
+[#927]: https://github.com/linebender/parley/pull/927
+[#933]: https://github.com/linebender/parley/pull/933
+[#939]: https://github.com/linebender/parley/pull/939
+[#941]: https://github.com/linebender/parley/pull/941
+[#942]: https://github.com/linebender/parley/pull/942
+[#944]: https://github.com/linebender/parley/pull/944
 
-[Unreleased]: https://github.com/linebender/parley/compare/v0.12.0...HEAD
+[Unreleased]: https://github.com/linebender/parley/compare/v0.13.0...HEAD
+[0.13.0]: https://github.com/linebender/parley/compare/v0.12.0...v0.13.0
 [0.12.0]: https://github.com/linebender/parley/compare/v0.11.1...v0.12.0
 [0.11.1]: https://github.com/linebender/parley/compare/v0.10.0...v0.11.1
 [0.11.0]: https://github.com/linebender/parley/compare/v0.10.0...v0.11.0
