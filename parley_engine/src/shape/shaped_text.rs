@@ -458,7 +458,7 @@ pub struct ShapedRun {
 pub(crate) fn push_glyph_buffer(
     shaped_clusters: &mut Vec<ShapedCluster>,
     glyphs: &mut Vec<Glyph>,
-    glyph_buffer: &harfrust::GlyphBuffer,
+    glyph_buffer: &harfrust::Buffer,
     font_unit_scale: f32,
     is_rtl: bool,
     characters: &[Character],

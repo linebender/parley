@@ -400,10 +400,10 @@ struct CachedFragment {
 /// because of the "n" before it, but measuring reshapes only the hyphen, which then takes its
 /// default form.
 pub struct Reshaper {
-    shape_data_cache: LruCache<cache::ShapeDataKey, harfrust::ShaperData>,
+    shape_data_cache: LruCache<cache::ShapeDataKey, harfrust::Font>,
     shape_plan_cache: LruCache<cache::ShapePlanId, harfrust::ShapePlan>,
 
-    unicode_buffer: Option<harfrust::UnicodeBuffer>,
+    buffer: harfrust::Buffer,
     features: Vec<harfrust::Feature>,
 
     cache: FragmentCache,
@@ -416,7 +416,7 @@ impl Default for Reshaper {
             shape_data_cache: LruCache::new(MAX_ENTRIES),
             shape_plan_cache: LruCache::new(MAX_ENTRIES),
 
-            unicode_buffer: Some(harfrust::UnicodeBuffer::new()),
+            buffer: harfrust::Buffer::new(),
             features: Vec::new(),
 
             cache: FragmentCache::default(),
@@ -1055,12 +1055,13 @@ impl Reshaper {
         let bytes = characters[chars.start as usize].text_byte_start as usize
             ..characters[chars.end as usize - 1].text_byte_range().end;
 
-        let mut buffer = self.unicode_buffer.take().unwrap_or_default();
-        buffer.clear();
+        self.buffer.clear();
 
         // Fill the characters into the `HarfRust` buffer with the start and end edits applied.
         if let Some(edit) = start_edit {
-            edit.inserted().chars().for_each(|ch| buffer.add(ch, 0));
+            edit.inserted()
+                .chars()
+                .for_each(|ch| self.buffer.push(ch.into(), 0));
         }
         for (ch, cluster_value) in text[bytes.clone()]
             .chars()
@@ -1068,29 +1069,28 @@ impl Reshaper {
             .take((char_count - end_num_chars_replaced) as usize)
             .skip(start_num_chars_replaced as usize)
         {
-            buffer.add(ch, cluster_value);
+            self.buffer.push(ch.into(), cluster_value);
         }
         if let Some(edit) = end_edit {
             let cluster_value = char_count - end_num_chars_replaced.max(1);
             edit.inserted
                 .chars()
-                .for_each(|ch| buffer.add(ch, cluster_value));
+                .for_each(|ch| self.buffer.push(ch.into(), cluster_value));
         }
-        buffer.set_pre_context(&text[..bytes.start]);
-        buffer.set_post_context(&text[bytes.end..]);
+        self.buffer.set_pre_context(&text[..bytes.start]);
+        self.buffer.set_post_context(&text[bytes.end..]);
 
-        let (glyph_buffer, font_unit_scale) = self.shape_like_run(shaped, run, buffer);
+        let font_unit_scale = self.shape_like_run(shaped, run);
         let (shaped_clusters_range, glyphs_range) = push_glyph_buffer(
             &mut reshaped.shaped_clusters,
             &mut reshaped.glyphs,
-            &glyph_buffer,
+            &self.buffer,
             font_unit_scale,
             run.bidi_level.is_rtl(),
             characters,
             chars.start as usize..chars.end as usize,
             shaped.has_safe_to_concat_flags,
         );
-        self.unicode_buffer = Some(glyph_buffer.clear());
 
         reshaped.runs.push(ReshapedRun {
             run: ShapedRun {
@@ -1109,36 +1109,30 @@ impl Reshaper {
         reshaped.runs.len() as u32 - 1
     }
 
-    /// Shape `buffer` with the font, normalized coordinates, direction, script, language, features
-    /// and font size, that `run` of `shaped` was shaped with.
+    /// Shape `self.buffer` in-place with the font, normalized coordinates, direction, script,
+    /// language, features and font size, that `run` of `shaped` was shaped with.
     ///
-    /// `buffer`'s characters and pre/post context must already be set.
+    /// The buffer's characters and pre/post context must already be set.
     ///
-    /// Returns `HarfRust`'s shaped glyph buffer and the font unit scale.
-    fn shape_like_run(
-        &mut self,
-        shaped: &ShapedText,
-        run: &ShapedRun,
-        mut buffer: harfrust::UnicodeBuffer,
-    ) -> (harfrust::GlyphBuffer, f32) {
+    /// Returns the font unit scale.
+    fn shape_like_run(&mut self, shaped: &ShapedText, run: &ShapedRun) -> f32 {
         let font = &shaped.fonts()[run.font_index];
-        // TODO: How do we want to handle errors like this?
-        let font_ref =
-            harfrust::FontRef::from_index(font.font.data.as_ref(), font.font.index).unwrap();
-        let shaper_data = self.shape_data_cache.entry(
+        let base_font = self.shape_data_cache.entry(
             cache::ShapeDataKey::new(font.font.data.id(), font.font.index),
-            || harfrust::ShaperData::new(&font_ref),
+            || {
+                let (data, _) = font.font.data.clone().into_raw_parts();
+                // TODO: How do we want to handle errors like this?
+                harfrust::Font::new(data, font.font.index).unwrap()
+            },
         );
         // The run's coordinates already include the synthesis's and the item's variations.
-        let instance = harfrust::ShaperInstance::from_coords(
-            &font_ref,
-            shaped.normalized_coords()[run.normalized_coords_range.clone()]
-                .iter()
-                .map(|coord| harfrust::NormalizedCoord::from_bits(coord.to_bits())),
-        );
-        let harf_shaper = shaper_data
-            .shaper(&font_ref)
-            .instance(Some(&instance))
+        let instance = base_font
+            .instance_builder()
+            .normalized_coords(
+                shaped.normalized_coords()[run.normalized_coords_range.clone()]
+                    .iter()
+                    .map(|coord| harfrust::font::NormalizedCoord::from_bits(coord.to_bits())),
+            )
             .build();
 
         let direction = if run.bidi_level.is_rtl() {
@@ -1160,11 +1154,11 @@ impl Reshaper {
                 hb_script,
                 language.clone(),
                 &self.features,
-                instance.coords(),
+                instance.normalized_coords(),
             ),
             || {
                 harfrust::ShapePlan::new(
-                    &harf_shaper,
+                    &instance,
                     direction,
                     Some(hb_script),
                     language.as_ref(),
@@ -1173,29 +1167,27 @@ impl Reshaper {
             },
         );
 
-        buffer.set_cluster_level(harfrust::BufferClusterLevel::MonotoneCharacters);
+        let buffer = &mut self.buffer;
+        buffer.set_cluster_level(harfrust::ClusterLevel::MonotoneCharacters);
         buffer.set_flags(if shaped.has_safe_to_concat_flags {
             harfrust::BufferFlags::PRODUCE_UNSAFE_TO_CONCAT
         } else {
             harfrust::BufferFlags::empty()
         });
         buffer.set_direction(direction);
-        buffer.set_script(hb_script);
-        if let Some(lang) = language {
-            buffer.set_language(lang);
-        }
+        buffer.set_script(Some(hb_script));
+        buffer.set_language(language);
 
-        let glyph_buffer = harf_shaper.shape(
+        harfrust::shape(
+            &harfrust::ShaperFont::new(&instance),
             buffer,
             HarfShapeOptions::new()
                 .plan(Some(shaper_plan))
                 .features(&self.features)
                 .point_size(Some(run.font_size)),
-        );
-        (
-            glyph_buffer,
-            run.font_size / harf_shaper.units_per_em() as f32,
         )
+        .expect("buffer direction and script match the shape plan");
+        run.font_size / instance.units_per_em() as f32
     }
 }
 
