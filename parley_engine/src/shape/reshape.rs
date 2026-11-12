@@ -308,12 +308,15 @@ enum SpliceMode {
 impl SpliceMode {
     fn is_safe_to_splice_before(self, cluster: ShapedCluster) -> bool {
         if !cluster.is_grapheme_start() {
-            // We put seams at grapheme boundaries, so that reshaping doesn't add shaped run
-            // boundaries inside graphemes. A consumer that doesn't break inside graphemes and
-            // perhaps otherwise already ignores graphemes spanning such boundaries (like bidi
-            // boundaries), then doesn't need to check after reshaping either. Boundaries inside
-            // graphemes are rarely safe to break, so this should not normally lead to any
-            // appreciable additional work.
+            // We do not add new shaped run boundaries inside graphemes. The reason is that users
+            // may want to assume grapheme and shaped run boundaries line up, for simplicity.
+            //
+            // Technically a shaped run boundary inside a grapheme is fine, but such boundaries
+            // otherwise only occur either in edge cases (like a grapheme spanning a bidi boundary)
+            // or when the user themselves asked for such a boundary by breaking inside a grapheme.
+            //
+            // In any case, boundaries inside graphemes are rarely safe to break, so this should not
+            // normally lead to any appreciable additional work.
             false
         } else {
             match self {
