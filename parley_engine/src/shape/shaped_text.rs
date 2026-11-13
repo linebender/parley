@@ -531,7 +531,7 @@ fn process_shaped_clusters<'a>(
     #[expect(clippy::cast_possible_truncation, reason = "Deferred")]
     #[inline(always)]
     fn flush(
-        cluster: &mut Cluster,
+        cluster: &Cluster,
         char_end: usize,
         characters: &[Character],
         shaped_clusters: &mut Vec<ShapedCluster>,
@@ -547,7 +547,7 @@ fn process_shaped_clusters<'a>(
             // Elide glyphs and advances of newlines and inline objects. Note that inline objects'
             // advances can be set later by the user.
             (cluster.glyphs_start as u32, 0, false, 0.)
-        } else if let Some(inline_glyph) = cluster.inline_glyph.take() {
+        } else if let Some(inline_glyph) = cluster.inline_glyph {
             (inline_glyph.id, 1, true, cluster.advance)
         } else {
             (
@@ -593,7 +593,7 @@ fn process_shaped_clusters<'a>(
     for (glyph_info, glyph_pos) in glyph_infos.zip(glyph_positions) {
         if glyph_info.cluster != cluster.id {
             let char_end = characters_start + glyph_info.cluster as usize;
-            flush(&mut cluster, char_end, characters, shaped_clusters);
+            flush(&cluster, char_end, characters, shaped_clusters);
 
             cluster = Cluster {
                 id: glyph_info.cluster,
@@ -636,7 +636,7 @@ fn process_shaped_clusters<'a>(
     }
 
     // Flush the final cluster.
-    flush(&mut cluster, characters.len(), characters, shaped_clusters);
+    flush(&cluster, characters.len(), characters, shaped_clusters);
 }
 
 #[cfg(test)]
