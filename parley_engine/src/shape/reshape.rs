@@ -3,13 +3,7 @@
 
 //! Reshaping of lines.
 //!
-//! A shaped piece of text broken into two parts sometimes requires the shaped glyphs to change. For
-//! example, some fonts may shape the Latin character sequence "ffi" into a ligature, and breaking
-//! somewhere in that ligature requires reshaping. Furthermore, you may want to insert hyphens or
-//! perform replacements near the edge: e.g., the Dutch word "skiën" once broken could be written as
-//! "ski-en".
-//!
-//! This module provides utilities to that end.
+//! See [`Reshaper`].
 
 use core::{mem, ops::Range};
 
@@ -377,17 +371,27 @@ struct CachedFragment {
     fragment: ReshapedText,
 }
 
-/// Reshape lines of a [`ShapedText`].
+/// Reshapes lines of a [`ShapedText`].
+///
+/// Breaking shaped text into lines can require its glyphs to change. For example, a font may shape
+/// the Latin character sequence "ffi" into a ligature, and breaking somewhere in that ligature
+/// breaks it up. Furthermore, you may want to insert hyphens or perform replacements near the edge:
+/// e.g., the Dutch word "skiën" once broken could be written as "ski-en" (see [`Edit`]).
+///
+/// You can use this as follows.
+///
+/// 1. Measure the effect of breaking at candidate line edges using [`Self::measure_start`] and
+///    [`Self::measure_end`].
+/// 2. Create a line from a start and end using [`Self::line`]. Optionally make the line you keep
+///    exact with [`Self::make_exact`].
+/// 3. Store the line using [`Self::push_line`].
+///
+/// Line edges can be at any character boundary, including inside a grapheme. [`Reshaper`] itself
+/// does not introduce boundaries inside graphemes.
 ///
 /// The text passed to [`Reshaper`]'s methods must be the text [`ShapedText`] was shaped from, and
 /// [`Reshaper::clear`] must be called when reusing the [`Reshaper`] on a different [`ShapedText`]
 /// (including the same [`ShapedText`] if it was shaped again).
-///
-/// Measure the effect of breaking at a position, including [`Edit`]s, [`Self::measure_start`] and
-/// [`Self::measure_end`]. Create lines using [`Self::line`]. Optionally make the line you keep
-/// exact with [`Self::make_exact`].
-///
-/// Store resulting lines using [`Self::push_line`].
 ///
 /// # Exactness
 ///
