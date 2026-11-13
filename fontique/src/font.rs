@@ -3,12 +3,12 @@
 
 //! Model for a font.
 
-use crate::CharmapIndex;
+use crate::{CharmapIndex, UnicodeRangeSet};
 
 use super::source::{SourceInfo, SourceKind};
 use super::{Blob, source_cache::SourceCache};
 use crate::{FontStyle, FontWeight, FontWidth};
-use core::{fmt, ops::RangeInclusive};
+use core::fmt;
 use read_fonts::{FontRef, TableProvider as _, types::Tag};
 use smallvec::SmallVec;
 
@@ -296,8 +296,8 @@ impl FontInfo {
                 }
             }
         }
-        if let Some(ranges) = info_override.unicode_range {
-            self.charmap_index.set_unicode_range(ranges);
+        if let Some(unicode_range) = info_override.unicode_range {
+            self.charmap_index.set_unicode_range(unicode_range);
         }
     }
 }
@@ -497,7 +497,7 @@ pub struct FontInfoOverride<'a> {
     /// This can be used to implement CSS's [`unicode-range`].
     ///
     /// [`unicode-range`]: https://www.w3.org/TR/css-fonts-4/#unicode-range-desc
-    pub unicode_range: Option<&'a [RangeInclusive<u32>]>,
+    pub unicode_range: Option<&'a UnicodeRangeSet>,
 }
 
 #[cfg(test)]
