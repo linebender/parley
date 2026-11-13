@@ -1202,14 +1202,18 @@ impl Reshaper {
     }
 }
 
-/// The edit made to one end of a line.
+/// An edit made to one edge of a line.
 ///
-/// This could be, e.g., the insertion of a hyphen, but could also insert or replace characters.
+/// This replaces the characters at that edge by other text.
 ///
-/// - In Dutch, "skiën" written with hyphenation can become "ski-en". Note on the second line the
-///   "ë" character was replaced by "e".
-/// - In Norwegian, "bussjåfør" can become "buss-sjåfør". Note on the second line an "s" character
-///   was inserted.
+/// - In Dutch, "skiën" written with hyphenation can become "ski-en". The first line ends with
+///   `Edit::new(0, "-")`, and the second line starts with `Edit::new(1, "e")`.
+/// - In Norwegian, "bussjåfør" can become "buss-sjåfør". The first line ends with 
+///   `Edit::new(0, "-")`, and the second line starts with `Edit::new(0, "s")`.
+///
+/// Note that inserted text is shaped with the font of the [`ShapedRun`] at that edge, without font
+/// fallback. The glyphs of the inserted text belong to the logically first replaced character, or,
+/// if no characters are replaced, to the character at the line's edge.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct Edit<'a> {
     /// The number of source characters dropped and replaced by [`Self::inserted`].
@@ -1236,13 +1240,6 @@ impl<'a> Edit<'a> {
     /// characters. For an edit at a line's logical end, these are the line's last characters.
     /// `replaced_chars` may be zero, in which case `inserted` is only inserted. With an empty
     /// `inserted`, the characters are only dropped.
-    ///
-    /// # Examples
-    ///
-    /// - "skiën" broken after "ski" ends the first line with `Edit::new(0, "-")`, and starts the
-    ///   second line with `Edit::new(1, "e")`.
-    /// - "bussjåfør" broken after "buss" ends the first line with `Edit::new(0, "-")`, and starts
-    ///   the second line with `Edit::new(0, "s")`.
     #[inline(always)]
     pub const fn new(replaced_chars: u32, inserted: &'a str) -> Self {
         Self {
