@@ -179,11 +179,7 @@ pub struct LineStart<'a> {
 }
 
 impl LineStart<'_> {
-    /// How much reshaping the line's start changed the line's advance.
-    ///
-    /// Add this to the line's source advance, counted from the line's start, to measure where the
-    /// line ends. Note that, once fully reshaped, the line may again measure differently. See
-    /// [`PendingLine::advance_delta`].
+    /// How much reshaping the line's start changed the advance; see [advances](Reshaper#advances).
     pub fn advance_delta(&self) -> f32 {
         self.advance_delta
     }
@@ -206,11 +202,7 @@ pub struct LineEnd<'a> {
 }
 
 impl LineEnd<'_> {
-    /// How much reshaping the line's end changed the line's advance.
-    ///
-    /// Add this and [`LineStart::advance_delta`] to the line's source advance to measure a line
-    /// ending here. Note that, once fully reshaped, the line may again measure differently. See
-    /// [`PendingLine::advance_delta`].
+    /// How much reshaping the line's end changed the advance; see [advances](Reshaper#advances).
     pub fn advance_delta(&self) -> f32 {
         self.advance_delta
     }
@@ -226,10 +218,9 @@ pub struct PendingLine<'a> {
 }
 
 impl PendingLine<'_> {
-    /// How much reshaping changed the line's advance.
+    /// How much reshaping the line changed the advance; see [advances](Reshaper#advances).
     ///
-    /// The reshaped line's advance is the sum of this delta and the advance of the line's source
-    /// shaped clusters (including those shaped clusters replaced by this reshaped line).
+    /// This is the line's advance minus its source advance.
     #[inline(always)]
     pub fn advance_delta(&self) -> f32 {
         self.start.advance_delta + self.end.advance_delta
@@ -278,10 +269,9 @@ impl ReshapedLine {
         self.reshaped_end_run
     }
 
-    /// How much reshaping changed the line's advance.
+    /// How much reshaping the line changed the advance; see [advances](Reshaper#advances).
     ///
-    /// The reshaped line's advance is the sum of this delta and the advance of the line's source
-    /// shaped clusters (including those shaped clusters replaced by this reshaped line).
+    /// This is the line's advance minus its source advance.
     #[inline(always)]
     pub fn advance_delta(&self) -> f32 {
         self.advance_delta
@@ -397,6 +387,20 @@ struct CachedFragment {
 /// The text passed to [`Reshaper`]'s methods must be the text [`ShapedText`] was shaped from, and
 /// [`Reshaper::clear`] must be called when reusing the [`Reshaper`] on a different [`ShapedText`]
 /// (including the same [`ShapedText`] if it was shaped again).
+///
+/// # Advances
+///
+/// Reshaping can change the shaped advances. For example, a kerned "VA" broken in the middle will
+/// drop the kerning once reshaped, and [`Edit`]s can replace text. The reshaper returns advance
+/// deltas, which are the change in advance due to reshaping. These are relative to a line's source
+/// advance: the summed advance of the source shaped clusters whose first character is on the line.
+/// If, e.g., "ffi" ligated into a single source shaped cluster, its whole advance is counted on the
+/// line the first "f" is on.
+///
+/// [`LineStart::advance_delta`] and [`LineEnd::advance_delta`] sum to
+/// [`PendingLine::advance_delta`], unless the line is so short that its reshaped start and end
+/// overlap (see [`Self::line`]). Making the line [exact](Self#exactness) may change the line's
+/// delta again.
 ///
 /// # Exactness
 ///
