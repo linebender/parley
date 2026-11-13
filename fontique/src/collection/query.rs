@@ -388,7 +388,7 @@ mod tests {
 
     #[test]
     fn unicode_range() {
-        use crate::{CollectionOptions, FontInfoOverride};
+        use crate::{CollectionOptions, FontInfoOverride, UnicodeRangeSet};
         use alloc::sync::Arc;
 
         const ROBOTO: &[u8] =
@@ -399,8 +399,8 @@ mod tests {
             shared: false,
             system_fonts: false,
         });
-        let digits = [0x35..=0x39, 0x30..=0x35, 0x32..=0x33, 0x660..=0x669];
-        for unicode_range in [None, Some(&digits[..])] {
+        let digits = UnicodeRangeSet::new([0x35..=0x39, 0x30..=0x35, 0x32..=0x33, 0x660..=0x669]);
+        for unicode_range in [None, Some(&digits)] {
             let info = FontInfoOverride {
                 family_name: Some("Composite"),
                 unicode_range,
