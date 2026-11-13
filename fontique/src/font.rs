@@ -8,7 +8,7 @@ use crate::CharmapIndex;
 use super::source::{SourceInfo, SourceKind};
 use super::{Blob, source_cache::SourceCache};
 use crate::{FontStyle, FontWeight, FontWidth};
-use core::fmt;
+use core::{fmt, ops::RangeInclusive};
 use read_fonts::{FontRef, TableProvider as _, types::Tag};
 use smallvec::SmallVec;
 
@@ -200,8 +200,8 @@ impl FontInfo {
     /// Returns the index used for constructing a [Charmap] for this font.
     ///
     /// [Charmap]: crate::Charmap
-    pub fn charmap_index(&self) -> CharmapIndex {
-        self.charmap_index
+    pub fn charmap_index(&self) -> &CharmapIndex {
+        &self.charmap_index
     }
 }
 
@@ -287,6 +287,9 @@ impl FontInfo {
                     axis.default = *value;
                 }
             }
+        }
+        if let Some(ranges) = info_override.unicode_range {
+            self.charmap_index.set_unicode_range(ranges);
         }
     }
 }
@@ -621,6 +624,12 @@ pub struct FontInfoOverride<'a> {
     /// Default values for the font's variation axes. Axes not included within
     /// the font will be ignored.
     pub axes: Option<&'a [(Tag, f32)]>,
+    /// The codepoints the font may be used for. The font is ignored for all other codepoints.
+    ///
+    /// This can be used to implement CSS's [`unicode-range`].
+    ///
+    /// [`unicode-range`]: https://www.w3.org/TR/css-fonts-4/#unicode-range-desc
+    pub unicode_range: Option<&'a [RangeInclusive<u32>]>,
 }
 
 #[cfg(test)]
