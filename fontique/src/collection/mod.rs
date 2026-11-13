@@ -213,7 +213,7 @@ impl Collection {
     /// `@font-face` behavior, where faces defined later are checked first. See
     /// [CSS Fonts 4 § 4.5.1][css-composite-fonts].
     ///
-    /// [css-composite-fonts]: https://www.w3.org/TR/css-fonts-4/#composite-fonlater 
+    /// [css-composite-fonts]: https://www.w3.org/TR/css-fonts-4/#composite-fonlater
     pub fn register_fonts(
         &mut self,
         data: Blob<u8>,
