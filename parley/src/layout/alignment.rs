@@ -144,6 +144,9 @@ pub(crate) fn align<B: Brush>(layout: &mut LayoutData<B>) {
 
     layout.cluster_gaps.clear();
     for line in &layout.lines {
+        if !line.has_spacing && line.justification.amount_per_opportunity == 0. {
+            continue;
+        }
         for item in &mut layout.line_items[line.item_range.clone()] {
             item.gaps_start = None;
             if item.kind != LayoutItemKind::TextRun {

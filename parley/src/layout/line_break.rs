@@ -1698,6 +1698,7 @@ fn commit_line<B: Brush>(
     // Mark line as needing bidi re-ordering if it contains any runs with non-zero bidi level
     // (zero is the default level, so this is equivalent to marking lines that have multiple levels)
     let mut needs_reorder = false;
+    let mut has_spacing = false;
     for (i, item) in items_to_commit.iter().enumerate() {
         match item.kind {
             LayoutItemKind::OutOfFlowBox => {
@@ -1757,6 +1758,7 @@ fn commit_line<B: Brush>(
                 text_start = text_start.min(item_text_range.start);
                 text_end = text_end.max(item_text_range.end);
                 needs_reorder |= shaped_run.bidi_level != BidiLevel::new(0);
+                has_spacing |= !layout.data.runs[item.index].spacing.is_zero();
 
                 lines.line_items.push(LineItemData {
                     kind: LayoutItemKind::TextRun,
@@ -1810,6 +1812,7 @@ fn commit_line<B: Brush>(
             justification_end_cluster,
             ..Justification::NONE
         },
+        has_spacing,
         metrics: LineMetrics {
             indent: line_indent,
             advance: state.x,

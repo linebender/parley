@@ -92,6 +92,8 @@ pub(crate) struct LineData {
     /// The number of justification opportunities on the line.
     pub(crate) num_justification_opportunities: u32,
     pub(crate) justification: Justification,
+    /// Whether any text run on this line has word or letter spacing.
+    pub(crate) has_spacing: bool,
     /// This line's entries in [`LayoutData::aligned_subtree_offsets`].
     ///
     /// Empty for lines with only baseline-relative content because the root aligned subtree
