@@ -21,7 +21,8 @@ use crate::{
     },
 };
 
-/// A mark that [`ReshapedText`] can be trimmed to.
+/// A mark created by [`ReshapedText::mark`] that [`ReshapedText`] can be
+/// [truncated](ReshapedText::truncate) back to.
 ///
 /// [`ReshapedTextMark::default`] is the empty start of a [`ReshapedText`].
 #[derive(Clone, Copy, Debug, Default)]
@@ -93,10 +94,10 @@ impl ReshapedText {
         }
     }
 
-    /// Truncate back to mark created by [`Self::mark`].
+    /// Truncate back to a mark created by [`Self::mark`].
     ///
-    /// This drops everything reshaped since the mark was taken. Other marks created after it must
-    /// not be used anymore.
+    /// This drops everything reshaped since the mark was taken. [`ReshapedLine`]s and marks created
+    /// after it must not be used anymore.
     #[inline]
     pub fn truncate(&mut self, mark: ReshapedTextMark) {
         self.runs.truncate(mark.runs_len as usize);
