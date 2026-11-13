@@ -411,6 +411,7 @@ pub fn match_font(
             if let Some(found) = set
                 .iter()
                 .enumerate()
+                .rev()
                 .filter(|f| f.1.weight < weight)
                 .max_by(|x, y| x.1.weight.partial_cmp(&y.1.weight).unwrap_or(Less))
             {
@@ -431,6 +432,7 @@ pub fn match_font(
             // weights less than or equal to the target weight are checked in descending
             if let Some(found) = set
                 .iter()
+                .rev()
                 .filter(|f| f.weight <= weight)
                 .max_by(|x, y| x.weight.partial_cmp(&y.weight).unwrap_or(Less))
             {
@@ -458,6 +460,7 @@ pub fn match_font(
             // followed by weights less than the target weight in descending order
             if let Some(found) = set
                 .iter()
+                .rev()
                 .filter(|f| f.weight < weight)
                 .max_by(|x, y| x.weight.partial_cmp(&y.weight).unwrap_or(Less))
             {
