@@ -49,9 +49,7 @@ impl ReshapedRun {
         &self.run
     }
 
-    /// The index of [`ShapedRun`] whose glyphs were reshaped.
-    ///
-    /// This indexes into the original [`ShapedText::runs`].
+    /// The source run this run was reshaped from, as an index into [`ShapedText::runs`].
     #[inline(always)]
     pub fn source_run(&self) -> u32 {
         self.source_run
@@ -59,6 +57,8 @@ impl ReshapedRun {
 }
 
 /// Storage for reshaped runs.
+///
+/// See [`Reshaper::push_line`].
 ///
 /// If you're implementing a line breaker that revises lines already pushed to this storage, you can
 /// use [`Self::mark`] and [`Self::truncate`] to trim.
@@ -70,12 +70,12 @@ pub struct ReshapedText {
 }
 
 impl ReshapedText {
-    /// Create a reusable [`ReshapedText`].
+    /// Create an empty [`ReshapedText`].
     pub fn new() -> Self {
         Self::default()
     }
 
-    /// Clear the result while retaining capacity.
+    /// Drop all reshaped runs while retaining capacity.
     #[inline]
     pub fn clear(&mut self) {
         self.runs.clear();
@@ -113,6 +113,8 @@ impl ReshapedText {
     }
 
     /// Get a [`ShapedSlice`] of the reshaped run at the given index.
+    ///
+    /// `source` must be the [`ShapedText`] the run was reshaped from.
     #[inline(always)]
     pub fn run_slice<'a>(
         &'a self,
@@ -160,7 +162,7 @@ impl ReshapedText {
     }
 }
 
-/// A reshaped line start measured by [`Reshaper::measure_start`].
+/// The start of a line, measured by [`Reshaper::measure_start`].
 #[derive(Clone, Copy, Debug)]
 pub struct LineStart<'a> {
     line_start_char: u32,
@@ -187,7 +189,7 @@ impl LineStart<'_> {
     }
 }
 
-/// A reshaped line end measured by [`Reshaper::measure_end`].
+/// The end of a line, measured by [`Reshaper::measure_end`].
 #[derive(Clone, Copy, Debug)]
 pub struct LineEnd<'a> {
     line_end_char: u32,
@@ -215,6 +217,8 @@ impl LineEnd<'_> {
 }
 
 /// A line from a [`LineStart`] to a [`LineEnd`].
+///
+/// The line's reshaped runs are not stored until you hand this to [`Reshaper::push_line`].
 #[derive(Clone, Copy, Debug)]
 pub struct PendingLine<'a> {
     start: LineStart<'a>,
@@ -446,7 +450,8 @@ impl Reshaper {
         }
     }
 
-    /// Measure the effect of starting a line at `line_start_char` with the given `edit`.
+    /// Measure the effect of starting a line at character index `line_start_char` with the given
+    /// `edit`.
     ///
     /// # Panics
     ///
@@ -463,7 +468,8 @@ impl Reshaper {
             .expect("an unbounded line start can't overlap a line end")
     }
 
-    /// Measure the effect of ending a line at `line_end_char` with the given `edit`.
+    /// Measure the effect of ending a line at character index `line_end_char` with the given
+    /// `edit`.
     ///
     /// # Panics
     ///
@@ -487,7 +493,7 @@ impl Reshaper {
     /// overlap, the whole line is reshaped as one piece. An empty line drops the edits, as it has
     /// no characters for inserted text to attach to.
     ///
-    /// See the note about exactness on [`Self`].
+    /// The line is not necessarily [exact](Self#exactness).
     ///
     /// # Panics
     ///
