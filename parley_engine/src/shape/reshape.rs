@@ -1208,7 +1208,7 @@ impl Reshaper {
 ///
 /// - In Dutch, "skiën" written with hyphenation can become "ski-en". The first line ends with
 ///   `Edit::new(0, "-")`, and the second line starts with `Edit::new(1, "e")`.
-/// - In Norwegian, "bussjåfør" can become "buss-sjåfør". The first line ends with 
+/// - In Norwegian, "bussjåfør" can become "buss-sjåfør". The first line ends with
 ///   `Edit::new(0, "-")`, and the second line starts with `Edit::new(0, "s")`.
 ///
 /// Note that inserted text is shaped with the font of the [`ShapedRun`] at that edge, without font
