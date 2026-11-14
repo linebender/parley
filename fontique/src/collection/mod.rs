@@ -207,6 +207,13 @@ impl Collection {
     /// added to that family.
     ///
     /// Optionally, you can override various aspects of the font's metadata.
+    ///
+    /// When newly registered fonts join an existing family, they are placed before
+    /// previously-registered fonts. This ordering can be useful, for example, for implementing CSS
+    /// `@font-face` behavior, where faces defined later are checked first. See
+    /// [CSS Fonts 4 § 4.5.1][css-composite-fonts].
+    ///
+    /// [css-composite-fonts]: https://www.w3.org/TR/css-fonts-4/#composite-fonlater
     pub fn register_fonts(
         &mut self,
         data: Blob<u8>,
@@ -804,7 +811,7 @@ impl CommonData {
     fn merge_families(&mut self, families: &HashMap<FamilyId, (FamilyName, Vec<FontInfo>)>) {
         for (id, (name, fonts)) in families.iter() {
             if let Some(Some(family)) = self.families.get_mut(id) {
-                let new_fonts = family.fonts().iter().chain(fonts).cloned();
+                let new_fonts = fonts.iter().chain(family.fonts()).cloned();
                 *family = FamilyInfo::new(name.clone(), new_fonts);
             } else {
                 let family = FamilyInfo::new(name.clone(), fonts.iter().cloned());
