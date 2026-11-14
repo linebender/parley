@@ -6,18 +6,63 @@
 // TODO(dfrg): move this code to read-fonts so it can be shared among other
 // crates.
 
+use alloc::{sync::Arc, vec::Vec};
+use core::{cmp::Ordering, ops::RangeInclusive};
 use read_fonts::{
     FontData, FontRead, FontRef, TableProvider, TopLevelTable,
     tables::cmap::{Cmap, CmapSubtable},
     types::GlyphId,
 };
 
+/// A set of Unicode codepoints, see
+/// [`FontInfoOverride::unicode_range`](crate::FontInfoOverride::unicode_range).
+#[derive(Clone, PartialEq, Eq, Debug)]
+pub struct UnicodeRangeSet(Arc<[RangeInclusive<u32>]>);
+
+impl UnicodeRangeSet {
+    /// Creates a set of codepoints in the given ranges.
+    ///
+    /// These ranges may overlap and be in any order.
+    pub fn new(ranges: impl IntoIterator<Item = RangeInclusive<u32>>) -> Self {
+        // Sort and merge overlapping ranges.
+        let mut ranges: Vec<_> = ranges.into_iter().collect();
+        ranges.sort_unstable_by_key(|r| *r.start());
+        ranges.dedup_by(|range, prev| {
+            let overlaps = range.start() <= prev.end();
+            if overlaps {
+                *prev = *prev.start()..=*prev.end().max(range.end());
+            }
+            overlaps
+        });
+        Self(ranges.into())
+    }
+
+    /// Returns `true` if the set contains the given codepoint.
+    #[inline]
+    pub fn contains(&self, codepoint: impl Into<u32>) -> bool {
+        let c = codepoint.into();
+        self.0
+            .binary_search_by(|range| {
+                if c < *range.start() {
+                    Ordering::Greater
+                } else if c > *range.end() {
+                    Ordering::Less
+                } else {
+                    Ordering::Equal
+                }
+            })
+            .is_ok()
+    }
+}
+
 /// Metadata for constructing a character map from font data.
-#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+#[derive(Clone, PartialEq, Eq, Debug)]
 pub struct CharmapIndex {
     subtable_offset: u32,
     is_symbol: bool,
     is_mac_roman: bool,
+    /// The codepoints the font may be used for.
+    unicode_range: Option<UnicodeRangeSet>,
 }
 
 impl CharmapIndex {
@@ -35,34 +80,65 @@ impl CharmapIndex {
             subtable_offset,
             is_symbol: rec.is_symbol(),
             is_mac_roman: rec.is_mac_roman(),
+            unicode_range: None,
         })
     }
 
+    pub(crate) fn set_unicode_range(&mut self, unicode_range: &UnicodeRangeSet) {
+        self.unicode_range = Some(unicode_range.clone());
+    }
+
+    /// Returns `true` if the font may be used for the given codepoint, see
+    /// [`FontInfoOverride::unicode_range`](crate::FontInfoOverride::unicode_range).
+    ///
+    /// This doesn't mean the font has a glyph for it.
+    #[inline]
+    pub fn in_unicode_range(&self, codepoint: impl Into<u32>) -> bool {
+        let unicode_range = self.unicode_range.as_ref();
+        unicode_range.is_none_or(|set| set.contains(codepoint))
+    }
+
     /// Creates a character map from the given font data.
-    pub fn charmap<'a>(&self, font_data: &'a [u8]) -> Option<Charmap<'a>> {
+    pub fn charmap<'a>(&'a self, font_data: &'a [u8]) -> Option<Charmap<'a>> {
         let subtable_data = font_data.get(self.subtable_offset as usize..)?;
         let subtable = CmapSubtable::read(FontData::new(subtable_data)).ok()?;
         Some(Charmap {
             subtable,
             is_symbol: self.is_symbol,
             is_mac_roman: self.is_mac_roman,
+            unicode_range: self.unicode_range.as_ref(),
         })
     }
 }
 
 /// Mapping from Unicode codepoints to nominal glyph identifiers.
+///
+/// This is the font's [effective character map]: i.e., its glyph identifiers are intersected with
+/// the font's [`unicode-range`](crate::FontInfoOverride::unicode_range) (if any).
+///
+/// [effective character map]: https://www.w3.org/TR/css-fonts-4/#effective-character-map
 #[derive(Clone)]
 pub struct Charmap<'a> {
     subtable: CmapSubtable<'a>,
     is_symbol: bool,
     is_mac_roman: bool,
+    unicode_range: Option<&'a UnicodeRangeSet>,
 }
 
 impl Charmap<'_> {
     /// Returns the glyph identifier for the given codepoint.
     pub fn map(&self, codepoint: impl Into<u32>) -> Option<u32> {
+        let c = codepoint.into();
+        if let Some(unicode_range) = self.unicode_range
+            && !unicode_range.contains(c)
+        {
+            return None;
+        }
+        self.map_cmap(c)
+    }
+
+    fn map_cmap(&self, mut c: u32) -> Option<u32> {
         const ASCII_MAX: u32 = 0x7F;
-        let mut c = codepoint.into();
         // The Mac Roman encoding requires special processing for codepoints
         // above the ASCII range.
         if self.is_mac_roman && c > ASCII_MAX {
@@ -92,7 +168,7 @@ impl Charmap<'_> {
             // Windows seems to do, and that's hinted about at:
             // https://docs.microsoft.com/en-us/typography/opentype/spec/recom
             // under "Non-Standard (Symbol) Fonts".
-            return self.map(0xF000 + c);
+            return self.map_cmap(0xF000 + c);
         }
         result.map(|gid| gid.to_u32())
     }

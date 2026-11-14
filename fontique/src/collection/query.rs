@@ -174,13 +174,16 @@ impl<'a> Query<'a> {
     /// Returns the [first available font] for the current settings: the first
     /// font that [`matches_with`](Self::matches_with) would yield, if any.
     ///
-    /// CSS additionally requires the font's `unicode-range` to include U+0020
-    /// SPACE; fontique has no `unicode-range`, so every available font qualifies.
+    /// As in CSS, fonts whose [unicode range] excludes U+0020 SPACE are skipped.
     ///
     /// [first available font]: https://drafts.csswg.org/css-fonts-4/#first-available-font
+    /// [unicode range]: crate::FontInfoOverride::unicode_range
     pub fn first_available_font(&mut self) -> Option<QueryFont> {
         let mut found = None;
         self.matches_with(|font| {
+            if !font.charmap_index.in_unicode_range(' ') {
+                return QueryStatus::Continue;
+            }
             found = Some(font.clone());
             QueryStatus::Stop
         });
@@ -295,7 +298,7 @@ fn load_bucket<'a>(
                         attributes.style,
                         attributes.weight,
                     ),
-                    charmap_index: font_info.charmap_index(),
+                    charmap_index: font_info.charmap_index().clone(),
                 });
             }
             if fonts.is_empty() {
@@ -334,7 +337,7 @@ fn load_font<'a>(
                 blob,
                 index: blob_index,
                 synthesis,
-                charmap_index: font_info.charmap_index(),
+                charmap_index: font_info.charmap_index().clone(),
             });
             if let Entry::Ok(font) = status {
                 Some(font)
@@ -374,4 +377,59 @@ enum Entry<T> {
     Ok(T),
     Vacant,
     Error,
+}
+
+#[cfg(test)]
+mod tests {
+    use alloc::vec::Vec;
+    use linebender_resource_handle::Blob;
+
+    use crate::{Collection, QueryStatus, SourceCache};
+
+    #[test]
+    fn unicode_range() {
+        use crate::{CollectionOptions, FontInfoOverride, UnicodeRangeSet};
+        use alloc::sync::Arc;
+
+        const ROBOTO: &[u8] =
+            include_bytes!("../../../parley_dev/assets/fonts/roboto_fonts/Roboto-Regular.ttf");
+
+        // One family of two fonts: an unrestricted one, and a later one for digits.
+        let mut collection = Collection::new(CollectionOptions {
+            shared: false,
+            system_fonts: false,
+        });
+        let digits = UnicodeRangeSet::new([0x35..=0x39, 0x30..=0x35, 0x32..=0x33, 0x660..=0x669]);
+        for unicode_range in [None, Some(&digits)] {
+            let info = FontInfoOverride {
+                family_name: Some("Composite"),
+                unicode_range,
+                ..Default::default()
+            };
+            collection.register_fonts(Blob::new(Arc::new(ROBOTO.to_vec())), Some(info));
+        }
+        let mut source_cache = SourceCache::default();
+        let mut query = collection.query(&mut source_cache);
+        query.set_families(["Composite"]);
+
+        // The later font is checked first.
+        let mut selected_unrestricted = Vec::new();
+        for ch in "a49 ".chars() {
+            query.matches_with(|font| {
+                if font.charmap().unwrap().map(ch).is_none() {
+                    return QueryStatus::Continue;
+                }
+                selected_unrestricted.push(font.charmap_index.in_unicode_range('a'));
+                QueryStatus::Stop
+            });
+        }
+        assert_eq!(selected_unrestricted, [true, false, false, true]);
+        assert!(
+            query
+                .first_available_font()
+                .unwrap()
+                .charmap_index
+                .in_unicode_range('a')
+        );
+    }
 }
