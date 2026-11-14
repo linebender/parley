@@ -21,6 +21,7 @@ extend-ignore-re = [
 # Match Identifier - Case Sensitive
 [default.extend-identifiers]
 Beng = "Beng"
+Heros = "Heros"
 Maka = "Maka"
 ot = "ot"
 ot_a = "ot_a"
