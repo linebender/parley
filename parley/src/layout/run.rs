@@ -5,7 +5,7 @@ use crate::FontData;
 use crate::layout::cluster::Cluster;
 use crate::layout::data::{LineItemData, RunData};
 use crate::layout::layout::Layout;
-use crate::layout::spacing::{EffectiveSpacing, Gaps, Justification};
+use crate::layout::spacing::{Gaps, RunGaps};
 use crate::style::Brush;
 
 use core::ops::Range;
@@ -125,14 +125,16 @@ impl<'a, B: Brush> Run<'a, B> {
         &self.shaped.font_metrics
     }
 
-    #[inline]
-    pub(crate) fn line_spacing(&self) -> EffectiveSpacing {
-        let justification = if self.line_data.is_some() {
-            self.layout.data.lines[self.line_index as usize].justification
-        } else {
-            Justification::NONE
-        };
-        EffectiveSpacing::new(self.data.spacing, justification)
+    /// Spacing for this run's shaped clusters on its line, or `None` for unspaced text.
+    pub(crate) fn gaps(&self) -> Option<RunGaps<'a>> {
+        // A Run with no line_data only happens during line breaking, which doesn't call this method.
+        // TODO: Maybe use a different data type than run in that case?
+        let item = self.line_data.unwrap();
+        let start = item.gaps_start? as usize;
+        Some(RunGaps::new(
+            &self.layout.data.cluster_gaps[start..start + item.shaped_cluster_range.len()],
+            item.shaped_cluster_range.start,
+        ))
     }
 
     /// Returns the advance for the run.
@@ -141,8 +143,20 @@ impl<'a, B: Brush> Run<'a, B> {
     /// layout has been [aligned](Layout::set_alignment) with [`Justify`](crate::Alignment::Justify), the
     /// justification.
     pub fn advance(&self) -> f32 {
-        let spacing = self.line_spacing();
-        spacing.slice_advance(self.line_slice())
+        let slice = self.line_slice();
+        match self.gaps() {
+            Some(gaps) => gaps
+                .for_cluster_range(slice.shaped_clusters_range())
+                .iter()
+                .zip(slice.shaped_clusters())
+                .map(|(entry, cluster)| cluster.advance + entry.total())
+                .sum(),
+            None => slice
+                .shaped_clusters()
+                .iter()
+                .map(|cluster| cluster.advance)
+                .sum(),
+        }
     }
 
     /// Returns the original text range for the run.
@@ -246,15 +260,18 @@ impl<'a, B: Brush> Run<'a, B> {
 
     /// An iterator over the glyphs in `shaped_clusters` in visual left-to-right order.
     ///
-    /// This includes additional spacing from [`EffectiveSpacing`].
+    /// This includes additional spacing from the stored [`Gaps`].
     ///
-    /// `shaped_clusters` indexes into the shaped run this [`Run`] belongs to, and must be
-    /// atom-aligned.
+    /// `shaped_clusters` must be a subrange of this [`Run`]'s shaped clusters on its line
+    /// (indexing into [`ShapedText::shaped_clusters`](parley_engine::ShapedText::shaped_clusters)).
     pub(crate) fn glyphs_in(self, shaped_clusters: Range<u32>) -> Glyphs<'a> {
+        let gaps = self
+            .gaps()
+            .map(|run_gaps| run_gaps.for_cluster_range(shaped_clusters.clone()));
         Glyphs::new(
             self.full_slice().narrow(shaped_clusters),
             self.is_rtl(),
-            self.line_spacing(),
+            gaps,
         )
     }
 }
@@ -267,44 +284,35 @@ pub(crate) struct Glyphs<'a> {
     /// The slice of shaped text narrowed to the shaped clusters being iterated.
     slice: ShapedSlice<'a>,
     is_rtl: bool,
-    /// The spacing to apply, if any. Without spacing, atoms are not tracked.
-    spacing: Option<EffectiveSpacing>,
-    /// The shaped clusters not yet visited: all of `slice`'s clusters without spacing, otherwise
-    /// those of the current atom. Visited in logical order for LTR text and in reverse for RTL.
-    shaped_clusters: Range<u32>,
+    /// The gaps of the shaped clusters being iterated, indexed relative to the start of
+    /// [`Self::slice`]'s shaped cluster range.
+    /// (Semantically, this is the same index space conversion as a [`RunGaps`] constructed
+    /// with that index, but using that abstraction would grow this iterator)
+    ///
+    /// If `None`, the shaped clusters have no additional spacing.
+    gaps: Option<&'a [Gaps]>,
+    /// The shaped clusters not yet visited. Visited in logical order for LTR text and in reverse
+    /// for RTL.
+    remaining: Range<u32>,
     /// The not-yet-yielded glyphs of the current shaped cluster.
     glyphs: ShapedClusterGlyphs<'a>,
-    /// The gaps around the current atom; only meaningful with `spacing`.
-    gaps: Gaps,
-    /// The index within the current atom of the next glyph to yield. The first one gets
-    /// `gaps.before`.
-    atom_glyph: usize,
-    /// The number of glyphs of the current atom. The last one gets `gaps.after`.
-    atom_glyph_count: usize,
+    /// The current shaped cluster's [`Gaps::before`], if its first glyph hasn't been yielded yet,
+    /// otherwise zero.
+    shift: f32,
+    /// The current shaped cluster's [`Gaps::after`].
+    after: f32,
 }
 
 impl<'a> Glyphs<'a> {
-    fn new(slice: ShapedSlice<'a>, is_rtl: bool, spacing: EffectiveSpacing) -> Self {
-        let clusters = slice.shaped_clusters_range();
+    fn new(slice: ShapedSlice<'a>, is_rtl: bool, gaps: Option<&'a [Gaps]>) -> Self {
         Self {
+            remaining: slice.shaped_clusters_range(),
             slice,
             is_rtl,
-            spacing: (!spacing.is_zero()).then_some(spacing),
-            shaped_clusters: if spacing.is_zero() {
-                clusters
-            } else {
-                // With spacing, clusters are visited atom by atom: start out on no atom, at the
-                // visually leftmost edge of the slice.
-                if is_rtl {
-                    clusters.end..clusters.end
-                } else {
-                    clusters.start..clusters.start
-                }
-            },
+            gaps,
             glyphs: ShapedClusterGlyphs::empty(),
-            gaps: Gaps::ZERO,
-            atom_glyph: 0,
-            atom_glyph_count: 0,
+            shift: 0.,
+            after: 0.,
         }
     }
 }
@@ -316,45 +324,36 @@ impl Iterator for Glyphs<'_> {
     fn next(&mut self) -> Option<Glyph> {
         loop {
             if let Some(mut glyph) = self.glyphs.next() {
-                if self.spacing.is_some() {
-                    if self.atom_glyph == 0 {
-                        glyph.x += self.gaps.before;
-                        glyph.advance += self.gaps.before;
-                    }
-                    self.atom_glyph += 1;
-                    if self.atom_glyph == self.atom_glyph_count {
-                        glyph.advance += self.gaps.after;
+                if self.gaps.is_some() {
+                    glyph.x += self.shift;
+                    // Also shift subsequent glyphs.
+                    glyph.advance += self.shift;
+                    self.shift = 0.;
+                    if self.glyphs.len() == 0 {
+                        glyph.advance += self.after;
                     }
                 }
                 return Some(glyph);
             }
 
             let cluster = if self.is_rtl {
-                self.shaped_clusters.next_back()
+                self.remaining.next_back()
             } else {
-                self.shaped_clusters.next()
-            };
-            if let Some(cluster) = cluster {
-                self.glyphs = self.slice.shaped_cluster_glyphs(cluster);
-                continue;
-            }
-
-            // Without spacing, that was the last cluster. With spacing, it was the last cluster of
-            // the current atom; move on to the next atom.
-            let spacing = self.spacing?;
-            let atom = if self.is_rtl {
-                self.slice.atoms_from(self.shaped_clusters.start).prev()
-            } else {
-                self.slice.atoms_from(self.shaped_clusters.end).next()
+                self.remaining.next()
             }?;
-            self.shaped_clusters = atom.shaped_clusters_range();
-            self.gaps = spacing.gaps(&atom);
-            self.atom_glyph = 0;
-            self.atom_glyph_count = atom
-                .shaped_clusters()
-                .iter()
-                .map(|cluster| usize::from(cluster.glyph_len()))
-                .sum();
+            self.glyphs = self.slice.shaped_cluster_glyphs(cluster);
+            if let Some(cluster_gaps) = self.gaps {
+                // TODO: if `self.shift` is non-zero at this point, then there was a shaped cluster without glyphs,
+                // and glyph rendering would fall out of sync with layout.
+                let index = (cluster - self.slice.shaped_clusters_range().start) as usize;
+                // TODO: These gaps are never made visible to the caller if
+                // this shaped cluster didn't contain any glyphs.
+                // This can make accumulated glyph advances (as in `GlyphRun::positioned_glyphs` disagree
+                // with layout, mispositioning subsequent glyphs in the run).
+                let gaps = cluster_gaps[index];
+                self.shift = gaps.before;
+                self.after = gaps.after;
+            }
         }
     }
 }
