@@ -12,7 +12,7 @@ use crate::font::FontInfoOverride;
 use super::SourceCache;
 
 use super::{
-    Blob, FontStyle, FontWeight, FontWidth, GenericFamily, Language, Script,
+    Blob, FontStyleRange, FontWeightRange, FontWidthRange, GenericFamily, Language, Script,
     backend::SystemFonts,
     fallback::{FallbackKey, FallbackMap},
     family::{FamilyId, FamilyInfo},
@@ -222,15 +222,15 @@ impl Collection {
         self.inner.register_fonts(data, info_override)
     }
 
-    /// Unregisters the font with the given attributes from the given family.
+    /// Unregisters the font with the given attribute ranges from the given family.
     ///
     /// Returns true if a font was removed from the family, false otherwise.
     pub fn unregister_font(
         &mut self,
         family: FamilyId,
-        width: FontWidth,
-        style: FontStyle,
-        weight: FontWeight,
+        width: FontWidthRange,
+        style: FontStyleRange,
+        weight: FontWeightRange,
     ) -> bool {
         self.inner.unregister_font(family, width, style, weight)
     }
@@ -545,15 +545,15 @@ impl Inner {
         self.data.register_fonts(data, info_override)
     }
 
-    /// Unregisters the font with the given attributes from the given family.
+    /// Unregisters the font with the given attribute ranges from the given family.
     ///
     /// Returns true if a font was removed from the family, false otherwise.
     pub fn unregister_font(
         &mut self,
         family: FamilyId,
-        width: FontWidth,
-        style: FontStyle,
-        weight: FontWeight,
+        width: FontWidthRange,
+        style: FontStyleRange,
+        weight: FontWeightRange,
     ) -> bool {
         #[cfg(feature = "std")]
         if let Some(shared) = &self.shared {
@@ -823,9 +823,9 @@ impl CommonData {
     fn unregister_font(
         &mut self,
         family: FamilyId,
-        width: FontWidth,
-        style: FontStyle,
-        weight: FontWeight,
+        width: FontWidthRange,
+        style: FontStyleRange,
+        weight: FontWeightRange,
     ) -> Option<()> {
         let family_name = self.family_names.get_by_id(family)?;
         let family = self.families.get_mut(&family)?.as_mut()?;

@@ -81,7 +81,7 @@ mod source_cache;
 pub use linebender_resource_handle::Blob;
 pub use script::ScriptExt;
 
-pub use attributes::Attributes;
+pub use attributes::{Attributes, FontStyleRange, FontWeightRange, FontWidthRange};
 pub use charmap::{Charmap, CharmapIndex, UnicodeRangeSet};
 pub use collection::{Collection, CollectionOptions, Query, QueryFamily, QueryFont, QueryStatus};
 pub use fallback::FallbackKey;

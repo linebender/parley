@@ -92,7 +92,7 @@ fn style_font_weight_uses_variable_axis_default() {
         roboto_flex,
         Some(FontInfoOverride {
             family_name: Some(FAMILY),
-            weight: Some(FontWeight::THIN),
+            weight: Some(FontWeight::THIN.into()),
             ..Default::default()
         }),
     );
@@ -102,7 +102,10 @@ fn style_font_weight_uses_variable_axis_default() {
         .iter()
         .find(|axis| axis.tag.to_be_bytes() == *b"wght")
         .unwrap();
-    assert_eq!(font.weight(), FontWeight::THIN);
+    assert_eq!(
+        font.weight(),
+        fontique::FontWeightRange::from(FontWeight::THIN)
+    );
     assert_eq!(weight_axis.default, FontWeight::NORMAL.value());
 
     let mut builder = env.ranged_builder(TEXT);
