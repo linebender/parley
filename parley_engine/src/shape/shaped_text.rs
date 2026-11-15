@@ -535,6 +535,7 @@ fn process_shaped_clusters<'a>(
         char_end: usize,
         characters: &[Character],
         shaped_clusters: &mut Vec<ShapedCluster>,
+        glyphs: &mut Vec<Glyph>,
     ) {
         let first_character = &characters[cluster.characters_start];
         let is_newline = first_character.whitespace == Whitespace::Newline;
@@ -550,12 +551,19 @@ fn process_shaped_clusters<'a>(
         } else if let Some(inline_glyph) = cluster.inline_glyph {
             (inline_glyph.id, 1, true, cluster.advance)
         } else {
-            (
-                cluster.glyphs_start as u32,
-                cluster.glyphs as u8,
-                false,
-                cluster.advance,
-            )
+            let mut advance = cluster.advance;
+            let glyph_len = u8::try_from(cluster.glyphs).unwrap_or_else(|_| {
+                // If more than 255 glyphs were produced, we keep only the first 255, drop the rest,
+                // and recompute the advance. This should only happen with artificial input, like
+                // 255+ invisible characters inside a ligature, or a hostile font.
+                glyphs.truncate(cluster.glyphs_start + usize::from(u8::MAX));
+                advance = glyphs[cluster.glyphs_start..]
+                    .iter()
+                    .map(|g| g.advance)
+                    .sum();
+                u8::MAX
+            });
+            (cluster.glyphs_start as u32, glyph_len, false, advance)
         };
 
         shaped_clusters.push(ShapedCluster {
@@ -593,7 +601,7 @@ fn process_shaped_clusters<'a>(
     for (glyph_info, glyph_pos) in glyph_infos.zip(glyph_positions) {
         if glyph_info.cluster != cluster.id {
             let char_end = characters_start + glyph_info.cluster as usize;
-            flush(&cluster, char_end, characters, shaped_clusters);
+            flush(&cluster, char_end, characters, shaped_clusters, glyphs);
 
             cluster = Cluster {
                 id: glyph_info.cluster,
@@ -636,7 +644,13 @@ fn process_shaped_clusters<'a>(
     }
 
     // Flush the final cluster.
-    flush(&cluster, characters.len(), characters, shaped_clusters);
+    flush(
+        &cluster,
+        characters.len(),
+        characters,
+        shaped_clusters,
+        glyphs,
+    );
 }
 
 #[cfg(test)]
