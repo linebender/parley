@@ -1907,8 +1907,10 @@ fn hanging_whitespace<B: Brush>(
                     };
                     let whitespace = atom.shaped_clusters()[0].whitespace();
                     if in_conditional_suffix && whitespace != Whitespace::Newline {
-                        // The atom hangs from its logical end, so use the last cluster's style to
-                        // decide whether it hangs conditionally.
+                        // It would be adversarial input wherein the atom hangs but has mixed `WhitespaceCollapse` styles (it would need
+                        // something like a ligature formed from two spaces). We currently use the last cluster's style to decide whether
+                        // it hangs conditionally in this case, effectively arbitrarily (an LLM has claimed this is more logical, but the
+                        // author hasn't verified this, due to the adversarial nature of such input)
                         let last_cluster = atom.shaped_clusters().last().unwrap();
                         if layout.data.styles[last_cluster.style_index as usize]
                             .white_space_collapse
@@ -1929,8 +1931,8 @@ fn hanging_whitespace<B: Brush>(
                         }
                     }
                     hanging_whitespace_advance += hanging_advance;
-                    // Justification can't stretch within an atom, so it stops at the start of the
-                    // last atom that hangs.
+                    // The last atom which doesn't hang is itself ineligible for justification (as any justification opportunities
+                    // it contributes would be themselves hanging).
                     justification_end_cluster = atom.shaped_clusters_range().start;
                     if is_word_separator(whitespace) {
                         hanging_opportunities += 1;
