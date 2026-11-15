@@ -138,7 +138,7 @@ mod lru_cache;
 pub mod shape;
 
 pub use linebender_resource_handle::FontData;
-pub use parlance::{BaseDirection, NormalizedCoord};
+pub use parlance::{BaseDirection, NormalizedCoord, Synthesis};
 
 pub use analysis::{Analysis, AnalysisDataSources, CharInfo, DictionaryProvider};
 pub use analyzer::{AnalysisOptions, Analyzer, InlineObject, LineBreakConfig};

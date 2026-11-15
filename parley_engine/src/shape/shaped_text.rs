@@ -656,8 +656,8 @@ fn process_shaped_clusters<'a>(
 mod tests {
     use alloc::{sync::Arc, vec, vec::Vec};
 
-    use fontique::Synthesis;
     use linebender_resource_handle::{Blob, FontData};
+    use parlance::Synthesis;
 
     use crate::{
         Analysis, AnalysisOptions, Analyzer, FontInstance, FontInstanceRef, FontSelector,
