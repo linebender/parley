@@ -70,7 +70,7 @@ mod text;
 pub use bidi::{BidiControl, BidiDirection, BidiLevel, BidiOverride};
 pub use font::{FontStyle, FontWeight, FontWidth};
 pub use font_family::{FontFamily, FontFamilyName, ParseFontFamilyError, ParseFontFamilyErrorKind};
-pub use font_range::{FontStyleRange, FontWeightRange, FontWidthRange};
+pub use font_range::{FontRange, FontStyleRange, FontWeightRange, FontWidthRange};
 pub use generic_family::GenericFamily;
 pub use language::{Language, ParseLanguageError};
 pub use normalized_coord::NormalizedCoord;

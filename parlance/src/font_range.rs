@@ -7,95 +7,28 @@ use core::fmt;
 
 use crate::{FontStyle, FontWeight, FontWidth};
 
-/// Inclusive range of [`FontWeight`]s supported by a font.
+/// Inclusive range of font attribute values supported by a font, such as
+/// weights, widths or oblique angles.
 ///
-/// A static font supports a single weight. A variable font supports the
-/// range of its `wght` axis, and a CSS `@font-face` rule can declare a range
-/// with its `font-weight` descriptor:
-/// <https://www.w3.org/TR/css-fonts-4/#font-prop-desc>.
+/// A static font supports a single value. A variable font supports the range
+/// of the matching variation axis, and a CSS `@font-face` rule can declare a
+/// range with its `font-weight`, `font-width` (`font-stretch`) or `font-style`
+/// descriptor: <https://www.w3.org/TR/css-fonts-4/#font-prop-desc>.
 #[derive(Copy, Clone, PartialEq, Debug)]
-pub struct FontWeightRange {
-    min: FontWeight,
-    max: FontWeight,
+pub struct FontRange<T> {
+    min: T,
+    max: T,
 }
 
-impl FontWeightRange {
-    /// Creates a range spanning `a` and `b`, in either order.
-    pub fn new(a: FontWeight, b: FontWeight) -> Self {
-        if b < a {
-            Self { min: b, max: a }
-        } else {
-            Self { min: a, max: b }
-        }
-    }
-
-    /// Returns the inclusive lower bound.
-    pub fn min(self) -> FontWeight {
-        self.min
-    }
-
-    /// Returns the inclusive upper bound.
-    pub fn max(self) -> FontWeight {
-        self.max
-    }
-
-    /// Returns `true` if `value` is within the range.
-    pub fn contains(self, value: FontWeight) -> bool {
-        self.min <= value && value <= self.max
-    }
-
-    /// Returns the value in the range closest to `value`.
-    pub fn clamp(self, value: FontWeight) -> FontWeight {
-        if value < self.min {
-            self.min
-        } else if value > self.max {
-            self.max
-        } else {
-            value
-        }
-    }
-}
-
-impl Default for FontWeightRange {
-    fn default() -> Self {
-        FontWeight::default().into()
-    }
-}
-
-impl From<FontWeight> for FontWeightRange {
-    fn from(value: FontWeight) -> Self {
-        Self {
-            min: value,
-            max: value,
-        }
-    }
-}
-
-impl fmt::Display for FontWeightRange {
-    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
-        if self.min == self.max {
-            write!(f, "{}", self.min)
-        } else {
-            write!(f, "{} {}", self.min, self.max)
-        }
-    }
-}
+/// Inclusive range of [`FontWeight`]s supported by a font.
+pub type FontWeightRange = FontRange<FontWeight>;
 
 /// Inclusive range of [`FontWidth`]s supported by a font.
-///
-/// A static font supports a single width. A variable font supports the
-/// range of its `wdth` axis, and a CSS `@font-face` rule can declare a range
-/// with its `font-width` (`font-stretch`) descriptor:
-/// <https://www.w3.org/TR/css-fonts-4/#font-prop-desc>.
-#[derive(Copy, Clone, PartialEq, Debug)]
-pub struct FontWidthRange {
-    min: FontWidth,
-    max: FontWidth,
-}
+pub type FontWidthRange = FontRange<FontWidth>;
 
-impl FontWidthRange {
+impl<T: Copy + PartialOrd> FontRange<T> {
     /// Creates a range spanning `a` and `b`, in either order.
-    pub fn new(a: FontWidth, b: FontWidth) -> Self {
+    pub fn new(a: T, b: T) -> Self {
         if b < a {
             Self { min: b, max: a }
         } else {
@@ -104,22 +37,22 @@ impl FontWidthRange {
     }
 
     /// Returns the inclusive lower bound.
-    pub fn min(self) -> FontWidth {
+    pub fn min(self) -> T {
         self.min
     }
 
     /// Returns the inclusive upper bound.
-    pub fn max(self) -> FontWidth {
+    pub fn max(self) -> T {
         self.max
     }
 
     /// Returns `true` if `value` is within the range.
-    pub fn contains(self, value: FontWidth) -> bool {
+    pub fn contains(self, value: T) -> bool {
         self.min <= value && value <= self.max
     }
 
     /// Returns the value in the range closest to `value`.
-    pub fn clamp(self, value: FontWidth) -> FontWidth {
+    pub fn clamp(self, value: T) -> T {
         if value < self.min {
             self.min
         } else if value > self.max {
@@ -130,14 +63,14 @@ impl FontWidthRange {
     }
 }
 
-impl Default for FontWidthRange {
+impl<T: Copy + Default> Default for FontRange<T> {
     fn default() -> Self {
-        FontWidth::default().into()
+        T::default().into()
     }
 }
 
-impl From<FontWidth> for FontWidthRange {
-    fn from(value: FontWidth) -> Self {
+impl<T: Copy> From<T> for FontRange<T> {
+    fn from(value: T) -> Self {
         Self {
             min: value,
             max: value,
@@ -145,7 +78,7 @@ impl From<FontWidth> for FontWidthRange {
     }
 }
 
-impl fmt::Display for FontWidthRange {
+impl<T: fmt::Display + PartialEq> fmt::Display for FontRange<T> {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
         if self.min == self.max {
             write!(f, "{}", self.min)
@@ -166,30 +99,19 @@ pub enum FontStyleRange {
     /// An upright or oblique font covering an inclusive range of angles, in
     /// degrees. Positive angles slant clockwise, as in CSS. An upright font is
     /// `0deg 0deg` ([`FontStyleRange::NORMAL`]).
-    Oblique {
-        /// The smallest supported angle.
-        min_angle: f32,
-        /// The largest supported angle.
-        max_angle: f32,
-    },
+    Oblique(FontRange<f32>),
 }
 
 impl FontStyleRange {
     /// An upright font, equivalent to CSS `oblique 0deg`.
-    pub const NORMAL: Self = Self::Oblique {
-        min_angle: 0.0,
-        max_angle: 0.0,
-    };
+    pub const NORMAL: Self = Self::Oblique(FontRange { min: 0.0, max: 0.0 });
 
     /// The oblique angle used when none is specified, in degrees.
     pub const DEFAULT_OBLIQUE_ANGLE: f32 = 14.0;
 
     /// Creates an oblique range spanning angles `a` and `b`, in either order.
     pub fn oblique(a: f32, b: f32) -> Self {
-        Self::Oblique {
-            min_angle: a.min(b),
-            max_angle: a.max(b),
-        }
+        Self::Oblique(FontRange::new(a, b))
     }
 
     /// Returns `true` if this is [`FontStyleRange::NORMAL`].
@@ -203,10 +125,7 @@ impl FontStyleRange {
     pub fn clamp_angle(self, angle: f32) -> FontStyle {
         match self {
             Self::Italic => FontStyle::Italic,
-            Self::Oblique {
-                min_angle,
-                max_angle,
-            } => match angle.clamp(min_angle, max_angle) {
+            Self::Oblique(angles) => match angles.clamp(angle) {
                 0.0 => FontStyle::Normal,
                 angle => FontStyle::Oblique(Some(angle)),
             },
@@ -226,8 +145,7 @@ impl From<FontStyle> for FontStyleRange {
             FontStyle::Normal => Self::NORMAL,
             FontStyle::Italic => Self::Italic,
             FontStyle::Oblique(angle) => {
-                let angle = angle.unwrap_or(Self::DEFAULT_OBLIQUE_ANGLE);
-                Self::oblique(angle, angle)
+                Self::Oblique(angle.unwrap_or(Self::DEFAULT_OBLIQUE_ANGLE).into())
             }
         }
     }
@@ -238,14 +156,10 @@ impl fmt::Display for FontStyleRange {
         match *self {
             _ if self.is_normal() => f.write_str("normal"),
             Self::Italic => f.write_str("italic"),
-            Self::Oblique {
-                min_angle,
-                max_angle,
-            } if min_angle == max_angle => write!(f, "oblique {min_angle}deg"),
-            Self::Oblique {
-                min_angle,
-                max_angle,
-            } => write!(f, "oblique {min_angle}deg {max_angle}deg"),
+            Self::Oblique(angles) if angles.min == angles.max => {
+                write!(f, "oblique {}deg", angles.min)
+            }
+            Self::Oblique(angles) => write!(f, "oblique {}deg {}deg", angles.min, angles.max),
         }
     }
 }

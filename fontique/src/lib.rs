@@ -89,7 +89,7 @@ pub use family::{FamilyId, FamilyInfo};
 pub use font::{AxisInfo, FontInfo, FontInfoOverride};
 pub use impl_fontconfig::FromFontconfig;
 pub use parlance::{
-    FontStyle, FontStyleRange, FontWeight, FontWeightRange, FontWidth, FontWidthRange,
+    FontRange, FontStyle, FontStyleRange, FontWeight, FontWeightRange, FontWidth, FontWidthRange,
     GenericFamily, Language, Script, Synthesis,
 };
 pub use source::{SourceId, SourceInfo, SourceKind};
