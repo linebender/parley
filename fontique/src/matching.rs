@@ -611,7 +611,7 @@ mod tests {
             ..Default::default()
         };
         let set = [
-            styles(FontStyleRange::Normal),
+            styles(FontStyleRange::NORMAL),
             styles(FontStyleRange::oblique(10., 20.)),
         ]
         .map(font);

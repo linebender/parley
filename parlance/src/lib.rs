@@ -56,6 +56,7 @@ extern crate std as _;
 mod bidi;
 mod font;
 mod font_family;
+mod font_range;
 mod generic_family;
 #[cfg(feature = "bytemuck")]
 mod impl_bytemuck;
@@ -69,6 +70,7 @@ mod text;
 pub use bidi::{BidiControl, BidiDirection, BidiLevel, BidiOverride};
 pub use font::{FontStyle, FontWeight, FontWidth};
 pub use font_family::{FontFamily, FontFamilyName, ParseFontFamilyError, ParseFontFamilyErrorKind};
+pub use font_range::{FontStyleRange, FontWeightRange, FontWidthRange};
 pub use generic_family::GenericFamily;
 pub use language::{Language, ParseLanguageError};
 pub use normalized_coord::NormalizedCoord;
