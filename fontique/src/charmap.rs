@@ -17,7 +17,14 @@ use read_fonts::{
 /// A set of Unicode codepoints, see
 /// [`FontInfoOverride::unicode_range`](crate::FontInfoOverride::unicode_range).
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub struct UnicodeRangeSet(Arc<[(u32, u32)]>);
+pub struct UnicodeRangeSet {
+    ranges: Arc<[(u32, u32)]>,
+    /// The first and last codepoint of [`Self::ranges`] to be able to reject codepoints quickly.
+    ///
+    /// 1 and 0 if the [`Self::ranges`] is empty.
+    min: u32,
+    max: u32,
+}
 
 impl UnicodeRangeSet {
     /// Creates a set of codepoints in the given ranges.
@@ -38,15 +45,24 @@ impl UnicodeRangeSet {
             }
             merge
         });
-        Self(ranges.into())
+        let min = ranges.first().map_or(1, |r| r.0);
+        let max = ranges.last().map_or(0, |r| r.1);
+        Self {
+            ranges: ranges.into(),
+            min,
+            max,
+        }
     }
 
     /// Returns `true` if the set contains the given codepoint.
     #[inline]
     pub fn contains(&self, codepoint: impl Into<u32>) -> bool {
         let c = codepoint.into();
-        let i = self.0.partition_point(|&(_, end)| end < c);
-        self.0.get(i).is_some_and(|&(start, _)| start <= c)
+        if c < self.min || c > self.max {
+            return false;
+        }
+        let i = self.ranges.partition_point(|&(_, end)| end < c);
+        self.ranges.get(i).is_some_and(|&(start, _)| start <= c)
     }
 }
 
