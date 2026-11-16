@@ -356,13 +356,13 @@ pub struct AxisInfo {
 // derived.
 #[derive(Copy, Clone, Default, PartialEq)]
 pub struct Synthesis {
+    flags: u8,
     /// The value for the `wdth` axis, if `HAS_WIDTH` is set.
     width: f32,
     /// The value for the `wght` axis, if `HAS_WEIGHT` is set.
     weight: f32,
     /// The value for the `slnt` axis, if `HAS_SLANT` is set.
     slant: f32,
-    flags: u8,
     skew: i8,
 }
 
@@ -375,6 +375,11 @@ impl Synthesis {
     const EMBOLDEN: u8 = 1 << 4;
     /// The flags of all variation settings.
     const VARIATIONS: u8 = Self::HAS_WIDTH | Self::HAS_WEIGHT | Self::HAS_ITALIC | Self::HAS_SLANT;
+
+    #[inline]
+    const fn has(&self, flag: u8) -> bool {
+        self.flags & flag != 0
+    }
 
     /// Sets the value to apply to the font's width (`wdth`) variation axis.
     #[inline]
@@ -397,10 +402,11 @@ impl Synthesis {
     /// Sets the font's italic (`ital`) variation axis to `1`.
     ///
     /// Italic and slant are alternative ways to synthesize a style, so this replaces a setting
-    /// made by [`with_slant`](Self::with_slant).
+    /// made by [`with_slant`](Self::with_slant) in release builds, and debug asserts otherwise.
     #[inline]
     #[must_use]
     pub const fn with_italic(mut self) -> Self {
+        debug_assert!(!self.has(Self::HAS_SLANT), "slant is already set");
         self.slant = 0.0;
         self.flags = (self.flags & !Self::HAS_SLANT) | Self::HAS_ITALIC;
         self
@@ -409,16 +415,17 @@ impl Synthesis {
     /// Sets the value to apply to the font's slant (`slnt`) variation axis.
     ///
     /// Italic and slant are alternative ways to synthesize a style, so this replaces a setting
-    /// made by [`with_italic`](Self::with_italic).
+    /// made by [`with_italic`](Self::with_italic) in release builds, and debug asserts otherwise.
     #[inline]
     #[must_use]
     pub const fn with_slant(mut self, slant: f32) -> Self {
+        debug_assert!(!self.has(Self::HAS_ITALIC), "italic is already set");
         self.slant = slant;
         self.flags = (self.flags & !Self::HAS_ITALIC) | Self::HAS_SLANT;
         self
     }
 
-    /// Sets whether the scaler should apply a faux bold.
+    /// Sets whether faux bold should be applied when rendering.
     #[inline]
     #[must_use]
     pub const fn with_embolden(mut self, embolden: bool) -> Self {
@@ -432,7 +439,8 @@ impl Synthesis {
 
     /// Sets the skew angle in degrees for a faux italic/oblique.
     ///
-    /// An angle of `0` means no skew.
+    /// Positive angles skew glyphs clockwise from upright, keeping the baseline fixed.
+    /// An angle of `0` means no skew. This is applied in addition to the variation axes.
     #[inline]
     #[must_use]
     pub const fn with_skew(mut self, degrees: i8) -> Self {
@@ -449,7 +457,7 @@ impl Synthesis {
     /// Returns `true` if there are any [variation settings](Self::variation_settings) to apply.
     #[inline]
     pub const fn has_variations(&self) -> bool {
-        self.flags & Self::VARIATIONS != 0
+        self.has(Self::VARIATIONS)
     }
 
     /// Returns the variation settings that should be applied to match the
@@ -458,28 +466,33 @@ impl Synthesis {
     /// These are yielded in the order width (`wdth`), weight (`wght`), style (`ital` or `slnt`).
     #[inline]
     pub fn variation_settings(&self) -> impl Iterator<Item = (parlance::Tag, f32)> + Clone + use<> {
-        let has = |flag: u8| self.flags & flag != 0;
-        let style = if has(Self::HAS_ITALIC) {
+        let style = if self.has(Self::HAS_ITALIC) {
             Some((parlance::Tag::new(b"ital"), 1.0))
         } else {
-            has(Self::HAS_SLANT).then_some((parlance::Tag::new(b"slnt"), self.slant))
+            self.has(Self::HAS_SLANT)
+                .then_some((parlance::Tag::new(b"slnt"), self.slant))
         };
         [
-            has(Self::HAS_WIDTH).then_some((parlance::Tag::new(b"wdth"), self.width)),
-            has(Self::HAS_WEIGHT).then_some((parlance::Tag::new(b"wght"), self.weight)),
+            self.has(Self::HAS_WIDTH)
+                .then_some((parlance::Tag::new(b"wdth"), self.width)),
+            self.has(Self::HAS_WEIGHT)
+                .then_some((parlance::Tag::new(b"wght"), self.weight)),
             style,
         ]
         .into_iter()
         .flatten()
     }
 
-    /// Returns `true` if the scaler should apply a faux bold.
+    /// Returns `true` if faux bold should be applied when rendering.
     #[inline]
     pub fn embolden(&self) -> bool {
-        self.flags & Self::EMBOLDEN != 0
+        self.has(Self::EMBOLDEN)
     }
 
-    /// Returns a skew angle for faux italic/oblique, if requested.
+    /// Returns a skew angle in degrees for faux italic/oblique, if requested.
+    ///
+    /// Positive angles skew glyphs clockwise from upright, keeping the baseline fixed.
+    /// This is applied in addition to the variation axes.
     #[inline]
     pub fn skew(&self) -> Option<f32> {
         if self.skew != 0 {
@@ -621,6 +634,61 @@ mod tests {
         include_bytes!("../../parley_dev/assets/fonts/roboto_fonts/Roboto-Regular.ttf");
     const ROBOTO_FLEX: &[u8] =
         include_bytes!("../../parley_dev/assets/fonts/roboto_fonts/RobotoFlex-VariableFont.ttf");
+
+    #[test]
+    fn synthesis_style_axes() {
+        let empty = Synthesis::default();
+        assert!(!empty.any());
+        assert!(!empty.has_variations());
+        assert!(!empty.embolden());
+        assert_eq!(empty.variation_settings().next(), None);
+        assert_eq!(empty.skew(), None);
+
+        let italic = empty.with_italic().with_italic().with_skew(14);
+        assert!(italic.any());
+        assert!(italic.has_variations());
+        assert!(
+            italic
+                .variation_settings()
+                .eq([(parlance::Tag::new(b"ital"), 1.0)])
+        );
+        assert_eq!(italic.skew(), Some(14.0));
+
+        let slant = empty.with_slant(-14.0).with_slant(-20.0);
+        assert!(slant.has_variations());
+        assert!(
+            slant
+                .variation_settings()
+                .eq([(parlance::Tag::new(b"slnt"), -20.0)])
+        );
+    }
+
+    #[cfg(debug_assertions)]
+    #[test]
+    #[should_panic(expected = "slant is already set")]
+    fn synthesis_italic_after_slant() {
+        let _ = Synthesis::default().with_slant(-14.0).with_italic();
+    }
+
+    #[cfg(debug_assertions)]
+    #[test]
+    #[should_panic(expected = "italic is already set")]
+    fn synthesis_slant_after_italic() {
+        let _ = Synthesis::default().with_italic().with_slant(-14.0);
+    }
+
+    #[cfg(not(debug_assertions))]
+    #[test]
+    fn synthesis_style_axes_replace_in_release() {
+        assert_eq!(
+            Synthesis::default().with_slant(-14.0).with_italic(),
+            Synthesis::default().with_italic()
+        );
+        assert_eq!(
+            Synthesis::default().with_italic().with_slant(-14.0),
+            Synthesis::default().with_slant(-14.0)
+        );
+    }
 
     fn font_info(data: &[u8]) -> FontInfo {
         let source = SourceInfo::new(
