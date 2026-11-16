@@ -3,7 +3,7 @@
 
 //! Query support.
 
-use crate::{Charmap, CharmapIndex};
+use crate::{Charmap, CharmapIndex, UnicodeRangeSet};
 
 use super::super::{Collection, SourceCache, matching::match_fonts};
 
@@ -181,7 +181,7 @@ impl<'a> Query<'a> {
     pub fn first_available_font(&mut self) -> Option<QueryFont> {
         let mut found = None;
         self.matches_with(|font| {
-            if !font.charmap_index.in_unicode_range(' ') {
+            if !font.in_unicode_range(' ') {
                 return QueryStatus::Continue;
             }
             found = Some(font.clone());
@@ -253,12 +253,29 @@ pub struct QueryFont {
     pub synthesis: Synthesis,
     /// Data used for constructing a character map for this font.
     pub charmap_index: CharmapIndex,
+    /// The codepoints the font may be used for.
+    ///
+    /// See [`FontInfoOverride::unicode_range`](crate::FontInfoOverride::unicode_range).
+    pub unicode_range: Option<UnicodeRangeSet>,
 }
 
 impl QueryFont {
     /// Attempts to construct a [Charmap] for this font.
+    ///
+    /// This maps all codepoints the font has glyphs for, including those outside its
+    /// [unicode range](Self::unicode_range).
     pub fn charmap(&self) -> Option<Charmap<'_>> {
         self.charmap_index.charmap(self.blob.as_ref())
+    }
+
+    /// Returns `true` if the font may be used for the given codepoint, see
+    /// [`FontInfoOverride::unicode_range`](crate::FontInfoOverride::unicode_range).
+    ///
+    /// This doesn't mean the font has a glyph for it.
+    #[inline]
+    pub fn in_unicode_range(&self, codepoint: impl Into<u32>) -> bool {
+        let unicode_range = self.unicode_range.as_ref();
+        unicode_range.is_none_or(|set| set.contains(codepoint))
     }
 }
 
@@ -298,7 +315,8 @@ fn load_bucket<'a>(
                         attributes.style,
                         attributes.weight,
                     ),
-                    charmap_index: font_info.charmap_index().clone(),
+                    charmap_index: font_info.charmap_index(),
+                    unicode_range: font_info.unicode_range().cloned(),
                 });
             }
             if fonts.is_empty() {
@@ -337,7 +355,8 @@ fn load_font<'a>(
                 blob,
                 index: blob_index,
                 synthesis,
-                charmap_index: font_info.charmap_index().clone(),
+                charmap_index: font_info.charmap_index(),
+                unicode_range: font_info.unicode_range().cloned(),
             });
             if let Entry::Ok(font) = status {
                 Some(font)
@@ -416,20 +435,14 @@ mod tests {
         let mut selected_unrestricted = Vec::new();
         for ch in "a49 ".chars() {
             query.matches_with(|font| {
-                if font.charmap().unwrap().map(ch).is_none() {
+                if !font.in_unicode_range(ch) || font.charmap().unwrap().map(ch).is_none() {
                     return QueryStatus::Continue;
                 }
-                selected_unrestricted.push(font.charmap_index.in_unicode_range('a'));
+                selected_unrestricted.push(font.in_unicode_range('a'));
                 QueryStatus::Stop
             });
         }
         assert_eq!(selected_unrestricted, [true, false, false, true]);
-        assert!(
-            query
-                .first_available_font()
-                .unwrap()
-                .charmap_index
-                .in_unicode_range('a')
-        );
+        assert!(query.first_available_font().unwrap().in_unicode_range('a'));
     }
 }

@@ -398,26 +398,22 @@ impl<'a, 'b, B: Brush> parley_engine::FontSelector for FontSelector<'a, 'b, B> {
         let mut best_coverage = Coverage::NONE;
 
         self.query.matches_with(|font| {
-            // Checking whether the character is in the unicode range is a lot cheaper than creating
-            // the charmap, which matters if families are split into many subsets.
-            let coverage = if let Some(unicode_range) = font.charmap_index.unicode_range()
-                && cluster.calculate_coverage(|ch| unicode_range.contains(ch)) == Coverage::NONE
-            {
-                Coverage::NONE
-            } else {
-                let Some(charmap) = font.charmap() else {
-                    return fontique::QueryStatus::Continue;
-                };
-                cluster.calculate_coverage(|ch| {
-                    charmap
-                        .map(ch)
-                        .map(|g| {
-                            // Any non-zero value indicates the existence of a glyph.
-                            g != 0
-                        })
-                        .unwrap_or_default()
-                })
-            };
+            // Only create the charmap if the character is the unicode range, as the the range check
+            // is a lot cheaper than creating the charmap. That matters if families are split into
+            // many subsets.
+            let mut charmap = None;
+            let coverage = cluster.calculate_coverage(|ch| {
+                font.in_unicode_range(ch)
+                    && charmap
+                        .get_or_insert_with(|| font.charmap())
+                        .as_ref()
+                        .and_then(|charmap| charmap.map(ch))
+                        // Any non-zero value indicates the existence of a glyph.
+                        .is_some_and(|g| g != 0)
+            });
+            if let Some(None) = charmap {
+                return fontique::QueryStatus::Continue;
+            }
             if coverage > best_coverage {
                 selected_font = Some(font);
                 best_coverage = coverage;

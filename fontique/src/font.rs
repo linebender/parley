@@ -25,6 +25,7 @@ pub struct FontInfo {
     axes: AxisVec,
     attr_axes: u8,
     charmap_index: CharmapIndex,
+    unicode_range: Option<UnicodeRangeSet>,
 }
 
 impl FontInfo {
@@ -200,8 +201,15 @@ impl FontInfo {
     /// Returns the index used for constructing a [Charmap] for this font.
     ///
     /// [Charmap]: crate::Charmap
-    pub fn charmap_index(&self) -> &CharmapIndex {
-        &self.charmap_index
+    pub fn charmap_index(&self) -> CharmapIndex {
+        self.charmap_index
+    }
+
+    /// Returns the codepoints the font may be used for.
+    ///
+    /// See [`FontInfoOverride::unicode_range`].
+    pub fn unicode_range(&self) -> Option<&UnicodeRangeSet> {
+        self.unicode_range.as_ref()
     }
 }
 
@@ -248,6 +256,7 @@ impl FontInfo {
             axes,
             attr_axes,
             charmap_index,
+            unicode_range: None,
         })
     }
 
@@ -289,7 +298,7 @@ impl FontInfo {
             }
         }
         if let Some(unicode_range) = info_override.unicode_range {
-            self.charmap_index.set_unicode_range(unicode_range);
+            self.unicode_range = Some(unicode_range.clone());
         }
     }
 }
