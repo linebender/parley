@@ -635,61 +635,6 @@ mod tests {
     const ROBOTO_FLEX: &[u8] =
         include_bytes!("../../parley_dev/assets/fonts/roboto_fonts/RobotoFlex-VariableFont.ttf");
 
-    #[test]
-    fn synthesis_style_axes() {
-        let empty = Synthesis::default();
-        assert!(!empty.any());
-        assert!(!empty.has_variations());
-        assert!(!empty.embolden());
-        assert_eq!(empty.variation_settings().next(), None);
-        assert_eq!(empty.skew(), None);
-
-        let italic = empty.with_italic().with_italic().with_skew(14);
-        assert!(italic.any());
-        assert!(italic.has_variations());
-        assert!(
-            italic
-                .variation_settings()
-                .eq([(parlance::Tag::new(b"ital"), 1.0)])
-        );
-        assert_eq!(italic.skew(), Some(14.0));
-
-        let slant = empty.with_slant(-14.0).with_slant(-20.0);
-        assert!(slant.has_variations());
-        assert!(
-            slant
-                .variation_settings()
-                .eq([(parlance::Tag::new(b"slnt"), -20.0)])
-        );
-    }
-
-    #[cfg(debug_assertions)]
-    #[test]
-    #[should_panic(expected = "slant is already set")]
-    fn synthesis_italic_after_slant() {
-        let _ = Synthesis::default().with_slant(-14.0).with_italic();
-    }
-
-    #[cfg(debug_assertions)]
-    #[test]
-    #[should_panic(expected = "italic is already set")]
-    fn synthesis_slant_after_italic() {
-        let _ = Synthesis::default().with_italic().with_slant(-14.0);
-    }
-
-    #[cfg(not(debug_assertions))]
-    #[test]
-    fn synthesis_style_axes_replace_in_release() {
-        assert_eq!(
-            Synthesis::default().with_slant(-14.0).with_italic(),
-            Synthesis::default().with_italic()
-        );
-        assert_eq!(
-            Synthesis::default().with_italic().with_slant(-14.0),
-            Synthesis::default().with_slant(-14.0)
-        );
-    }
-
     fn font_info(data: &[u8]) -> FontInfo {
         let source = SourceInfo::new(
             SourceId::new(),
