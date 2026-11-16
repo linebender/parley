@@ -5,8 +5,8 @@
 
 use crate::test_name;
 use crate::util::{ColorBrush, TestEnv, draw_layout, render_to_pixmap, samples};
-use parley::Layout;
 use parley::style::{LineHeight, StyleProperty};
+use parley::{Alignment, AlignmentOptions, Layout, PositionedLayoutItem};
 
 /// Helper to build a layout with line height applied
 fn build_with_line_height(
@@ -273,5 +273,67 @@ fn spacing_and_multi_shaped_cluster_graphemes() {
         let mut layout = builder.build(text);
         layout.break_all_lines(None);
         env.with_name("word").check_layout_snapshot(&layout);
+    }
+}
+
+/// The additional spacing on shaped clusters is applied consistently: positioned glyphs advance by
+/// exactly their glyph run's advance, a run's clusters add up to the run's advance, and a glyph run
+/// starts where the previous one ended.
+///
+/// This covers multiple glyphs per shaped cluster (combining marks), multiple shaped clusters per
+/// grapheme, RTL text, ligatures, negative spacing, and justification.
+#[test]
+fn spacing_glyph_and_cluster_advances_agree() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    fn nearly_eq(a: f32, b: f32, what: &str) {
+        assert!((a - b).abs() < 1e-3, "{what}: {a} != {b}");
+    }
+
+    let texts = [
+        samples::LOREM_IPSUM,
+        samples::ARABIC,
+        samples::MIXED_BIDI,
+        samples::LIGATURES,
+        "a \u{0301}bh\u{0301}d e\u{0301}\u{0323} x\u{0323}\u{0301}y",
+    ];
+    let spacings = [(0., 0.), (3., 0.), (0., 5.), (-2., 4.), (2., -3.)];
+    for text in texts {
+        for (letter, word) in spacings {
+            for alignment in [Alignment::Start, Alignment::Justify] {
+                let mut builder = env.ranged_builder(text);
+                builder.push_default(StyleProperty::LetterSpacing(letter));
+                builder.push_default(StyleProperty::WordSpacing(word));
+                let mut layout = builder.build(text);
+                layout.set_alignment(alignment, AlignmentOptions::default());
+                layout.break_all_lines(Some(120.));
+
+                for line in layout.lines() {
+                    let mut line_advance = 0.;
+                    for run in line.runs() {
+                        let clusters_advance: f32 = run.clusters().map(|c| c.advance()).sum();
+                        nearly_eq(clusters_advance, run.advance(), "run clusters");
+                        line_advance += run.advance();
+                    }
+
+                    let mut expected_offset = None;
+                    let mut glyph_runs_advance = 0.;
+                    for item in line.items() {
+                        let PositionedLayoutItem::GlyphRun(glyph_run) = item else {
+                            continue;
+                        };
+                        if let Some(expected_offset) = expected_offset {
+                            nearly_eq(glyph_run.offset(), expected_offset, "glyph run offset");
+                        }
+                        let glyphs_advance: f32 =
+                            glyph_run.positioned_glyphs().map(|g| g.advance).sum();
+                        nearly_eq(glyphs_advance, glyph_run.advance(), "glyph run glyphs");
+                        glyph_runs_advance += glyph_run.advance();
+                        expected_offset = Some(glyph_run.offset() + glyph_run.advance());
+                    }
+                    nearly_eq(glyph_runs_advance, line_advance, "line glyph runs");
+                }
+            }
+        }
     }
 }

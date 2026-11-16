@@ -97,6 +97,9 @@ pub struct Shaper {
     buffer: harfrust::Buffer,
     features: Vec<harfrust::Feature>,
     char_cluster: CharCluster,
+    /// The text character indices of the first characters of the current run's graphemes which
+    /// are presented as emoji.
+    emoji_graphemes: Vec<u32>,
 }
 
 impl Default for Shaper {
@@ -109,6 +112,7 @@ impl Default for Shaper {
             buffer: harfrust::Buffer::new(),
             features: Vec::new(),
             char_cluster: CharCluster::default(),
+            emoji_graphemes: Vec::new(),
         }
     }
 }
@@ -310,6 +314,8 @@ fn shape_segment(
     }
 
     let char_cluster = &mut scx.char_cluster;
+    let emoji_graphemes = &mut scx.emoji_graphemes;
+    emoji_graphemes.clear();
 
     // Shaping inputs that are constant over the segment.
     let direction = if segment.bidi_level.is_rtl() {
@@ -332,7 +338,10 @@ fn shape_segment(
     }));
 
     // Shape a run of the segment with a single font, appending it to `shaped_text`.
-    let mut shape_run = |font: &FontInstance, range: TextRange| {
+    //
+    // `emoji_graphemes` holds the first characters of the run's graphemes which are presented as
+    // emoji, and is cleared for the next run.
+    let mut shape_run = |font: &FontInstance, range: TextRange, emoji_graphemes: &mut Vec<u32>| {
         // Create harfrust font instance
         let base_font = scx.shape_data_cache.entry(
             cache::ShapeDataKey::new(font.font.data.id(), font.font.index),
@@ -430,7 +439,9 @@ fn shape_segment(
             font,
             buffer,
             instance,
+            emoji_graphemes,
         );
+        emoji_graphemes.clear();
     };
 
     // This is the run being accumulated, i.e., consecutive graphemes for which `select_font`
@@ -467,12 +478,14 @@ fn shape_segment(
         // doesn't need a font of its own, so it takes the current run's.
         let is_inline_object = char_info[char_start].is_inline_object();
         if is_inline_object && let Some((run_font, run_range)) = run.take() {
-            shape_run(&run_font, run_range);
+            shape_run(&run_font, run_range, emoji_graphemes);
             run = Some((run_font, grapheme));
             run_is_inline_object = true;
             continue;
         }
 
+        // TODO: a `font-variant-emoji`-like style would also be resolved here.
+        let is_emoji = char_cluster.is_emoji();
         let font = select_font
             .select_font(segment, options, char_cluster)
             .ok_or(())?;
@@ -486,14 +499,18 @@ fn shape_segment(
         } else {
             if let Some((run_font, run_range)) = run.take() {
                 // The font changed: shape the previous run.
-                shape_run(&run_font, run_range);
+                shape_run(&run_font, run_range, emoji_graphemes);
             }
             run = Some((font.into(), grapheme));
             run_is_inline_object = is_inline_object;
         }
+        if is_emoji {
+            #[expect(clippy::cast_possible_truncation, reason = "Deferred")]
+            emoji_graphemes.push(char_start as u32);
+        }
     }
     if let Some((run_font, run_range)) = run {
-        shape_run(&run_font, run_range);
+        shape_run(&run_font, run_range, emoji_graphemes);
     }
 
     Ok(())

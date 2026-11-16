@@ -1,0 +1,91 @@
+<!DOCTYPE html>
+<html lang="en">
+<meta charset="utf-8">
+<title>CJ justification comparison</title>
+<style>
+  @import url('https://fonts.googleapis.com/css2?family=Roboto&family=Noto+Sans+JP&family=Noto+Kufi+Arabic&display=swap');
+  body {
+    --font-size: 16;
+    font-size: calc(1px * var(--font-size));
+    font-family: "Roboto", "Noto Sans JP", "Noto Kufi Arabic";
+    background: #222;
+    margin: 50px;
+  }
+  #layout {
+    text-align: justify;
+    text-align-last: justify;
+  }
+  #layout > div {
+    width: calc(1px * var(--max-advance));
+    background: white;
+    border: 20px solid #a6c8ff;
+    margin-bottom: 20px;
+    line-height: 1;
+  }
+  .underline { text-decoration: underline; }
+</style>
+<!--
+  Matches the exact texts in tests/justification.rs. Hover for fixture names.
+  Every fixture is one line at twice its natural advance (minimum 16px).
+  Width measurement preserves whitespace, as Rust's natural advance does.
+  Google Fonts' Japanese font substitutes for the local Noto CJK SC subset;
+  ideograph outlines can differ. Bidi comparisons are best-effort, not parity.
+  Trailing U+3000 already hangs on this branch; it does not own expansion.
+-->
+<div id="layout">
+  <div title="pair">漢字</div>
+  <div title="space">漢 字</div>
+  <div title="latin_edges">a漢字b</div>
+  <div title="triple">漢字典</div>
+  <div title="ideographic_space">漢　字</div>
+  <div title="ideographic_space_latin">a　b</div>
+  <div title="ideographic_space_trailing">漢　</div>
+  <div title="punctuation">漢、。字</div>
+  <div title="trailing_space">漢字 </div>
+  <div title="nbsp">漢&#xA0;字</div>
+  <div title="trailing_nbsp">漢字&#xA0;</div>
+  <div title="ignorable">漢&#x2060;字</div>
+  <div title="all_ignorable">&#x2060;</div>
+  <div title="no_opportunity">漢</div>
+  <div title="ligature">fi漢</div>
+  <div title="bidi">漢مرحبا字</div>
+  <div title="rtl_no_opportunity" dir="rtl">مرحبا</div>
+  <div title="emoji">a👀b</div>
+  <div title="emoji_text_selector">a👀&#xFE0E;b</div>
+  <div title="emoji_selector">a✌&#xFE0F;b</div>
+  <div title="text_pictograph (differs: Chrome expands)">a✌b</div>
+  <div title="halfway_geometry" style="--max-advance: 52"><span class="underline">漢</span>字</div>
+  <!--
+    Differences from Chrome, see `README.md`. These are not Rust fixtures (the test fonts lack
+    the glyphs). Each is between Latin letters, so the only opportunities are those provided by
+    the character in question, i.e. there is expansion iff it is expandable.
+  -->
+  <div title="diff: text pictograph (Parley: no, Chrome: yes)">a☎b</div>
+  <div title="diff: legacy symbol (Parley: no, Chrome: yes)">a★b</div>
+  <div title="diff: emoji sequence (Parley: yes, Chrome: no)">a©&#xFE0F;b</div>
+  <div title="diff: fullwidth currency (Parley: no, Chrome: yes)">a￥b</div>
+  <div title="diff: enclosed Hangul (Parley: no, Chrome: yes)">a㈀b</div>
+  <div title="diff: halfwidth punctuation (Parley: no, Chrome: yes)">a｡b</div>
+  <div title="diff: Yi (Parley: yes, Chrome: no)">aꀀb</div>
+  <div title="diff: wide punctuation (Parley: yes, Chrome: no)">a；b</div>
+</div>
+<script>
+  async function setWidths() {
+    await Promise.all([
+      document.fonts.load('16px Roboto', 'afi b'),
+      document.fonts.load('16px "Noto Sans JP"', '漢字典、。　￥｡；'),
+      document.fonts.load('16px "Noto Kufi Arabic"', 'مرحبا'),
+    ]);
+    for (const fixture of document.querySelectorAll('#layout > div')) {
+      if (fixture.title === 'halfway_geometry') continue;
+      const natural = document.createElement('span');
+      natural.style.cssText = 'position: absolute; white-space: pre;';
+      natural.textContent = fixture.textContent;
+      document.body.append(natural);
+      fixture.style.setProperty('--max-advance', Math.max(16, 2 * natural.getBoundingClientRect().width));
+      natural.remove();
+    }
+  }
+  setWidths();
+</script>
+</html>

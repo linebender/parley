@@ -49,7 +49,9 @@ extern crate alloc as _alloc;
 extern crate std as _;
 
 use icu_collections::codepointtrie::TrieValue;
-use icu_properties::props::{BidiClass, GeneralCategory, GraphemeClusterBreak, Script};
+use icu_properties::props::{
+    BidiClass, EastAsianWidth, GeneralCategory, GraphemeClusterBreak, Script,
+};
 
 /// Baked data (`PackTab` tables).
 pub(crate) mod generated;
@@ -72,6 +74,7 @@ impl Properties {
     const IS_EMOJI_MODIFIER_BITS: u32 = 1;
     const IS_EMOJI_MODIFIER_BASE_BITS: u32 = 1;
     const IS_DEFAULT_IGNORABLE_BITS: u32 = 1;
+    const IS_BLOCK_SCRIPT_BITS: u32 = 1;
 
     const SCRIPT_SHIFT: u32 = 0;
     const GC_SHIFT: u32 = Self::SCRIPT_SHIFT + Self::SCRIPT_BITS;
@@ -93,14 +96,14 @@ impl Properties {
         Self::IS_EMOJI_MODIFIER_SHIFT + Self::IS_EMOJI_MODIFIER_BITS;
     const IS_DEFAULT_IGNORABLE_SHIFT: u32 =
         Self::IS_EMOJI_MODIFIER_BASE_SHIFT + Self::IS_EMOJI_MODIFIER_BASE_BITS;
+    const IS_BLOCK_SCRIPT_SHIFT: u32 =
+        Self::IS_DEFAULT_IGNORABLE_SHIFT + Self::IS_DEFAULT_IGNORABLE_BITS;
 
     #[inline(always)]
     /// Returns the properties for a given character.
     pub fn get(ch: char) -> Self {
-        let inner: u32 = generated::composite_packtab_get(u32::from(ch).try_into().unwrap());
-        // If we ever set the highest bit, `inner` would become i64.
-        // Make sure to use `cast_unsigned` in that case.
-        Self(inner.into())
+        let inner: u64 = generated::composite_packtab_get(u32::from(ch).try_into().unwrap());
+        Self(inner)
     }
 
     /// Creates a new [`Properties`] from the given properties
@@ -118,6 +121,7 @@ impl Properties {
         is_emoji_presentation: bool,
         is_emoji_modifier: bool,
         is_emoji_modifier_base: bool,
+        is_block_script: bool,
     ) -> Self {
         // The TrieValue implementation is guaranteed to be stable (strongly enough for our purposes, at least).
         // See https://github.com/unicode-org/icu4x/issues/6067#issuecomment-5361908792 and
@@ -140,7 +144,8 @@ impl Properties {
                 | ((is_emoji as u64) << Self::IS_EMOJI_SHIFT)
                 | ((is_emoji_presentation as u64) << Self::IS_EMOJI_PRESENTATION_SHIFT)
                 | ((is_emoji_modifier as u64) << Self::IS_EMOJI_MODIFIER_SHIFT)
-                | ((is_emoji_modifier_base as u64) << Self::IS_EMOJI_MODIFIER_BASE_SHIFT),
+                | ((is_emoji_modifier_base as u64) << Self::IS_EMOJI_MODIFIER_BASE_SHIFT)
+                | ((is_block_script as u64) << Self::IS_BLOCK_SCRIPT_SHIFT),
         )
     }
 
@@ -281,6 +286,46 @@ impl Properties {
             Self::IS_DEFAULT_IGNORABLE_BITS,
         ) != 0
     }
+
+    /// Returns whether the character belongs to a block script for the purposes of justification,
+    /// as computed by [`Self::block_script`].
+    #[inline(always)]
+    pub fn is_block_script(&self) -> bool {
+        self.bits(Self::IS_BLOCK_SCRIPT_SHIFT, Self::IS_BLOCK_SCRIPT_BITS) != 0
+    }
+
+    /// Computes whether a character with the given properties belongs to a block script for the
+    /// purposes of justification.
+    ///
+    /// This follows the definition of block scripts in [CSS Text Level 3, Appendix D][css], i.e.
+    /// the characters of the Bopomofo, Han, Hiragana, Katakana and Yi scripts, and all characters
+    /// which are `Wide` or `Fullwidth` ([UAX #11][]), with these deviations:
+    ///
+    /// - Hangul is excluded, because Korean is generally written with spaces between words.
+    ///   CSS only wants this where it is the convention of the content language, but we don't
+    ///   make that distinction yet.
+    /// - Currency symbols are excluded, as these attach to the adjacent number. CSS allows
+    ///   reassigning specific symbols and punctuation in this way ([§ 6.4.2][symbols]).
+    ///
+    /// TODO: CSS also includes the `Ambiguous` characters (largely the symbols from legacy East
+    /// Asian character sets) if the content language is Chinese, Japanese or Korean.
+    ///
+    /// TODO: Handle the other traditions for symbols and punctuation ([§ 6.4.2][symbols]). For
+    /// example, there are no justification opportunities between consecutive U+2014 EM DASH,
+    /// U+2015 HORIZONTAL BAR, U+2026 HORIZONTAL ELLIPSIS, or U+2025 TWO DOT LEADER characters
+    /// in Japanese.
+    ///
+    /// [css]: https://www.w3.org/TR/css-text-3/#script-groups
+    /// [symbols]: https://www.w3.org/TR/css-text-3/#justify-symbols
+    /// [UAX #11]: https://www.unicode.org/reports/tr11/
+    pub fn block_script(script: Script, gc: GeneralCategory, width: EastAsianWidth) -> bool {
+        (matches!(
+            script,
+            Script::Bopomofo | Script::Han | Script::Hiragana | Script::Katakana | Script::Yi
+        ) || matches!(width, EastAsianWidth::Wide | EastAsianWidth::Fullwidth))
+            && script != Script::Hangul
+            && gc != GeneralCategory::CurrencySymbol
+    }
 }
 
 impl From<Properties> for u64 {
@@ -293,9 +338,9 @@ impl From<Properties> for u64 {
 mod tests {
     use super::Properties;
     use icu_properties::props::{
-        BidiClass, DefaultIgnorableCodePoint, Emoji, EmojiModifier, EmojiModifierBase,
-        EmojiPresentation, ExtendedPictographic, GeneralCategory, GraphemeClusterBreak, LineBreak,
-        RegionalIndicator, Script, VariationSelector,
+        BidiClass, DefaultIgnorableCodePoint, EastAsianWidth, Emoji, EmojiModifier,
+        EmojiModifierBase, EmojiPresentation, ExtendedPictographic, GeneralCategory,
+        GraphemeClusterBreak, LineBreak, RegionalIndicator, Script, VariationSelector,
     };
     use icu_properties::{CodePointMapData, CodePointSetData};
 
@@ -339,6 +384,7 @@ mod tests {
         is_emoji_presentation: bool,
         is_emoji_modifier: bool,
         is_emoji_modifier_base: bool,
+        is_block_script: bool,
     }
 
     impl UnclampedProperties {
@@ -371,6 +417,11 @@ mod tests {
                 is_emoji_presentation: CodePointSetData::new::<EmojiPresentation>().contains32(cp),
                 is_emoji_modifier: CodePointSetData::new::<EmojiModifier>().contains32(cp),
                 is_emoji_modifier_base: CodePointSetData::new::<EmojiModifierBase>().contains32(cp),
+                is_block_script: Properties::block_script(
+                    CodePointMapData::<Script>::new().get32(cp),
+                    CodePointMapData::<GeneralCategory>::new().get32(cp),
+                    CodePointMapData::<EastAsianWidth>::new().get32(cp),
+                ),
             }
         }
 
@@ -392,6 +443,7 @@ mod tests {
                 is_emoji_presentation: properties.is_emoji_presentation(),
                 is_emoji_modifier: properties.is_emoji_modifier(),
                 is_emoji_modifier_base: properties.is_emoji_modifier_base(),
+                is_block_script: properties.is_block_script(),
             }
         }
 
@@ -411,6 +463,7 @@ mod tests {
                 self.is_emoji_presentation,
                 self.is_emoji_modifier,
                 self.is_emoji_modifier_base,
+                self.is_block_script,
             )
         }
     }
