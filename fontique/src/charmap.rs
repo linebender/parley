@@ -88,6 +88,13 @@ impl CharmapIndex {
         self.unicode_range = Some(unicode_range.clone());
     }
 
+    /// Returns the codepoints the font may be used for, if they are restricted, see
+    /// [`FontInfoOverride::unicode_range`](crate::FontInfoOverride::unicode_range).
+    #[inline]
+    pub fn unicode_range(&self) -> Option<&UnicodeRangeSet> {
+        self.unicode_range.as_ref()
+    }
+
     /// Returns `true` if the font may be used for the given codepoint, see
     /// [`FontInfoOverride::unicode_range`](crate::FontInfoOverride::unicode_range).
     ///

@@ -398,19 +398,26 @@ impl<'a, 'b, B: Brush> parley_engine::FontSelector for FontSelector<'a, 'b, B> {
         let mut best_coverage = Coverage::NONE;
 
         self.query.matches_with(|font| {
-            let Some(charmap) = font.charmap() else {
-                return fontique::QueryStatus::Continue;
+            // Checking whether the character is in the unicode range is a lot cheaper than creating
+            // the charmap, which matters if families are split into many subsets.
+            let coverage = if let Some(unicode_range) = font.charmap_index.unicode_range()
+                && cluster.calculate_coverage(|ch| unicode_range.contains(ch)) == Coverage::NONE
+            {
+                Coverage::NONE
+            } else {
+                let Some(charmap) = font.charmap() else {
+                    return fontique::QueryStatus::Continue;
+                };
+                cluster.calculate_coverage(|ch| {
+                    charmap
+                        .map(ch)
+                        .map(|g| {
+                            // Any non-zero value indicates the existence of a glyph.
+                            g != 0
+                        })
+                        .unwrap_or_default()
+                })
             };
-
-            let coverage = cluster.calculate_coverage(|ch| {
-                charmap
-                    .map(ch)
-                    .map(|g| {
-                        // Any non-zero value indicates the existence of a glyph.
-                        g != 0
-                    })
-                    .unwrap_or_default()
-            });
             if coverage > best_coverage {
                 selected_font = Some(font);
                 best_coverage = coverage;
