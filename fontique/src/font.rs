@@ -377,7 +377,7 @@ impl Synthesis {
     const VARIATIONS: u8 = Self::HAS_WIDTH | Self::HAS_WEIGHT | Self::HAS_ITALIC | Self::HAS_SLANT;
 
     #[inline]
-    const fn has(&self, flag: u8) -> bool {
+    const fn has(self, flag: u8) -> bool {
         self.flags & flag != 0
     }
 
