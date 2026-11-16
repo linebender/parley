@@ -2,7 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 use crate::inline_box::LayoutInlineBox;
-use crate::layout::spacing::{Gaps, Justification, Spacing};
+use crate::layout::spacing::{Gaps, Spacing};
 use crate::layout::style_metrics::{BoxMetrics, StyleMetrics, inline_box_placement};
 use crate::layout::whitespace::whitespace_hangs;
 use crate::layout::{ContentWidths, LineMetrics, Style};
@@ -89,11 +89,16 @@ pub(crate) struct LineData {
     pub(crate) break_reason: BreakReason,
     /// Maximum advance for the line.
     pub(crate) max_advance: f32,
-    /// The number of justification opportunities on the line.
-    pub(crate) num_justification_opportunities: u32,
-    pub(crate) justification: Justification,
     /// Whether any text run on this line has word or letter spacing.
     pub(crate) has_spacing: bool,
+    /// The start of the logically first atom excluded from justification. Atoms starting at or
+    /// beyond this shaped cluster index are not justified, as they hang past the line's end (even
+    /// if only partially), or are a word separator closing the line (e.g., an NBSP doesn't hang,
+    /// but if it closes the line, it shouldn't get justified).
+    ///
+    /// Other atoms closing the line (that don't hang) are not excluded, as they may still own a
+    /// justification opportunity visually before themselves, see [`crate::layout::justification`].
+    pub(crate) justification_end_cluster: u32,
     /// This line's entries in [`LayoutData::aligned_subtree_offsets`].
     ///
     /// Empty for lines with only baseline-relative content because the root aligned subtree

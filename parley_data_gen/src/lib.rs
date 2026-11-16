@@ -6,9 +6,9 @@
 use icu_properties::{
     CodePointMapData, CodePointSetData,
     props::{
-        BidiClass, DefaultIgnorableCodePoint, Emoji, EmojiModifier, EmojiModifierBase,
-        EmojiPresentation, ExtendedPictographic, GeneralCategory, GraphemeClusterBreak, LineBreak,
-        Script, VariationSelector,
+        BidiClass, DefaultIgnorableCodePoint, EastAsianWidth, Emoji, EmojiModifier,
+        EmojiModifierBase, EmojiPresentation, ExtendedPictographic, GeneralCategory,
+        GraphemeClusterBreak, LineBreak, Script, VariationSelector,
     },
 };
 use parley_data::Properties;
@@ -35,6 +35,7 @@ pub fn generate(out: std::path::PathBuf, config: &Config) {
     let general_category_data = CodePointMapData::<GeneralCategory>::new();
     let grapheme_cluster_break_data = CodePointMapData::<GraphemeClusterBreak>::new();
     let bidi_class_data = CodePointMapData::<BidiClass>::new();
+    let east_asian_width_data = CodePointMapData::<EastAsianWidth>::new();
 
     let variation_selector_data = CodePointSetData::new::<VariationSelector>();
     let default_ignorable_data = CodePointSetData::new::<DefaultIgnorableCodePoint>();
@@ -80,6 +81,11 @@ pub fn generate(out: std::path::PathBuf, config: &Config) {
             emoji_presentation_data.contains32(cp),
             emoji_modifier_data.contains32(cp),
             emoji_modifier_base_data.contains32(cp),
+            Properties::block_script(
+                script_data.get32(cp),
+                general_category_data.get32(cp),
+                east_asian_width_data.get32(cp),
+            ),
         );
         characters.push(u64::from(v).cast_signed());
     }

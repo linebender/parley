@@ -341,6 +341,7 @@ impl CharInfo {
     const EMOJI_MODIFIER_BASE_SHIFT: u16 = 12;
     const INLINE_OBJECT_SHIFT: u16 = 13;
     const DEFAULT_IGNORABLE_SHIFT: u16 = 14;
+    const BLOCK_SCRIPT_SHIFT: u16 = 15;
 
     const VARIATION_SELECTOR_MASK: u16 = 1 << Self::VARIATION_SELECTOR_SHIFT;
     const REGION_INDICATOR_MASK: u16 = 1 << Self::REGION_INDICATOR_SHIFT;
@@ -357,6 +358,7 @@ impl CharInfo {
     const EMOJI_MODIFIER_BASE_MASK: u16 = 1 << Self::EMOJI_MODIFIER_BASE_SHIFT;
     const INLINE_OBJECT_MASK: u16 = 1 << Self::INLINE_OBJECT_SHIFT;
     const DEFAULT_IGNORABLE_MASK: u16 = 1 << Self::DEFAULT_IGNORABLE_SHIFT;
+    const BLOCK_SCRIPT_MASK: u16 = 1 << Self::BLOCK_SCRIPT_SHIFT;
 
     fn new(
         script: Script,
@@ -374,6 +376,7 @@ impl CharInfo {
         is_emoji_modifier: bool,
         is_emoji_modifier_base: bool,
         is_default_ignorable: bool,
+        is_block_script: bool,
     ) -> Self {
         Self {
             script,
@@ -390,7 +393,8 @@ impl CharInfo {
                 | (is_emoji_presentation as u16) << Self::EMOJI_PRESENTATION_SHIFT
                 | (is_emoji_modifier as u16) << Self::EMOJI_MODIFIER_SHIFT
                 | (is_emoji_modifier_base as u16) << Self::EMOJI_MODIFIER_BASE_SHIFT
-                | (is_default_ignorable as u16) << Self::DEFAULT_IGNORABLE_SHIFT,
+                | (is_default_ignorable as u16) << Self::DEFAULT_IGNORABLE_SHIFT
+                | (is_block_script as u16) << Self::BLOCK_SCRIPT_SHIFT,
         }
     }
 
@@ -466,6 +470,16 @@ impl CharInfo {
     #[inline(always)]
     pub fn is_default_ignorable(self) -> bool {
         self.flags & Self::DEFAULT_IGNORABLE_MASK != 0
+    }
+
+    /// Whether this character belongs to a block script for the purposes of justification (see
+    /// [`parley_data::Properties::block_script`]).
+    ///
+    /// These are largely the Chinese and Japanese characters, which provide a justification
+    /// opportunity at their boundary with any other character.
+    #[inline(always)]
+    pub fn is_block_script(self) -> bool {
+        self.flags & Self::BLOCK_SCRIPT_MASK != 0
     }
 
     /// Whether this character contributes glyphs to shaping (`false` for control characters and
@@ -869,6 +883,7 @@ pub(crate) fn analyze_text(
             properties.is_emoji_modifier(),
             properties.is_emoji_modifier_base(),
             properties.is_default_ignorable(),
+            properties.is_block_script(),
         ));
     }
 

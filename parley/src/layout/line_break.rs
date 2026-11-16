@@ -12,9 +12,9 @@ use parlance::BidiLevel;
 
 use crate::inline_box::{LayoutInlineBox, inline_object_box_index};
 use crate::layout::data::{AlignedSubtreeOffset, run_box_metrics};
-use crate::layout::spacing::{EffectiveSpacing, Justification, is_word_separator};
+use crate::layout::spacing::is_word_separator;
 use crate::layout::style_metrics::{BoxMetrics, StyleMetrics, inline_box_placement};
-use crate::layout::whitespace::atom_hanging_advance;
+use crate::layout::whitespace::{atom_hanging_advance, whitespace_hangs};
 use crate::layout::{
     BreakReason, Layout, LayoutData, LayoutItem, LayoutItemKind, LineData, LineItemData,
     LineMetrics, Run,
@@ -75,12 +75,6 @@ struct LineState {
     /// We lag the text-wrap-mode by one cluster due to line-breaking boundaries only
     /// being triggered on the cluster after the linebreak.
     text_wrap_mode: TextWrapMode,
-
-    /// The number of word separators appended to the line so far.
-    ///
-    /// These are the line's justification opportunities, before subtracting those that end up in
-    /// the line's hanging whitespace.
-    num_word_separators: u32,
 }
 
 impl LineState {
@@ -88,7 +82,6 @@ impl LineState {
     fn reset(&mut self) {
         self.x = 0.0;
         self.box_metrics.reset();
-        self.num_word_separators = 0;
     }
 }
 
@@ -766,8 +759,7 @@ impl BreakerState {
     ///
     /// `style_index` is the style of the atom's first character. The span boxes of the atom's
     /// styles (and those of their ancestors) are added to the line too, as is the box of the atom's
-    /// run, see [`LineBoxMetrics::add_text`]. `is_word_separator` is `true` iff the atom is a
-    /// [word separator](`is_word_separator`), i.e., a justification opportunity.
+    /// run, see [`LineBoxMetrics::add_text`].
     #[inline]
     fn append_atom_to_line<B: Brush>(
         &mut self,
@@ -775,13 +767,11 @@ impl BreakerState {
         next_x: f32,
         style_index: u16,
         data: &LayoutData<B>,
-        is_word_separator: bool,
     ) {
         self.line.items.end = self.item_idx + 1;
         self.line.clusters.end = atom.shaped_clusters_range().end;
         self.cluster_idx = atom.shaped_clusters_range().end;
         self.line.x = next_x;
-        self.line.num_word_separators += u32::from(is_word_separator);
         self.line.box_metrics.add_text(
             self.item_idx,
             self.run_idx,
@@ -1130,9 +1120,10 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                     let run_idx = item.index;
                     let run = Run::new(self.layout, 0, 0, run_idx, None);
                     let slice = run.full_slice();
+                    let is_rtl = run.is_rtl();
 
                     // Additional spacing to apply between atoms.
-                    let spacing = EffectiveSpacing::new(run.data.spacing, Justification::NONE);
+                    let spacing = run.data.spacing;
 
                     // The height to report if the maximum line height is exceeded.
                     let mut line_height = run.data.line_height;
@@ -1163,14 +1154,14 @@ impl<'a, B: Brush> BreakLines<'a, B> {
 
                     // Iterate over the remaining atoms in the Run
                     for atom in slice.atoms_from(self.state.cluster_idx) {
-                        // Retrieve metadata about the atom
+                        // Retrieve metadata about the atom. Its first shaped cluster caches the
+                        // properties of its first character, which avoids reading the characters.
                         let first_cluster = atom.shaped_clusters()[0];
                         let whitespace = first_cluster.whitespace();
                         let is_newline = whitespace == Whitespace::Newline;
-                        // Whether this atom is a justification opportunity.
-                        let is_separator = is_word_separator(whitespace);
                         let is_soft_wrap_opportunity =
                             first_cluster.is_soft_wrap_opportunity_before();
+                        let gaps = spacing.atom_gaps(&atom);
                         let max_height_exceeded = self.state.line.max_height_exceeded;
                         let style_index = first_cluster.style_index;
                         let style = &self.layout.data.styles[style_index as usize];
@@ -1190,7 +1181,6 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                                 self.state.line.x,
                                 style_index,
                                 &self.layout.data,
-                                is_separator,
                             );
 
                             return self.start_new_line(
@@ -1217,7 +1207,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
 
                         // Breaking an atom requires reshaping, which we don't do here, so it is
                         // consumed as a whole (this includes all clusters of a ligature).
-                        let advance = spacing.atom_advance(&atom);
+                        let advance = atom.advance() + gaps.total();
 
                         // Compute the x position of the content being currently processed
                         let next_x = self.state.line.x + advance;
@@ -1234,7 +1224,6 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                                 next_x,
                                 style_index,
                                 &self.layout.data,
-                                is_separator,
                             );
                         }
                         // Else we attempt to line break:
@@ -1250,8 +1239,8 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                                 slice,
                                 &atom,
                                 &self.layout.data.styles,
-                                spacing,
-                                item.bidi_level.is_rtl(),
+                                gaps,
+                                is_rtl,
                             );
                             if all_hang || next_x - hanging <= max_advance {
                                 if max_height_exceeded {
@@ -1262,7 +1251,6 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                                     next_x,
                                     style_index,
                                     &self.layout.data,
-                                    is_separator,
                                 );
                             }
                             // Case: we have previously encountered a REGULAR line-breaking opportunity in the current line
@@ -1306,7 +1294,6 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                                     next_x,
                                     style_index,
                                     &self.layout.data,
-                                    is_separator,
                                 );
                             }
                         }
@@ -1361,7 +1348,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                     let shaped_run = &self.layout.data.shaped_text.runs()[run_idx];
                     let run = Run::new(self.layout, 0, 0, run_idx, None);
                     let slice = run.full_slice();
-                    let spacing = EffectiveSpacing::new(run.data.spacing, Justification::NONE);
+                    let spacing = run.data.spacing;
                     let cluster_end = shaped_run.shaped_clusters_range.end;
 
                     for atom in slice.atoms_from(self.state.cluster_idx) {
@@ -1374,8 +1361,8 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         let first_cluster = atom.shaped_clusters()[0];
                         let whitespace = first_cluster.whitespace();
                         let is_newline = whitespace == Whitespace::Newline;
-                        let is_separator = is_word_separator(whitespace);
-                        let advance = spacing.atom_advance(&atom);
+                        let gaps = spacing.atom_gaps(&atom);
+                        let advance = atom.advance() + gaps.total();
 
                         // Compute the x position.
                         // Newlines don't contribute to line width (matching break_next behavior).
@@ -1389,7 +1376,6 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                             next_x,
                             first_cluster.style_index,
                             &self.layout.data,
-                            is_separator,
                         );
                         char_count += atom.char_range().len() as u32;
 
@@ -1787,14 +1773,11 @@ fn commit_line<B: Brush>(
         BreakReason::Regular | BreakReason::Emergency => f32::INFINITY,
         BreakReason::Explicit | BreakReason::None => state.x - max_advance,
     };
-    let (hanging_advance, justification_end_cluster, hanging_opportunities) = hanging_whitespace(
+    let (hanging_advance, justification_end_cluster) = hanging_whitespace(
         layout,
         &lines.line_items[start_item_idx..end_item_idx],
         overflow,
     );
-    // The word separators counted as the line was built include the line's hanging whitespace, and
-    // hanging whitespace is not stretched by justification.
-    let num_justification_opportunities = state.num_word_separators - hanging_opportunities;
 
     // Reorder the items within the line (if required). Reordering is required if the line contains
     // a mix of bidi levels (a mix of LTR and RTL text)
@@ -1807,12 +1790,8 @@ fn commit_line<B: Brush>(
         text_range: Range::from(text_start..text_end),
         max_advance,
         break_reason,
-        num_justification_opportunities,
-        justification: Justification {
-            justification_end_cluster,
-            ..Justification::NONE
-        },
         has_spacing,
+        justification_end_cluster,
         metrics: LineMetrics {
             indent: line_indent,
             advance: state.x,
@@ -1841,9 +1820,8 @@ fn commit_line<B: Brush>(
 }
 
 /// Returns the advance of the whitespace hanging past the end of the line made up of `line_items`,
-/// the index one past its logically last shaped cluster that's eligible for justification (see
-/// [`Justification::justification_end_cluster`]), and the number of justification opportunities
-/// that are no longer eligible, as they are at or beyond that cluster.
+/// the start of its logically first atom excluded from justification (see
+/// [`LineData::justification_end_cluster`]).
 ///
 /// `line_items` must be in logical order.
 ///
@@ -1865,11 +1843,10 @@ fn hanging_whitespace<B: Brush>(
     layout: &Layout<B>,
     line_items: &[LineItemData],
     overflow: f32,
-) -> (f32, u32, u32) {
+) -> (f32, u32) {
     let mut hanging_whitespace_advance = 0.;
-    // Atoms with shaped clusters before this index may be stretched by justification.
+    // Atoms starting before this shaped cluster index may be stretched by justification.
     let mut justification_end_cluster = u32::MAX;
-    let mut hanging_opportunities = 0;
     // Following CSS Text 4 § 4.3.2, a sequence of whitespace with `WhiteSpaceCollapse::Preserve`
     // directly preceding a forced line break hangs conditionally. All other whitespace hangs
     // unconditionally. Note that, in particular, a sequence of `WhiteSpaceCollapse::Preserve`
@@ -1895,10 +1872,7 @@ fn hanging_whitespace<B: Brush>(
                     break;
                 }
 
-                let effective_spacing = EffectiveSpacing::new(
-                    layout.data.runs[line_item.index].spacing,
-                    Justification::NONE,
-                );
+                let spacing = layout.data.runs[line_item.index].spacing;
                 let slice = layout
                     .data
                     .shaped_text
@@ -1910,7 +1884,7 @@ fn hanging_whitespace<B: Brush>(
                         slice,
                         &atom,
                         &layout.data.styles,
-                        effective_spacing,
+                        spacing.atom_gaps(&atom),
                         line_item.is_rtl(),
                     );
                     let whitespace = atom.shaped_clusters()[0].whitespace();
@@ -1937,10 +1911,21 @@ fn hanging_whitespace<B: Brush>(
                     }
                     hanging_whitespace_advance += hanging;
                     // Justification can't stretch within an atom, so it stops at the start of the
-                    // last atom that hangs in its entirety or only partially.
-                    justification_end_cluster = atom.shaped_clusters_range().start;
-                    if is_word_separator(whitespace) {
-                        hanging_opportunities += 1;
+                    // last atom that hangs in its entirety or only partially. A word separator
+                    // closing the line is excluded even if it doesn't hang (e.g., an NBSP). Other
+                    // atoms closing the line remain, as they may own an opportunity before them.
+                    let last_cluster = atom.shaped_clusters().last().unwrap();
+                    let ends_in_hanging_whitespace = slice
+                        .characters_in(last_cluster.chars_range())
+                        .iter()
+                        .all(|character| {
+                            whitespace_hangs(
+                                character.whitespace,
+                                &layout.data.styles[character.style_index as usize],
+                            )
+                        });
+                    if ends_in_hanging_whitespace || is_word_separator(whitespace) {
+                        justification_end_cluster = atom.shaped_clusters_range().start;
                     }
                     if !all_hang {
                         break 'items;
@@ -1954,11 +1939,7 @@ fn hanging_whitespace<B: Brush>(
         hanging_whitespace_advance -= advance - advance.min(overflow).max(0.);
     }
 
-    (
-        hanging_whitespace_advance,
-        justification_end_cluster,
-        hanging_opportunities,
-    )
+    (hanging_whitespace_advance, justification_end_cluster)
 }
 
 /// Reorder items within line according to the bidi levels of the items
