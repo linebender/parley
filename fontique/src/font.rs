@@ -89,7 +89,6 @@ impl FontInfo {
     /// Returns synthesis suggestions for this font with the given attributes.
     pub fn synthesis(&self, width: FontWidth, style: FontStyle, weight: FontWeight) -> Synthesis {
         let mut synth = Synthesis::default();
-        let mut len = 0_usize;
         // A variable font is shaped at its axis defaults unless we set the axes,
         // and those defaults don't need to match the font's declared attributes.
         //
@@ -105,16 +104,14 @@ impl FontInfo {
         if let Some(width_axis) = self.axes.iter().find(|axis| axis.tag == Tag::new(b"wdth"))
             && width_axis.default != width.percentage()
         {
-            synth.vars[len] = (Tag::new(b"wdth"), width.percentage());
-            len += 1;
+            synth = synth.with_width(width.percentage());
         }
         if let Some(weight_axis) = self.axes.iter().find(|axis| axis.tag == Tag::new(b"wght")) {
             if weight_axis.default != weight.value() {
-                synth.vars[len] = (Tag::new(b"wght"), weight.value());
-                len += 1;
+                synth = synth.with_weight(weight.value());
             }
         } else if weight.value() > self.weight.value() + 200.0 {
-            synth.embolden = true;
+            synth = synth.with_embolden(true);
         }
         // A positive `slnt` slants counter-clockwise, whereas positive CSS obliques slant
         // clockwise. Hence, we need to negate angles for `slnt`.
@@ -122,29 +119,24 @@ impl FontInfo {
             FontStyle::Normal => {}
             FontStyle::Italic => {
                 if self.has_italic_axis() {
-                    synth.vars[len] = (Tag::new(b"ital"), 1.0);
-                    len += 1;
+                    synth = synth.with_italic();
                 } else if self.has_slant_axis() {
-                    synth.vars[len] = (Tag::new(b"slnt"), -14.0);
-                    len += 1;
+                    synth = synth.with_slant(-14.0);
                 } else if self.style == FontStyle::Normal {
-                    synth.skew = 14;
+                    synth = synth.with_skew(14);
                 }
             }
             FontStyle::Oblique(angle) => {
                 let degrees = angle.unwrap_or(14.0);
                 if self.has_slant_axis() {
-                    synth.vars[len] = (Tag::new(b"slnt"), -degrees);
-                    len += 1;
+                    synth = synth.with_slant(-degrees);
                 } else if self.has_italic_axis() && degrees > 0. {
-                    synth.vars[len] = (Tag::new(b"ital"), 1.0);
-                    len += 1;
+                    synth = synth.with_italic();
                 } else if self.style == FontStyle::Normal {
-                    synth.skew = degrees as i8;
+                    synth = synth.with_skew(degrees as i8);
                 }
             }
         }
-        synth.len = len as u8;
         synth
     }
 
@@ -339,39 +331,169 @@ pub struct AxisInfo {
 /// Suggestions for synthesizing a set of font attributes for a given
 /// font.
 ///
-/// Instances of this can be obtained from [`FontInfo::synthesis`]
-/// as well as [`QueryFont::synthesis`].
+/// When the font selected for some requested attributes (width, weight and style) does not match
+/// those attributes exactly, this describes how to make up the difference: variation settings to
+/// apply to a variable font, and whether to apply a faux bold or a faux italic/oblique skew.
 ///
-/// [`QueryFont::synthesis`]: crate::QueryFont::synthesis
+/// This is not a general-purpose container for font variation settings. It holds at most three:
+/// one each for width, weight and style.
+///
+/// ```
+/// use fontique::Synthesis;
+/// use parlance::Tag;
+///
+/// let synthesis = Synthesis::default().with_weight(700.0).with_skew(14);
+/// assert!(
+///     synthesis
+///         .variation_settings()
+///         .eq([(Tag::new(b"wght"), 700.0)])
+/// );
+/// assert_eq!(synthesis.skew(), Some(14.0));
+/// assert!(!synthesis.embolden());
+/// ```
+//
+// The values of variation settings that are not set are kept at zero, so that equality can be
+// derived.
 #[derive(Copy, Clone, Default, PartialEq)]
 pub struct Synthesis {
-    vars: [(Tag, f32); 3],
-    len: u8,
-    embolden: bool,
+    flags: u8,
+    /// The value for the `wdth` axis, if `HAS_WIDTH` is set.
+    width: f32,
+    /// The value for the `wght` axis, if `HAS_WEIGHT` is set.
+    weight: f32,
+    /// The value for the `slnt` axis, if `HAS_SLANT` is set.
+    slant: f32,
     skew: i8,
 }
 
 impl Synthesis {
+    const HAS_WIDTH: u8 = 1 << 0;
+    const HAS_WEIGHT: u8 = 1 << 1;
+    /// The `ital` axis is set to `1`. Mutually exclusive with `HAS_SLANT`.
+    const HAS_ITALIC: u8 = 1 << 2;
+    const HAS_SLANT: u8 = 1 << 3;
+    const EMBOLDEN: u8 = 1 << 4;
+    /// The flags of all variation settings.
+    const VARIATIONS: u8 = Self::HAS_WIDTH | Self::HAS_WEIGHT | Self::HAS_ITALIC | Self::HAS_SLANT;
+
+    #[inline]
+    const fn has(self, flag: u8) -> bool {
+        self.flags & flag != 0
+    }
+
+    /// Sets the value to apply to the font's width (`wdth`) variation axis.
+    #[inline]
+    #[must_use]
+    pub const fn with_width(mut self, width: f32) -> Self {
+        self.width = width;
+        self.flags |= Self::HAS_WIDTH;
+        self
+    }
+
+    /// Sets the value to apply to the font's weight (`wght`) variation axis.
+    #[inline]
+    #[must_use]
+    pub const fn with_weight(mut self, weight: f32) -> Self {
+        self.weight = weight;
+        self.flags |= Self::HAS_WEIGHT;
+        self
+    }
+
+    /// Sets the font's italic (`ital`) variation axis to `1`.
+    ///
+    /// Italic and slant are alternative ways to synthesize a style, so this replaces a setting
+    /// made by [`with_slant`](Self::with_slant) in release builds, and debug asserts otherwise.
+    #[inline]
+    #[must_use]
+    pub const fn with_italic(mut self) -> Self {
+        debug_assert!(!self.has(Self::HAS_SLANT), "slant is already set");
+        self.slant = 0.0;
+        self.flags = (self.flags & !Self::HAS_SLANT) | Self::HAS_ITALIC;
+        self
+    }
+
+    /// Sets the value to apply to the font's slant (`slnt`) variation axis.
+    ///
+    /// Italic and slant are alternative ways to synthesize a style, so this replaces a setting
+    /// made by [`with_italic`](Self::with_italic) in release builds, and debug asserts otherwise.
+    #[inline]
+    #[must_use]
+    pub const fn with_slant(mut self, slant: f32) -> Self {
+        debug_assert!(!self.has(Self::HAS_ITALIC), "italic is already set");
+        self.slant = slant;
+        self.flags = (self.flags & !Self::HAS_ITALIC) | Self::HAS_SLANT;
+        self
+    }
+
+    /// Sets whether faux bold should be applied when rendering.
+    #[inline]
+    #[must_use]
+    pub const fn with_embolden(mut self, embolden: bool) -> Self {
+        if embolden {
+            self.flags |= Self::EMBOLDEN;
+        } else {
+            self.flags &= !Self::EMBOLDEN;
+        }
+        self
+    }
+
+    /// Sets the skew angle in degrees for a faux italic/oblique.
+    ///
+    /// Positive angles skew glyphs clockwise from upright, keeping the baseline fixed.
+    /// An angle of `0` means no skew. This is applied in addition to the variation axes.
+    #[inline]
+    #[must_use]
+    pub const fn with_skew(mut self, degrees: i8) -> Self {
+        self.skew = degrees;
+        self
+    }
+
     /// Returns `true` if any synthesis suggestions are available.
+    #[inline]
     pub fn any(&self) -> bool {
-        self.len != 0 || self.embolden || self.skew != 0
+        self.flags != 0 || self.skew != 0
+    }
+
+    /// Returns `true` if there are any [variation settings](Self::variation_settings) to apply.
+    #[inline]
+    pub const fn has_variations(&self) -> bool {
+        self.has(Self::VARIATIONS)
     }
 
     /// Returns the variation settings that should be applied to match the
     /// requested attributes.
     ///
-    /// When using `parley`, these can be used to create `FontVariation`
-    /// settings.
-    pub fn variation_settings(&self) -> &[(Tag, f32)] {
-        &self.vars[..self.len as usize]
+    /// These are yielded in the order width (`wdth`), weight (`wght`), style (`ital` or `slnt`).
+    #[inline]
+    pub fn variation_settings(&self) -> impl Iterator<Item = (parlance::Tag, f32)> + Clone + use<> {
+        let style = if self.has(Self::HAS_ITALIC) {
+            Some((parlance::Tag::new(b"ital"), 1.0))
+        } else {
+            self.has(Self::HAS_SLANT)
+                .then_some((parlance::Tag::new(b"slnt"), self.slant))
+        };
+        [
+            self.has(Self::HAS_WIDTH)
+                .then_some((parlance::Tag::new(b"wdth"), self.width)),
+            self.has(Self::HAS_WEIGHT)
+                .then_some((parlance::Tag::new(b"wght"), self.weight)),
+            style,
+        ]
+        .into_iter()
+        .flatten()
     }
 
-    /// Returns `true` if the scaler should apply a faux bold.
+    /// Returns `true` if faux bold should be applied when rendering.
+    #[inline]
     pub fn embolden(&self) -> bool {
-        self.embolden
+        self.has(Self::EMBOLDEN)
     }
 
-    /// Returns a skew angle for faux italic/oblique, if requested.
+    /// Returns a skew angle in degrees for faux italic/oblique, if requested.
+    ///
+    /// Positive angles skew glyphs clockwise from upright, keeping the baseline fixed.
+    /// This is applied in addition to the variation axes.
+    #[inline]
     pub fn skew(&self) -> Option<f32> {
         if self.skew != 0 {
             Some(self.skew as f32)
@@ -381,12 +503,22 @@ impl Synthesis {
     }
 }
 
-#[allow(clippy::missing_fields_in_debug)]
+#[expect(
+    clippy::missing_fields_in_debug,
+    reason = "the fields are shown as the settings they represent"
+)]
 impl fmt::Debug for Synthesis {
     fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        struct Vars(Synthesis);
+        impl fmt::Debug for Vars {
+            fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+                f.debug_list().entries(self.0.variation_settings()).finish()
+            }
+        }
+
         f.debug_struct("Synthesis")
-            .field("vars", &self.variation_settings())
-            .field("embolden", &self.embolden)
+            .field("vars", &Vars(*self))
+            .field("embolden", &self.embolden())
             .field("skew", &self.skew)
             .finish()
     }
@@ -534,8 +666,10 @@ mod tests {
 
         let synthesis = font.synthesis(font.width(), font.style(), FontWeight::NORMAL);
         assert_eq!(
-            synthesis.variation_settings(),
-            &[(Tag::new(b"wght"), FontWeight::NORMAL.value())]
+            synthesis
+                .variation_settings()
+                .collect::<alloc::vec::Vec<_>>(),
+            [(parlance::Tag::new(b"wght"), FontWeight::NORMAL.value())]
         );
         assert!(!synthesis.embolden());
 
@@ -560,6 +694,6 @@ mod tests {
             FontWeight::new(font.weight().value() + 201.0),
         );
         assert!(synthesis.embolden());
-        assert!(synthesis.variation_settings().is_empty());
+        assert!(!synthesis.has_variations());
     }
 }
