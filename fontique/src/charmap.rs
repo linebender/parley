@@ -7,7 +7,7 @@
 // crates.
 
 use alloc::{sync::Arc, vec::Vec};
-use core::{cmp::Ordering, ops::RangeInclusive};
+use core::ops::RangeInclusive;
 use read_fonts::{
     FontData, FontRead, FontRef, TableProvider, TopLevelTable,
     tables::cmap::{Cmap, CmapSubtable},
@@ -17,22 +17,26 @@ use read_fonts::{
 /// A set of Unicode codepoints, see
 /// [`FontInfoOverride::unicode_range`](crate::FontInfoOverride::unicode_range).
 #[derive(Clone, PartialEq, Eq, Debug)]
-pub struct UnicodeRangeSet(Arc<[RangeInclusive<u32>]>);
+pub struct UnicodeRangeSet(Arc<[(u32, u32)]>);
 
 impl UnicodeRangeSet {
     /// Creates a set of codepoints in the given ranges.
     ///
     /// These ranges may overlap and be in any order.
     pub fn new(ranges: impl IntoIterator<Item = RangeInclusive<u32>>) -> Self {
-        // Sort and merge overlapping ranges.
-        let mut ranges: Vec<_> = ranges.into_iter().collect();
-        ranges.sort_unstable_by_key(|r| *r.start());
-        ranges.dedup_by(|range, prev| {
-            let overlaps = range.start() <= prev.end();
-            if overlaps {
-                *prev = *prev.start()..=*prev.end().max(range.end());
+        // Sort, then merge overlapping and adjacent ranges.
+        let mut ranges: Vec<_> = ranges
+            .into_iter()
+            .filter(|r| !r.is_empty())
+            .map(|r| (*r.start(), *r.end()))
+            .collect();
+        ranges.sort_unstable();
+        ranges.dedup_by(|&mut (start, end), (_, prev_end)| {
+            let merge = start <= prev_end.saturating_add(1);
+            if merge {
+                *prev_end = (*prev_end).max(end);
             }
-            overlaps
+            merge
         });
         Self(ranges.into())
     }
@@ -41,17 +45,8 @@ impl UnicodeRangeSet {
     #[inline]
     pub fn contains(&self, codepoint: impl Into<u32>) -> bool {
         let c = codepoint.into();
-        self.0
-            .binary_search_by(|range| {
-                if c < *range.start() {
-                    Ordering::Greater
-                } else if c > *range.end() {
-                    Ordering::Less
-                } else {
-                    Ordering::Equal
-                }
-            })
-            .is_ok()
+        let i = self.0.partition_point(|&(_, end)| end < c);
+        self.0.get(i).is_some_and(|&(start, _)| start <= c)
     }
 }
 
