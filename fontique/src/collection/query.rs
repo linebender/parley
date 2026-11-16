@@ -254,6 +254,7 @@ pub struct QueryFont {
 
 impl QueryFont {
     /// Attempts to construct a [Charmap] for this font.
+    #[inline]
     pub fn charmap(&self) -> Option<Charmap<'_>> {
         self.charmap_index.charmap(self.blob.as_ref())
     }
