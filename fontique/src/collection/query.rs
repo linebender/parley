@@ -250,6 +250,9 @@ impl CachedFont {
         attributes: Attributes,
         cache: &mut SourceCache,
     ) -> Option<Self> {
+        if let SourceKind::Failed(_) = info.source().kind() {
+            return None;
+        }
         if let SourceKind::Pending(key) = info.source().kind() {
             return Some(Self::Pending {
                 key: *key,

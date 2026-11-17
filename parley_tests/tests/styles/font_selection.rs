@@ -188,6 +188,82 @@ fn pending_metrics_and_resolution_preserve_face_priority() {
 }
 
 #[test]
+fn failed_pending_font_keeps_its_slot_but_is_not_matched() {
+    use fontique::{
+        Blob, Collection, CollectionOptions, PendingFontStatus, QueryStatus, SourceCache,
+    };
+    use std::sync::Arc;
+
+    let bytes = include_bytes!("../../../parley_dev/assets/fonts/roboto_fonts/Roboto-Regular.ttf");
+    for shared in [false, true] {
+        let mut collection = Collection::new(CollectionOptions {
+            shared,
+            system_fonts: false,
+        });
+        let info = FontInfoOverride {
+            family_name: Some("Failing"),
+            ..FontInfoOverride::default()
+        };
+        let family = collection.register_pending_font(1, info).unwrap();
+        collection.register_pending_font(2, info).unwrap();
+        let mut clone = collection.clone();
+        assert_eq!(
+            collection.pending_font_status(1),
+            Some(PendingFontStatus::Pending)
+        );
+        assert!(!collection.fail_pending_font(99));
+        assert!(collection.fail_pending_font(1));
+        assert!(!collection.fail_pending_font(1));
+        assert_eq!(
+            collection.pending_font_status(1),
+            Some(PendingFontStatus::Failed)
+        );
+        assert_eq!(
+            collection.pending_font_status(2),
+            Some(PendingFontStatus::Pending)
+        );
+        if shared {
+            assert_eq!(
+                clone.pending_font_status(1),
+                Some(PendingFontStatus::Failed)
+            );
+        }
+        assert_eq!(collection.family(family).unwrap().fonts().len(), 2);
+
+        // Only the face that is still pending is reported.
+        let mut cache = SourceCache::default();
+        {
+            let mut query = collection.query(&mut cache);
+            query.set_families([family]);
+            let mut keys = Vec::new();
+            assert!(
+                query
+                    .first_available_font_with(|key| keys.push(key))
+                    .is_none()
+            );
+            assert_eq!(keys, [2]);
+            let mut count = 0;
+            query.matches_with_pending(|_| {
+                count += 1;
+                QueryStatus::Continue
+            });
+            assert_eq!(count, 1);
+        }
+
+        // A failed face can still be resolved, in its original position, or removed.
+        let font = Blob::new(Arc::new(bytes.to_vec()));
+        assert!(collection.resolve_pending_font(1, font.clone()));
+        assert_eq!(collection.pending_font_status(1), None);
+        let fonts = collection.family(family).unwrap();
+        assert_eq!(fonts.fonts()[1].load(None).unwrap().id(), font.id());
+        assert!(collection.fail_pending_font(2));
+        assert!(collection.unregister_pending_font(2));
+        assert_eq!(collection.pending_font_status(2), None);
+        assert_eq!(collection.family(family).unwrap().fonts().len(), 1);
+    }
+}
+
+#[test]
 fn style_font_size_values() {
     let mut env = TestEnv::new(test_name!(), None);
     let text = samples::LATIN;

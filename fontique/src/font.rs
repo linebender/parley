@@ -32,7 +32,7 @@ impl FontInfo {
     /// Creates a new font object from the given source and index.
     pub fn from_source(source: SourceInfo, index: u32) -> Option<Self> {
         match &source.kind {
-            SourceKind::Pending(_) => None,
+            SourceKind::Pending(_) | SourceKind::Failed(_) => None,
             #[cfg(feature = "std")]
             SourceKind::Path(path) => {
                 let file = std::fs::File::open(&**path).ok()?;
@@ -64,7 +64,7 @@ impl FontInfo {
             source_cache.get(&self.source)
         } else {
             match &self.source.kind {
-                SourceKind::Pending(_) => None,
+                SourceKind::Pending(_) | SourceKind::Failed(_) => None,
                 SourceKind::Memory(blob) => Some(blob.clone()),
                 #[cfg(feature = "std")]
                 SourceKind::Path(path) => super::source_cache::load_blob(path),
@@ -244,6 +244,13 @@ impl FontInfo {
         };
         font.apply_override(info);
         font
+    }
+
+    /// Marks a pending face as failed, so that it is no longer matched.
+    pub(crate) fn fail_pending(&mut self) {
+        if let SourceKind::Pending(key) = self.source.kind {
+            self.source.kind = SourceKind::Failed(key);
+        }
     }
 
     pub(crate) fn from_font_ref(

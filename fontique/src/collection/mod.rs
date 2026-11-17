@@ -61,6 +61,15 @@ impl Default for CollectionOptions {
     }
 }
 
+/// Load status of a face registered with [`Collection::register_pending_font`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PendingFontStatus {
+    /// The face is waiting for its data.
+    Pending,
+    /// Loading the face's data failed.
+    Failed,
+}
+
 /// Collection of fonts.
 #[derive(Clone)]
 pub struct Collection {
@@ -79,13 +88,33 @@ impl Collection {
         self.inner.register_pending_font(key, info_override)
     }
 
-    /// Removes a pending face, after registering its data or when loading fails.
+    /// Marks a pending face as failed. It stays in its family, keeping its position and
+    /// descriptors, but is no longer matched or reported by queries. Returns false for
+    /// an unknown key or a face that has already failed.
+    pub fn fail_pending_font(&mut self, key: u64) -> bool {
+        self.inner.fail_pending_font(key)
+    }
+
+    /// Returns whether a registered face is still waiting for data or has failed,
+    /// or `None` if the key is unknown or the face has been resolved.
+    pub fn pending_font_status(&mut self, key: u64) -> Option<PendingFontStatus> {
+        self.inner.sync_shared();
+        let face = self.inner.data.pending_fonts.get(&key)?;
+        Some(if face.failed {
+            PendingFontStatus::Failed
+        } else {
+            PendingFontStatus::Pending
+        })
+    }
+
+    /// Removes a pending or failed face, for example when its `@font-face` rule is removed.
     pub fn unregister_pending_font(&mut self, key: u64) -> bool {
         self.inner.unregister_pending_font(key)
     }
 
-    /// Replaces a pending face with fonts from `data`, preserving its family position
-    /// and registered overrides. Returns false for an unknown key or invalid data.
+    /// Replaces a pending or failed face with fonts from `data`, preserving its family
+    /// position and registered overrides. Returns false for an unknown key or invalid
+    /// data, leaving the face as it was.
     pub fn resolve_pending_font(&mut self, key: u64, data: Blob<u8>) -> bool {
         self.inner.resolve_pending_font(key, data)
     }
@@ -311,6 +340,22 @@ impl Inner {
         #[cfg(not(feature = "std"))]
         let result = self.data.register_pending_font(key, info);
         result
+    }
+
+    fn fail_pending_font(&mut self, key: u64) -> bool {
+        #[cfg(feature = "std")]
+        let failed = if let Some(shared) = &self.shared {
+            let failed = shared.data.lock().unwrap().fail_pending_font(key);
+            if failed {
+                shared.bump_version();
+            }
+            failed
+        } else {
+            self.data.fail_pending_font(key)
+        };
+        #[cfg(not(feature = "std"))]
+        let failed = self.data.fail_pending_font(key);
+        failed
     }
 
     fn unregister_pending_font(&mut self, key: u64) -> bool {
@@ -772,6 +817,7 @@ struct CommonData {
 #[derive(Clone)]
 struct PendingFace {
     family: FamilyId,
+    failed: bool,
     width: Option<FontWidthRange>,
     style: Option<FontStyleRange>,
     weight: Option<FontWeightRange>,
@@ -794,6 +840,7 @@ impl CommonData {
             key,
             PendingFace {
                 family: id,
+                failed: false,
                 width: info.width,
                 style: info.style,
                 weight: info.weight,
@@ -838,7 +885,7 @@ impl CommonData {
         let name = self.family_names.get_by_id(id).unwrap().clone();
         let mut fonts = Vec::new();
         for font in family.fonts() {
-            if matches!(font.source().kind(), SourceKind::Pending(k) if *k == key) {
+            if font.source().kind().descriptor_key() == Some(key) {
                 fonts.extend(replacements.iter().cloned());
             } else {
                 fonts.push(font.clone());
@@ -846,6 +893,28 @@ impl CommonData {
         }
         *family = FamilyInfo::new(name, fonts);
         self.pending_fonts.remove(&key);
+        true
+    }
+
+    fn fail_pending_font(&mut self, key: u64) -> bool {
+        let Some(face) = self.pending_fonts.get_mut(&key) else {
+            return false;
+        };
+        if face.failed {
+            return false;
+        }
+        face.failed = true;
+        let id = face.family;
+        if let Some(Some(family)) = self.families.get_mut(&id) {
+            let name = self.family_names.get_by_id(id).unwrap().clone();
+            let fonts = family.fonts().iter().cloned().map(|mut font| {
+                if font.source().kind().descriptor_key() == Some(key) {
+                    font.fail_pending();
+                }
+                font
+            });
+            *family = FamilyInfo::new(name, fonts);
+        }
         true
     }
 
@@ -858,7 +927,7 @@ impl CommonData {
             let fonts = family
                 .fonts()
                 .iter()
-                .filter(|font| !matches!(font.source().kind(), SourceKind::Pending(k) if *k == key))
+                .filter(|font| font.source().kind().descriptor_key() != Some(key))
                 .cloned();
             *family = FamilyInfo::new(name, fonts);
         }
@@ -1004,7 +1073,7 @@ impl CommonData {
                 || family
                     .fonts()
                     .iter()
-                    .any(|font| matches!(font.source().kind(), SourceKind::Pending(k) if k == key))
+                    .any(|font| font.source().kind().descriptor_key() == Some(*key))
         });
 
         Some(())

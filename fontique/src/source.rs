@@ -65,6 +65,8 @@ impl SourceInfo {
 pub enum SourceKind {
     /// Descriptor-only font awaiting data, identified by an application key.
     Pending(u64),
+    /// Descriptor-only font whose data failed to load. It is never matched.
+    Failed(u64),
     /// Shared data containing the content of the font file.
     Memory(Blob<u8>),
     #[cfg(feature = "std")]
@@ -72,10 +74,21 @@ pub enum SourceKind {
     Path(Arc<Path>),
 }
 
+impl SourceKind {
+    /// The application key of a descriptor-only font, whether awaiting data or failed.
+    pub(crate) fn descriptor_key(&self) -> Option<u64> {
+        match self {
+            Self::Pending(key) | Self::Failed(key) => Some(*key),
+            _ => None,
+        }
+    }
+}
+
 impl core::fmt::Debug for SourceKind {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
             Self::Pending(key) => write!(f, "Pending({key})"),
+            Self::Failed(key) => write!(f, "Failed({key})"),
             #[cfg(feature = "std")]
             Self::Path(path) => {
                 write!(f, "Path({path:?})")
