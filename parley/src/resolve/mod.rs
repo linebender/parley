@@ -20,7 +20,7 @@ use crate::util::nearly_eq;
 use crate::{CollapsedSpace, TextWrapMode, WhiteSpaceCollapse, WordBreak};
 use crate::{LineBreak, LineHeight, OverflowWrap, VerticalAlign, layout};
 use core::borrow::Borrow;
-use core::ops::Range;
+use core::range::Range;
 use fontique::FamilyId;
 use fontique::Language;
 
@@ -71,7 +71,7 @@ struct Cache<T> {
     /// Items in the cache. May contain sequences.
     items: Vec<T>,
     /// Each entry represents a range of items in `data`.
-    entries: Vec<(usize, usize)>,
+    entries: Vec<Range<usize>>,
 }
 
 impl<T> Default for Cache<T> {
@@ -90,9 +90,8 @@ impl<T: Clone + PartialEq> Cache<T> {
     }
 
     pub(crate) fn insert(&mut self, items: &[T]) -> Resolved<T> {
-        for (i, entry) in self.entries.iter().enumerate() {
-            let range = entry.0..entry.1;
-            if range.len() != items.len() {
+        for (i, &range) in self.entries.iter().enumerate() {
+            if range.end - range.start != items.len() {
                 continue;
             }
             if let Some(existing) = self.items.get(range)
@@ -108,7 +107,7 @@ impl<T: Clone + PartialEq> Cache<T> {
         let start = self.items.len();
         self.items.extend(items.iter().cloned());
         let end = self.items.len();
-        self.entries.push((start, end));
+        self.entries.push((start..end).into());
         Resolved {
             index,
             _phantom: core::marker::PhantomData,
@@ -116,8 +115,7 @@ impl<T: Clone + PartialEq> Cache<T> {
     }
 
     pub(crate) fn get(&self, handle: Resolved<T>) -> Option<&[T]> {
-        let (start, end) = *self.entries.get(handle.index)?;
-        self.items.get(start..end)
+        self.items.get(*self.entries.get(handle.index)?)
     }
 }
 

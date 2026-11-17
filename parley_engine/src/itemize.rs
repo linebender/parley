@@ -3,7 +3,7 @@
 
 //! Itemization breaks text into individually-shapeable items.
 
-use core::{ops::Range, str::CharIndices};
+use core::{range::Range, str::CharIndices};
 
 use icu_properties::props::Script as IcuScript;
 use parlance::{BidiLevel, Script};
@@ -11,7 +11,7 @@ use parlance::{BidiLevel, Script};
 use crate::{Analysis, CharInfo, ShapeOptions};
 
 /// A range of text.
-#[derive(Clone, Debug, PartialEq, Eq)]
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub struct TextRange {
     /// The range of byte offsets.
     pub byte_range: Range<usize>,
@@ -197,8 +197,10 @@ impl Itemizer<'_> {
 
             if item_char_len > 0
                 && split_after(TextRange {
-                    byte_range: start_byte_offset..byte_offset,
-                    char_range: self.current_char_offset..self.current_char_offset + item_char_len,
+                    byte_range: (start_byte_offset..byte_offset).into(),
+                    char_range: (self.current_char_offset
+                        ..self.current_char_offset + item_char_len)
+                        .into(),
                 })
             {
                 break;
@@ -223,8 +225,8 @@ impl Itemizer<'_> {
 
         Some(Segment {
             range: TextRange {
-                byte_range: start_byte_offset..self.char_indices.offset(),
-                char_range: start_char_offset..self.current_char_offset,
+                byte_range: (start_byte_offset..self.char_indices.offset()).into(),
+                char_range: (start_char_offset..self.current_char_offset).into(),
             },
             script: icu_script_to_parlance_script(self.current_script),
             bidi_level: item_bidi_level,
@@ -315,10 +317,10 @@ mod tests {
         let items: Vec<_> =
             core::iter::from_fn(|| itemizer.next(|range| range.char_range.end == 3)).collect();
         assert_eq!(items.len(), 2);
-        assert_eq!(items[0].range.byte_range, 0..3);
-        assert_eq!(items[0].range.char_range, 0..3);
-        assert_eq!(items[1].range.byte_range, 3..6);
-        assert_eq!(items[1].range.char_range, 3..6);
+        assert_eq!(items[0].range.byte_range, (0..3).into());
+        assert_eq!(items[0].range.char_range, (0..3).into());
+        assert_eq!(items[1].range.byte_range, (3..6).into());
+        assert_eq!(items[1].range.char_range, (3..6).into());
     }
 
     #[test]
@@ -328,9 +330,9 @@ mod tests {
         let items = items(text);
         assert_eq!(items.len(), 2);
         // The space attaches to the Latin run.
-        assert_eq!(&text[items[0].range.byte_range.clone()], "abc ");
+        assert_eq!(&text[items[0].range.byte_range], "abc ");
         assert_eq!(items[0].script, LATN);
-        assert_eq!(&text[items[1].range.byte_range.clone()], "αβγ");
+        assert_eq!(&text[items[1].range.byte_range], "αβγ");
         assert_eq!(items[1].script, GREK);
     }
 }

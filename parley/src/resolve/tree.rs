@@ -208,7 +208,7 @@ impl<B: Brush> TreeStyleBuilder<B> {
             }
             _ => self.style_runs.push(StyleRun {
                 style_index,
-                range: start..self.text.len(),
+                range: (start..self.text.len()).into(),
             }),
         }
     }
@@ -314,7 +314,7 @@ impl<B: Brush> TreeStyleBuilder<B> {
             // If there's no text, the layout still needs the root style, e.g., to size a cursor.
             style_runs.push(StyleRun {
                 style_index: 0,
-                range: 0..0,
+                range: (0..0).into(),
             });
         }
 
@@ -327,7 +327,7 @@ mod tests {
     use super::*;
     use crate::CollapsedSpace;
     use alloc::vec::Vec;
-    use core::ops::Range;
+    use core::range::Range;
 
     #[test]
     fn preserve_breaks_collapses_across_text_and_style_boundaries() {

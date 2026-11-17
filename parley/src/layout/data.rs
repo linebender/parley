@@ -9,7 +9,7 @@ use crate::layout::{ContentWidths, LineMetrics, Style};
 use crate::resolve::ResolvedStyle;
 use crate::style::Brush;
 use crate::{IndentOptions, LineHeight, OverflowWrap, TextWrapMode, WhiteSpaceCollapse};
-use core::ops::Range;
+use core::range::Range;
 
 use alloc::vec::Vec;
 use parlance::BidiLevel;
@@ -364,7 +364,7 @@ impl<B: Brush> LayoutData<B> {
         // The run's box metrics, if it's uniform across all the styles within the run. A run's box
         // can change mid-run if the line height changes.
         let run_box = {
-            let chars = shaped_run.range.char_range.clone();
+            let chars = shaped_run.range.char_range;
             let first_style = char_styles[chars.start];
             let line_height = self.styles[usize::from(first_style)].line_height;
 
@@ -386,7 +386,7 @@ impl<B: Brush> LayoutData<B> {
         // An atom has mixed styles iff a style changes at one of its characters other than its
         // first.
         let has_mixed_style_atoms = {
-            let chars = shaped_run.range.char_range.clone();
+            let chars = shaped_run.range.char_range;
             let slice = self.shaped_text.run_slice(shaped_run_idx as u32);
             (chars.start + 1..chars.end).any(|char_idx| {
                 char_styles[char_idx - 1] != char_styles[char_idx]

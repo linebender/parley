@@ -24,7 +24,7 @@ use crate::{
     BaselineShift, InlineBoxKind, OverflowWrap, TextWrapMode, VerticalAlign, WhiteSpaceCollapse,
 };
 
-use core::ops::Range;
+use core::range::Range;
 use parley_engine::Atom;
 use parley_engine::shape::{Character, Whitespace};
 use smallvec::SmallVec;
@@ -1474,7 +1474,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
         line.metrics.line_height = line_height;
 
         if line.item_range.is_empty() {
-            line.text_range = self.layout.data.text_len..self.layout.data.text_len;
+            line.text_range = (self.layout.data.text_len..self.layout.data.text_len).into();
         }
 
         // Whether metrics should be quantized to pixel boundaries
@@ -1516,11 +1516,11 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                     kind: LayoutItemKind::TextRun,
                     index,
                     bidi_level: BidiLevel::new(0),
-                    shaped_cluster_range: cluster..cluster,
-                    text_range: text..text,
+                    shaped_cluster_range: (cluster..cluster).into(),
+                    text_range: (text..text).into(),
                     gaps_start: None,
                 });
-                line.item_range = run_index..run_index + 1;
+                line.item_range = (run_index..run_index + 1).into();
             }
         }
 
@@ -1682,7 +1682,7 @@ fn commit_line<B: Brush>(
 
     let start_item_idx = lines.line_items.len();
 
-    let items_to_commit = &layout.data.items[state.items.clone()];
+    let items_to_commit = &layout.data.items[state.items];
 
     // Compute first and last run index
     let is_text_run = |item: &LayoutItem| item.kind == LayoutItemKind::TextRun;
@@ -1708,8 +1708,8 @@ fn commit_line<B: Brush>(
                     bidi_level: item.bidi_level,
 
                     // These properties are ignored for inline boxes. So we just put a dummy value.
-                    shaped_cluster_range: 0..0,
-                    text_range: 0..0,
+                    shaped_cluster_range: Range::default(),
+                    text_range: Range::default(),
                     gaps_start: None,
                 });
 
@@ -1720,7 +1720,7 @@ fn commit_line<B: Brush>(
 
                 // Compute cluster range
                 // The first and last ranges have overrides to account for line-breaks within runs
-                let mut cluster_range = shaped_run.shaped_clusters_range.clone();
+                let mut cluster_range = shaped_run.shaped_clusters_range;
                 if i == first_run_pos {
                     cluster_range.start = state.clusters.start;
                 }
@@ -1765,7 +1765,7 @@ fn commit_line<B: Brush>(
                     index: item.index,
                     bidi_level: shaped_run.bidi_level,
                     shaped_cluster_range: cluster_range,
-                    text_range: item_text_range,
+                    text_range: item_text_range.into(),
                     gaps_start: None,
                 });
             }
@@ -1803,8 +1803,8 @@ fn commit_line<B: Brush>(
     }
 
     lines.lines.push(LineData {
-        item_range: start_item_idx..end_item_idx,
-        text_range: text_start..text_end,
+        item_range: (start_item_idx..end_item_idx).into(),
+        text_range: (text_start..text_end).into(),
         max_advance,
         break_reason,
         num_justification_opportunities,
@@ -1819,7 +1819,7 @@ fn commit_line<B: Brush>(
             hanging_advance,
             ..Default::default()
         },
-        aligned_subtree_offsets: 0..0,
+        aligned_subtree_offsets: Range::default(),
     });
 
     // Reset state for the new line
@@ -1903,7 +1903,7 @@ fn hanging_whitespace<B: Brush>(
                     .data
                     .shaped_text
                     .run_slice(line_item.index as u32)
-                    .narrow(line_item.shaped_cluster_range.clone());
+                    .narrow(line_item.shaped_cluster_range.into());
 
                 for atom in slice.atoms_end().rev() {
                     let (hanging, all_hang) = atom_hanging_advance(
