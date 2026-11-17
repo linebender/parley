@@ -27,7 +27,8 @@ fn build_with_font_size(env: &mut TestEnv, text: &str, size: f32) -> Layout<Colo
 #[test]
 fn pending_font_requests_use_unicode_range_and_fallback() {
     use fontique::{
-        Blob, Collection, CollectionOptions, PendingFontState, QueryFamily, UnicodeRangeSet,
+        Blob, Collection, CollectionOptions, PendingFontState, QueryFamily, SourceCache,
+        UnicodeRangeSet,
     };
     use parley::style::FontFamily;
     use parley::{FontContext, LayoutContext};
@@ -41,7 +42,7 @@ fn pending_font_requests_use_unicode_range_and_fallback() {
                 shared,
                 system_fonts: false,
             }),
-            source_cache: Default::default(),
+            source_cache: SourceCache::default(),
         };
         let fallback = Blob::new(Arc::new(ROBOTO.to_vec()));
         fonts.collection.register_fonts(
@@ -57,7 +58,7 @@ fn pending_font_requests_use_unicode_range_and_fallback() {
                 .register_pending_font(1, FontInfoOverride::default())
                 .is_none()
         );
-        let range = UnicodeRangeSet::new([u32::from('a')..=u32::from('z')]);
+        let range = UnicodeRangeSet::new(std::iter::once(u32::from('a')..=u32::from('z')));
         let info = FontInfoOverride {
             family_name: Some("A"),
             unicode_range: Some(&range),
