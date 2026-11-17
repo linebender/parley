@@ -108,7 +108,7 @@ struct NameKey {
 impl NameKey {
     fn from_str(s: &str) -> Self {
         let mut res = Self::default();
-        let mut buf = [0_u8; 4];
+        let mut buf = [0_u8; char::MAX_LEN_UTF8];
         for ch in s.chars() {
             for ch in ch.to_lowercase() {
                 res.data

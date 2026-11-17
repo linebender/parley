@@ -28,8 +28,7 @@ impl ScriptExt for Script {
 
 #[test]
 fn assert_sorted() {
-    for w in SCRIPT_SAMPLES.windows(2) {
-        let &[prev, curr] = w else { unreachable!() };
+    for [prev, curr] in SCRIPT_SAMPLES.array_windows() {
         assert!(prev.0 < curr.0);
     }
 }
