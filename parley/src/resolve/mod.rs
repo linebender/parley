@@ -107,7 +107,7 @@ impl<T: Clone + PartialEq> Cache<T> {
         let start = self.items.len();
         self.items.extend(items.iter().cloned());
         let end = self.items.len();
-        self.entries.push((start..end).into());
+        self.entries.push(Range::from(start..end));
         Resolved {
             index,
             _phantom: core::marker::PhantomData,

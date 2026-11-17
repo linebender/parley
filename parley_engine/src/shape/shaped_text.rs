@@ -330,13 +330,13 @@ impl ShapedText {
                     .iter()
                     .map(|c| NormalizedCoord::from_bits(c.to_bits())),
             );
-            (start..self.normalized_coords.len()).into()
+            Range::from(start..self.normalized_coords.len())
         };
 
         let features_range = {
             let start = self.features.len();
             self.features.extend_from_slice(options.features);
-            (start..self.features.len()).into()
+            Range::from(start..self.features.len())
         };
 
         let font_index = self
@@ -432,15 +432,15 @@ impl ShapedText {
         }
 
         let shaped_clusters_range =
-            (shaped_clusters_start as u32..self.shaped_clusters.len() as u32).into();
+            Range::from(shaped_clusters_start as u32..self.shaped_clusters.len() as u32);
 
         self.runs.push(ShapedRun {
             range,
             font_size: options.font_size,
             font_index,
-            characters_range: (characters_start as u32..self.characters.len() as u32).into(),
+            characters_range: Range::from(characters_start as u32..self.characters.len() as u32),
             shaped_clusters_range,
-            glyphs_range: (glyphs_start..self.glyphs.len()).into(),
+            glyphs_range: Range::from(glyphs_start..self.glyphs.len()),
             normalized_coords_range,
             features_range,
             bidi_level: segment.bidi_level,
@@ -561,7 +561,7 @@ fn process_shaped_clusters<'a>(
         };
 
         shaped_clusters.push(ShapedCluster {
-            chars_range: (cluster.characters_start as u32..char_end as u32).into(),
+            chars_range: Range::from(cluster.characters_start as u32..char_end as u32),
             style_index: first_character.style_index,
             flags: ShapedClusterFlags::new(glyph_len)
                 .with_grapheme_start(first_character.grapheme_start)

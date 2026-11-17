@@ -1474,7 +1474,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
         line.metrics.line_height = line_height;
 
         if line.item_range.is_empty() {
-            line.text_range = (self.layout.data.text_len..self.layout.data.text_len).into();
+            line.text_range = Range::from(self.layout.data.text_len..self.layout.data.text_len);
         }
 
         // Whether metrics should be quantized to pixel boundaries
@@ -1516,11 +1516,11 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                     kind: LayoutItemKind::TextRun,
                     index,
                     bidi_level: BidiLevel::new(0),
-                    shaped_cluster_range: (cluster..cluster).into(),
-                    text_range: (text..text).into(),
+                    shaped_cluster_range: Range::from(cluster..cluster),
+                    text_range: Range::from(text..text),
                     gaps_start: None,
                 });
-                line.item_range = (run_index..run_index + 1).into();
+                line.item_range = Range::from(run_index..run_index + 1);
             }
         }
 
@@ -1765,7 +1765,7 @@ fn commit_line<B: Brush>(
                     index: item.index,
                     bidi_level: shaped_run.bidi_level,
                     shaped_cluster_range: cluster_range,
-                    text_range: item_text_range.into(),
+                    text_range: Range::from(item_text_range),
                     gaps_start: None,
                 });
             }
@@ -1803,8 +1803,8 @@ fn commit_line<B: Brush>(
     }
 
     lines.lines.push(LineData {
-        item_range: (start_item_idx..end_item_idx).into(),
-        text_range: (text_start..text_end).into(),
+        item_range: Range::from(start_item_idx..end_item_idx),
+        text_range: Range::from(text_start..text_end),
         max_advance,
         break_reason,
         num_justification_opportunities,

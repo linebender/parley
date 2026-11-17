@@ -197,10 +197,10 @@ impl Itemizer<'_> {
 
             if item_char_len > 0
                 && split_after(TextRange {
-                    byte_range: (start_byte_offset..byte_offset).into(),
-                    char_range: (self.current_char_offset
-                        ..self.current_char_offset + item_char_len)
-                        .into(),
+                    byte_range: Range::from(start_byte_offset..byte_offset),
+                    char_range: Range::from(
+                        self.current_char_offset..self.current_char_offset + item_char_len,
+                    ),
                 })
             {
                 break;
@@ -225,8 +225,8 @@ impl Itemizer<'_> {
 
         Some(Segment {
             range: TextRange {
-                byte_range: (start_byte_offset..self.char_indices.offset()).into(),
-                char_range: (start_char_offset..self.current_char_offset).into(),
+                byte_range: Range::from(start_byte_offset..self.char_indices.offset()),
+                char_range: Range::from(start_char_offset..self.current_char_offset),
             },
             script: icu_script_to_parlance_script(self.current_script),
             bidi_level: item_bidi_level,
