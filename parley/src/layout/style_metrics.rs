@@ -195,7 +195,7 @@ fn shaped_run_metrics(
         .find(|run| {
             run.font_index == font_index
                 && run.font_size.to_bits() == font_size.to_bits()
-                && coords[run.normalized_coords_range.clone()]
+                && coords[run.normalized_coords_range]
                     .iter()
                     .all(|c| c.to_bits() == 0)
         })

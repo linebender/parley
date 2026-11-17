@@ -3,7 +3,7 @@
 
 //! Data structures to store the result of shaping.
 
-use core::ops::Range;
+use core::range::Range;
 
 use alloc::vec::Vec;
 use parlance::{BidiLevel, FontFeature, Language, NormalizedCoord, Script};
@@ -205,10 +205,7 @@ impl ShapedText {
             shaped_clusters: &self.shaped_clusters,
             glyphs: &self.glyphs,
 
-            clusters: (
-                run.shaped_clusters_range.start,
-                run.shaped_clusters_range.end,
-            ),
+            clusters: run.shaped_clusters_range,
         }
     }
 
@@ -319,8 +316,8 @@ impl ShapedText {
         normalized_coords: &[harfrust::font::NormalizedCoord],
     ) {
         debug_assert_eq!(
-            range.char_range.len(),
-            text[range.byte_range.clone()].chars().count(),
+            range.char_range.end - range.char_range.start,
+            text[range.byte_range].chars().count(),
             "The claimed character range and the text's covered byte range should agree"
         );
 
@@ -333,13 +330,13 @@ impl ShapedText {
                     .iter()
                     .map(|c| NormalizedCoord::from_bits(c.to_bits())),
             );
-            start..self.normalized_coords.len()
+            Range::from(start..self.normalized_coords.len())
         };
 
         let features_range = {
             let start = self.features.len();
             self.features.extend_from_slice(options.features);
-            start..self.features.len()
+            Range::from(start..self.features.len())
         };
 
         let font_index = self
@@ -374,10 +371,10 @@ impl ShapedText {
 
         // Push all characters.
         let characters_start = self.characters.len();
-        for (((byte_offset, ch), info), style_index) in text[range.byte_range.clone()]
+        for (((byte_offset, ch), info), style_index) in text[range.byte_range]
             .char_indices()
-            .zip(&char_info[range.char_range.clone()])
-            .zip(&char_style_indices[range.char_range.clone()])
+            .zip(&char_info[range.char_range])
+            .zip(&char_style_indices[range.char_range])
         {
             self.characters.push(Character {
                 text_byte_start: (range.byte_range.start + byte_offset) as u32,
@@ -434,15 +431,16 @@ impl ShapedText {
             }
         }
 
-        let shaped_clusters_range = shaped_clusters_start as u32..self.shaped_clusters.len() as u32;
+        let shaped_clusters_range =
+            Range::from(shaped_clusters_start as u32..self.shaped_clusters.len() as u32);
 
         self.runs.push(ShapedRun {
             range,
             font_size: options.font_size,
             font_index,
-            characters_range: characters_start as u32..self.characters.len() as u32,
+            characters_range: Range::from(characters_start as u32..self.characters.len() as u32),
             shaped_clusters_range,
-            glyphs_range: glyphs_start..self.glyphs.len(),
+            glyphs_range: Range::from(glyphs_start..self.glyphs.len()),
             normalized_coords_range,
             features_range,
             bidi_level: segment.bidi_level,
@@ -454,7 +452,7 @@ impl ShapedText {
 }
 
 /// One shaped run, belonging to a [`ShapedText`].
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 #[non_exhaustive]
 pub struct ShapedRun {
     /// The range of text this run corresponds to.
@@ -462,9 +460,6 @@ pub struct ShapedRun {
     /// Font size.
     pub font_size: f32,
     /// This run's font, as an index into [`ShapedText::fonts`].
-    //
-    // Note: We carry the font index instead of having `ShapedRun` carry `Arc<FontInstance>`,
-    // meaning `ShapedRun` could become `Copy` once we have access to `core::range::Range`.
     pub font_index: usize,
     /// This run's characters, as a range into [`ShapedText::characters`].
     pub characters_range: Range<u32>,
@@ -566,7 +561,7 @@ fn process_shaped_clusters<'a>(
         };
 
         shaped_clusters.push(ShapedCluster {
-            chars_range: (cluster.characters_start as u32, char_end as u32),
+            chars_range: Range::from(cluster.characters_start as u32..char_end as u32),
             style_index: first_character.style_index,
             flags: ShapedClusterFlags::new(glyph_len)
                 .with_grapheme_start(first_character.grapheme_start)
@@ -814,9 +809,9 @@ mod tests {
         let [a, soft_hyphen, b] = shaped.runs() else {
             panic!("expected three runs, got {}", shaped.runs().len());
         };
-        assert_eq!(a.characters_range, 0..1);
-        assert_eq!(soft_hyphen.characters_range, 1..2);
-        assert_eq!(b.characters_range, 2..3);
+        assert_eq!(a.characters_range, (0..1).into());
+        assert_eq!(soft_hyphen.characters_range, (1..2).into());
+        assert_eq!(b.characters_range, (2..3).into());
 
         assert!(soft_hyphen.glyphs_range.is_empty());
 

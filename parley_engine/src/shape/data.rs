@@ -183,7 +183,7 @@ pub struct ShapedCluster {
     //
     // TODO: this currently stores the full range, but perhaps we could store only the start index.
     // See <https://github.com/linebender/parley/pull/715#discussion_r3693794119>.
-    pub(crate) chars_range: (u32, u32),
+    pub(crate) chars_range: core::range::Range<u32>,
 
     /// Style index for this cluster.
     pub style_index: u16,
@@ -207,7 +207,7 @@ impl ShapedCluster {
     /// value sense).
     #[inline(always)]
     pub fn chars_range(&self) -> Range<u32> {
-        self.chars_range.0..self.chars_range.1
+        self.chars_range.into()
     }
 
     /// The number of glyphs of this cluster.
@@ -303,7 +303,7 @@ impl ShapedCluster {
     /// The number of characters in this cluster.
     #[inline(always)]
     pub fn char_len(self) -> u32 {
-        self.chars_range.1 - self.chars_range.0
+        self.chars_range.end - self.chars_range.start
     }
 
     /// The number of graphemes this cluster overlaps.

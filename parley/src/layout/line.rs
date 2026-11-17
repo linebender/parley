@@ -35,12 +35,12 @@ impl<'a, B: Brush> Line<'a, B> {
 
     /// Returns the range of text for the line.
     pub fn text_range(&self) -> Range<usize> {
-        self.data.text_range.clone()
+        self.data.text_range.into()
     }
 
     /// Returns the number of items in the line.
     pub fn len(&self) -> usize {
-        self.data.item_range.len()
+        self.data.item_range.end - self.data.item_range.start
     }
 
     /// Returns `true` if the line is empty.
@@ -118,7 +118,7 @@ impl<'a, B: Brush> Line<'a, B> {
         &self,
     ) -> impl Iterator<Item = LineItem<'a, B>> + Clone + use<'a, B> {
         let copy = self.clone();
-        let line_items = &copy.layout.data.line_items[self.data.item_range.clone()];
+        let line_items = &copy.layout.data.line_items[self.data.item_range];
         line_items
             .iter()
             .enumerate()
@@ -287,7 +287,7 @@ pub struct GlyphRun<'a, B: Brush> {
     /// The glyph run's shaped clusters, indexing into the shaped run this [`Run`] belongs to.
     ///
     /// Both bounds are atom boundaries, as glyph runs must span full ligatures.
-    shaped_clusters: Range<u32>,
+    shaped_clusters: core::range::Range<u32>,
     offset: f32,
     baseline: f32,
     advance: f32,
@@ -339,7 +339,7 @@ impl<'a, B: Brush> GlyphRun<'a, B> {
 
     /// Returns an iterator over the glyphs in the run.
     pub fn glyphs(&self) -> impl Iterator<Item = Glyph> + 'a + Clone + use<'a, B> {
-        self.run.glyphs_in(self.shaped_clusters.clone())
+        self.run.glyphs_in(self.shaped_clusters.into())
     }
 
     /// Returns an iterator over the fully positioned glyphs in the run.
@@ -490,7 +490,7 @@ impl<'a, B: Brush> Iterator for GlyphRunIter<'a, B> {
                 return Some(PositionedLayoutItem::GlyphRun(GlyphRun {
                     run,
                     style_index,
-                    shaped_clusters: glyph_run_clusters,
+                    shaped_clusters: glyph_run_clusters.into(),
                     offset: offset
                         + self.line.data.metrics.inline_min_coord
                         + self.line.data.metrics.offset,

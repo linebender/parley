@@ -189,11 +189,11 @@ impl<'b, B: Brush> StyleRunBuilder<'b, B> {
             (style_index as usize) < self.lcx.style_table.len(),
             "StyleRunBuilder expects style indices that were previously added via push_style"
         );
+        self.cursor = range.end;
         self.lcx.style_runs.push(StyleRun {
             style_index,
-            range: range.clone(),
+            range: range.into(),
         });
-        self.cursor = range.end;
     }
 
     /// Adds an inline box.
@@ -256,7 +256,7 @@ impl<'b, B: Brush> StyleRunBuilder<'b, B> {
             }
             self.lcx.style_runs.push(StyleRun {
                 style_index: 0,
-                range: 0..0,
+                range: (0..0).into(),
             });
         }
         build_into_layout(layout, text.as_ref(), self.lcx, self.fcx, self.options);
@@ -410,7 +410,7 @@ fn build_into_layout<B: Brush>(
         lcx.style_table.push(ResolvedStyle::default());
         lcx.style_runs.push(StyleRun {
             style_index: 0,
-            range: 0..0,
+            range: (0..0).into(),
         });
     }
     assert!(
@@ -481,7 +481,7 @@ fn build_into_layout<B: Brush>(
         .resize(lcx.analysis.char_info().len(), 0);
     let mut char_index = 0;
     for style_run in &lcx.style_runs {
-        for _ in text[style_run.range.clone()].chars() {
+        for _ in text[style_run.range].chars() {
             lcx.char_style_indices[char_index] = style_run.style_index;
             char_index += 1;
         }
