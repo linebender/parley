@@ -160,7 +160,7 @@ impl<'a> Query<'a> {
             );
             let mut yielded_default = false;
             for font in bucket {
-                if font.family_index == family_info.default_font_index() {
+                if font.family_index() == family_info.default_font_index() {
                     yielded_default = true;
                 }
                 if f(font.as_candidate()) == QueryStatus::Stop {
@@ -231,11 +231,15 @@ pub enum QueryCandidate<'a> {
     },
 }
 
+/// A query cache entry: a loaded font or a descriptor-only face.
 #[derive(Clone)]
-struct CachedFont {
-    family_index: usize,
-    font: Option<QueryFont>,
-    pending: Option<(u64, Option<UnicodeRangeSet>)>,
+enum CachedFont {
+    Loaded(QueryFont),
+    Pending {
+        key: u64,
+        family_index: usize,
+        unicode_range: Option<UnicodeRangeSet>,
+    },
 }
 
 impl CachedFont {
@@ -247,34 +251,31 @@ impl CachedFont {
         cache: &mut SourceCache,
     ) -> Option<Self> {
         if let SourceKind::Pending(key) = info.source().kind() {
-            return Some(Self {
+            return Some(Self::Pending {
+                key: *key,
                 family_index,
-                font: None,
-                pending: Some((*key, info.unicode_range().cloned())),
+                unicode_range: info.unicode_range().cloned(),
             });
         }
-        Some(Self {
-            family_index,
-            font: Some(QueryFont::load(
-                family,
-                family_index,
-                info,
-                attributes,
-                cache,
-            )?),
-            pending: None,
-        })
+        QueryFont::load(family, family_index, info, attributes, cache).map(Self::Loaded)
+    }
+
+    fn family_index(&self) -> usize {
+        match self {
+            Self::Loaded(font) => font.family.1,
+            Self::Pending { family_index, .. } => *family_index,
+        }
     }
 
     fn as_candidate(&self) -> QueryCandidate<'_> {
-        if let Some(font) = &self.font {
-            QueryCandidate::Font(font)
-        } else {
-            let (key, range) = self.pending.as_ref().unwrap();
-            QueryCandidate::Pending {
+        match self {
+            Self::Loaded(font) => QueryCandidate::Font(font),
+            Self::Pending {
+                key, unicode_range, ..
+            } => QueryCandidate::Pending {
                 key: *key,
-                unicode_range: range.as_ref(),
-            }
+                unicode_range: unicode_range.as_ref(),
+            },
         }
     }
 }

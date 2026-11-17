@@ -32,15 +32,6 @@ use std::sync::{Mutex, atomic::Ordering};
 
 type FamilyMap = HashMap<FamilyId, Option<FamilyInfo>>;
 
-/// Application-managed load state of a descriptor-only font.
-#[derive(Clone, Copy, Debug, PartialEq, Eq)]
-pub enum PendingFontState {
-    /// No request has been started.
-    Unloaded,
-    /// A request is in progress.
-    Loading,
-}
-
 /// Options for a [font collection](Collection).
 #[derive(Copy, Clone, Debug)]
 pub struct CollectionOptions {
@@ -97,28 +88,6 @@ impl Collection {
     /// and registered overrides. Returns false for an unknown key or invalid data.
     pub fn resolve_pending_font(&mut self, key: u64, data: Blob<u8>) -> bool {
         self.inner.resolve_pending_font(key, data)
-    }
-
-    /// Returns this collection's local load state. Clones have independent states.
-    pub fn pending_font_state(&mut self, key: u64) -> Option<PendingFontState> {
-        self.inner.sync_shared();
-        self.inner.data.pending_fonts.get(&key)?;
-        Some(
-            *self
-                .inner
-                .pending_states
-                .entry(key)
-                .or_insert(PendingFontState::Unloaded),
-        )
-    }
-
-    /// Sets this collection's local load state, returning false for an unknown key.
-    pub fn set_pending_font_state(&mut self, key: u64, state: PendingFontState) -> bool {
-        if self.pending_font_state(key).is_none() {
-            return false;
-        }
-        self.inner.pending_states.insert(key, state);
-        true
     }
 
     /// Creates a new collection with the given options.
@@ -304,7 +273,6 @@ impl Default for Collection {
 /// Collection of fonts.
 #[derive(Clone)]
 struct Inner {
-    pending_states: HashMap<u64, PendingFontState>,
     system: Option<System>,
     data: CommonData,
     #[allow(unused)]
@@ -328,9 +296,6 @@ impl Inner {
         };
         #[cfg(not(feature = "std"))]
         let resolved = self.data.resolve_pending_font(key, data);
-        if resolved {
-            self.pending_states.remove(&key);
-        }
         resolved
     }
 
@@ -345,9 +310,6 @@ impl Inner {
         };
         #[cfg(not(feature = "std"))]
         let result = self.data.register_pending_font(key, info);
-        if result.is_some() {
-            self.pending_states.insert(key, PendingFontState::Unloaded);
-        }
         result
     }
 
@@ -362,7 +324,6 @@ impl Inner {
         };
         #[cfg(not(feature = "std"))]
         let removed = self.data.unregister_pending_font(key);
-        self.pending_states.remove(&key);
         removed
     }
 
@@ -371,7 +332,6 @@ impl Inner {
         let system = options.system_fonts.then(System::new);
         let shared = options.shared.then(|| Arc::new(Shared::default()));
         Self {
-            pending_states: HashMap::default(),
             system,
             data: CommonData::default(),
             shared,
@@ -692,7 +652,6 @@ impl Inner {
             self.data.clear();
         }
         self.data.clear();
-        self.pending_states.clear();
     }
 
     fn sync_shared(&mut self) {
@@ -705,8 +664,6 @@ impl Inner {
                 // If this becomes a problem, do more fine grained tracking
                 // of changes.
                 self.data = shared.data.lock().unwrap().clone();
-                self.pending_states
-                    .retain(|key, _| self.data.pending_fonts.contains_key(key));
                 self.shared_version = version;
                 self.fallback_cache.reset();
             }
@@ -804,16 +761,17 @@ impl System {
 /// Common data for base and shared collections.
 #[derive(Clone, Default)]
 struct CommonData {
-    pending_fonts: HashMap<u64, FamilyId>,
-    pending_overrides: HashMap<u64, PendingOverride>,
+    pending_fonts: HashMap<u64, PendingFace>,
     family_names: FamilyNameMap,
     families: FamilyMap,
     generic_families: GenericFamilyMap,
     fallbacks: FallbackMap,
 }
 
+/// A descriptor-only face: its family and the overrides to apply once its data arrives.
 #[derive(Clone)]
-struct PendingOverride {
+struct PendingFace {
+    family: FamilyId,
     width: Option<FontWidthRange>,
     style: Option<FontStyleRange>,
     weight: Option<FontWeightRange>,
@@ -832,10 +790,10 @@ impl CommonData {
         let mut families = HashMap::default();
         families.insert(id, (name, alloc::vec![FontInfo::pending(key, &info)]));
         self.merge_families(&families);
-        self.pending_fonts.insert(key, id);
-        self.pending_overrides.insert(
+        self.pending_fonts.insert(
             key,
-            PendingOverride {
+            PendingFace {
+                family: id,
                 width: info.width,
                 style: info.style,
                 weight: info.weight,
@@ -847,12 +805,10 @@ impl CommonData {
     }
 
     fn resolve_pending_font(&mut self, key: u64, data: Blob<u8>) -> bool {
-        let Some(&id) = self.pending_fonts.get(&key) else {
+        let Some(info) = self.pending_fonts.get(&key) else {
             return false;
         };
-        let Some(info) = self.pending_overrides.get(&key) else {
-            return false;
-        };
+        let id = info.family;
         let source = SourceInfo {
             id: SourceId::new(),
             kind: SourceKind::Memory(data.clone()),
@@ -890,15 +846,13 @@ impl CommonData {
         }
         *family = FamilyInfo::new(name, fonts);
         self.pending_fonts.remove(&key);
-        self.pending_overrides.remove(&key);
         true
     }
 
     fn unregister_pending_font(&mut self, key: u64) -> bool {
-        let Some(id) = self.pending_fonts.remove(&key) else {
+        let Some(PendingFace { family: id, .. }) = self.pending_fonts.remove(&key) else {
             return false;
         };
-        self.pending_overrides.remove(&key);
         if let Some(Some(family)) = self.families.get_mut(&id) {
             let name = self.family_names.get_by_id(id).unwrap().clone();
             let fonts = family
@@ -1045,15 +999,13 @@ impl CommonData {
             .cloned();
         *family = FamilyInfo::new(family_name.clone(), new_fonts);
 
-        self.pending_fonts.retain(|key, id| {
-            *id != family.id()
+        self.pending_fonts.retain(|key, face| {
+            face.family != family.id()
                 || family
                     .fonts()
                     .iter()
                     .any(|font| matches!(font.source().kind(), SourceKind::Pending(k) if k == key))
         });
-        self.pending_overrides
-            .retain(|key, _| self.pending_fonts.contains_key(key));
 
         Some(())
     }

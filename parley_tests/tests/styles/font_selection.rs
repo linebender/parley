@@ -27,8 +27,7 @@ fn build_with_font_size(env: &mut TestEnv, text: &str, size: f32) -> Layout<Colo
 #[test]
 fn pending_font_requests_use_unicode_range_and_fallback() {
     use fontique::{
-        Blob, Collection, CollectionOptions, PendingFontState, QueryFamily, SourceCache,
-        UnicodeRangeSet,
+        Blob, Collection, CollectionOptions, QueryFamily, SourceCache, UnicodeRangeSet,
     };
     use parley::style::FontFamily;
     use parley::{FontContext, LayoutContext};
@@ -68,24 +67,6 @@ fn pending_font_requests_use_unicode_range_and_fallback() {
         assert_eq!(fonts.collection.family_id("A"), Some(family));
         assert!(fonts.collection.register_pending_font(1, info).is_none());
         let mut cloned = fonts.collection.clone();
-        assert!(
-            fonts
-                .collection
-                .set_pending_font_state(1, PendingFontState::Loading)
-        );
-        assert_eq!(
-            fonts.collection.pending_font_state(1),
-            Some(PendingFontState::Loading)
-        );
-        assert_eq!(
-            cloned.pending_font_state(1),
-            Some(PendingFontState::Unloaded)
-        );
-        assert!(
-            !fonts
-                .collection
-                .set_pending_font_state(99, PendingFontState::Loading)
-        );
 
         let mut context = LayoutContext::<[u8; 4]>::new();
         for (text, expected) in [("abc abc", vec![1]), ("123", vec![]), ("", vec![])] {
@@ -116,9 +97,8 @@ fn pending_font_requests_use_unicode_range_and_fallback() {
         }
         assert!(fonts.collection.resolve_pending_font(1, fallback.clone()));
         assert!(!fonts.collection.unregister_pending_font(1));
-        assert_eq!(fonts.collection.pending_font_state(1), None);
         if shared {
-            assert_eq!(cloned.pending_font_state(1), None);
+            assert!(!cloned.unregister_pending_font(1));
         }
         assert!(
             fonts
@@ -132,7 +112,6 @@ fn pending_font_requests_use_unicode_range_and_fallback() {
 
         fonts.collection.register_pending_font(2, info).unwrap();
         assert!(fonts.collection.unregister_pending_font(2));
-        assert_eq!(fonts.collection.pending_font_state(2), None);
     }
 }
 
