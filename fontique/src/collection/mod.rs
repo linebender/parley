@@ -802,22 +802,12 @@ impl System {
 /// Common data for base and shared collections.
 #[derive(Clone, Default)]
 struct CommonData {
-    pending_fonts: HashMap<u64, PendingFace>,
+    /// The family of each pending font, by its key.
+    pending_fonts: HashMap<u64, FamilyId>,
     family_names: FamilyNameMap,
     families: FamilyMap,
     generic_families: GenericFamilyMap,
     fallbacks: FallbackMap,
-}
-
-/// A descriptor-only face: its family and the overrides to apply once its data arrives.
-#[derive(Clone)]
-struct PendingFace {
-    family: FamilyId,
-    width: Option<FontWidthRange>,
-    style: Option<FontStyleRange>,
-    weight: Option<FontWeightRange>,
-    axes: Option<Vec<(read_fonts::types::Tag, f32)>>,
-    unicode_range: Option<crate::UnicodeRangeSet>,
 }
 
 impl CommonData {
@@ -829,27 +819,22 @@ impl CommonData {
         let name = self.family_names.get_or_insert(family_name);
         let id = name.id();
         let mut families = HashMap::default();
-        families.insert(id, (name, alloc::vec![FontInfo::pending(key, &info)]));
+        families.insert(id, (name, alloc::vec![FontInfo::new_pending(key, &info)]));
         self.merge_families(&families);
-        self.pending_fonts.insert(
-            key,
-            PendingFace {
-                family: id,
-                width: info.width,
-                style: info.style,
-                weight: info.weight,
-                axes: info.axes.map(<[_]>::to_vec),
-                unicode_range: info.unicode_range.cloned(),
-            },
-        );
+        self.pending_fonts.insert(key, id);
         Some(id)
     }
 
     fn resolve_pending_font(&mut self, key: u64, data: Blob<u8>) -> bool {
-        let Some(info) = self.pending_fonts.get(&key) else {
+        let Some(&id) = self.pending_fonts.get(&key) else {
             return false;
         };
-        let id = info.family;
+        let Some(overrides) = self
+            .pending_source(key)
+            .map(|pending| pending.overrides.clone())
+        else {
+            return false;
+        };
         let source = SourceInfo {
             id: SourceId::new(),
             kind: SourceKind::Memory(data.clone()),
@@ -859,14 +844,7 @@ impl CommonData {
             if let Some(mut font) =
                 FontInfo::from_font_ref(&scanned.font, source.clone(), scanned.index)
             {
-                font.apply_override(&FontInfoOverride {
-                    width: info.width,
-                    style: info.style,
-                    weight: info.weight,
-                    axes: info.axes.as_deref(),
-                    unicode_range: info.unicode_range.as_ref(),
-                    ..FontInfoOverride::default()
-                });
+                font.apply_override(&overrides.as_override());
                 replacements.push(font);
             }
         });
@@ -890,14 +868,19 @@ impl CommonData {
         true
     }
 
-    fn pending_font_status(&self, key: u64) -> Option<PendingFontStatus> {
-        let id = self.pending_fonts.get(&key)?.family;
-        let family = self.families.get(&id)?.as_ref()?;
+    /// Finds the record of a pending font in its family.
+    fn pending_source(&self, key: u64) -> Option<&crate::source::PendingSource> {
+        let id = self.pending_fonts.get(&key)?;
+        let family = self.families.get(id)?.as_ref()?;
         family
             .fonts()
             .iter()
-            .filter_map(FontInfo::pending_status)
-            .find_map(|(k, status)| (k == key).then_some(status))
+            .filter_map(FontInfo::pending)
+            .find(|pending| pending.key() == key)
+    }
+
+    fn pending_font_status(&self, key: u64) -> Option<PendingFontStatus> {
+        self.pending_source(key).map(|pending| pending.status())
     }
 
     fn set_pending_font_status(&mut self, key: u64, status: PendingFontStatus) -> bool {
@@ -907,7 +890,7 @@ impl CommonData {
         {
             return false;
         }
-        let id = self.pending_fonts[&key].family;
+        let id = self.pending_fonts[&key];
         if let Some(Some(family)) = self.families.get_mut(&id) {
             let name = self.family_names.get_by_id(id).unwrap().clone();
             let fonts = family.fonts().iter().cloned().map(|mut font| {
@@ -922,7 +905,7 @@ impl CommonData {
     }
 
     fn unregister_pending_font(&mut self, key: u64) -> bool {
-        let Some(PendingFace { family: id, .. }) = self.pending_fonts.remove(&key) else {
+        let Some(id) = self.pending_fonts.remove(&key) else {
             return false;
         };
         if let Some(Some(family)) = self.families.get_mut(&id) {
@@ -1071,8 +1054,8 @@ impl CommonData {
             .cloned();
         *family = FamilyInfo::new(family_name.clone(), new_fonts);
 
-        self.pending_fonts.retain(|key, face| {
-            face.family != family.id()
+        self.pending_fonts.retain(|key, id| {
+            *id != family.id()
                 || family
                     .fonts()
                     .iter()

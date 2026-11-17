@@ -4,8 +4,9 @@
 //! Model for a font.
 
 use crate::{CharmapIndex, UnicodeRangeSet};
+use alloc::{boxed::Box, vec::Vec};
 
-use super::source::{PendingFontStatus, SourceInfo, SourceKind};
+use super::source::{PendingFontStatus, PendingSource, SourceInfo, SourceKind};
 use super::{Blob, source_cache::SourceCache};
 use crate::{FontStyle, FontStyleRange, FontWeight, FontWeightRange, FontWidth, FontWidthRange};
 use parlance::Synthesis;
@@ -32,7 +33,7 @@ impl FontInfo {
     /// Creates a new font object from the given source and index.
     pub fn from_source(source: SourceInfo, index: u32) -> Option<Self> {
         match &source.kind {
-            SourceKind::Pending { .. } => None,
+            SourceKind::Pending(_) => None,
             #[cfg(feature = "std")]
             SourceKind::Path(path) => {
                 let file = std::fs::File::open(&**path).ok()?;
@@ -64,7 +65,7 @@ impl FontInfo {
             source_cache.get(&self.source)
         } else {
             match &self.source.kind {
-                SourceKind::Pending { .. } => None,
+                SourceKind::Pending(_) => None,
                 SourceKind::Memory(blob) => Some(blob.clone()),
                 #[cfg(feature = "std")]
                 SourceKind::Path(path) => super::source_cache::load_blob(path),
@@ -230,14 +231,21 @@ impl FontInfo {
 }
 
 impl FontInfo {
-    pub(crate) fn pending(key: u64, info: &FontInfoOverride<'_>) -> Self {
+    pub(crate) fn new_pending(key: u64, info: &FontInfoOverride<'_>) -> Self {
         let mut font = Self {
             source: SourceInfo::new(
                 super::source::SourceId::new(),
-                SourceKind::Pending {
+                SourceKind::Pending(PendingSource {
                     key,
                     status: PendingFontStatus::Unloaded,
-                },
+                    overrides: Box::new(PendingOverrides {
+                        width: info.width,
+                        style: info.style,
+                        weight: info.weight,
+                        axes: info.axes.map(<[_]>::to_vec),
+                        unicode_range: info.unicode_range.cloned(),
+                    }),
+                }),
             ),
             index: 0,
             width: FontWidthRange::default(),
@@ -252,17 +260,17 @@ impl FontInfo {
         font
     }
 
-    /// The key and load status of a descriptor-only font.
-    pub(crate) fn pending_status(&self) -> Option<(u64, PendingFontStatus)> {
-        match self.source.kind {
-            SourceKind::Pending { key, status } => Some((key, status)),
+    /// The pending source of a descriptor-only font.
+    pub(crate) fn pending(&self) -> Option<&PendingSource> {
+        match &self.source.kind {
+            SourceKind::Pending(pending) => Some(pending),
             _ => None,
         }
     }
 
-    pub(crate) fn set_pending_status(&mut self, new_status: PendingFontStatus) {
-        if let SourceKind::Pending { status, .. } = &mut self.source.kind {
-            *status = new_status;
+    pub(crate) fn set_pending_status(&mut self, status: PendingFontStatus) {
+        if let SourceKind::Pending(pending) = &mut self.source.kind {
+            pending.status = status;
         }
     }
 
@@ -374,6 +382,31 @@ const WIDTH_AXIS: u8 = 0x02;
 const SLANT_AXIS: u8 = 0x04;
 const ITALIC_AXIS: u8 = 0x08;
 const OPTICAL_SIZE_AXIS: u8 = 0x10;
+
+/// The descriptors a pending font was registered with. Unlike the [`FontInfo`] of the
+/// pending font, this records which of them were given, which decides whether a value
+/// read from the font's data is replaced once the data arrives.
+#[derive(Clone)]
+pub(crate) struct PendingOverrides {
+    width: Option<FontWidthRange>,
+    style: Option<FontStyleRange>,
+    weight: Option<FontWeightRange>,
+    axes: Option<Vec<(Tag, f32)>>,
+    unicode_range: Option<UnicodeRangeSet>,
+}
+
+impl PendingOverrides {
+    pub(crate) fn as_override(&self) -> FontInfoOverride<'_> {
+        FontInfoOverride {
+            family_name: None,
+            width: self.width,
+            style: self.style,
+            weight: self.weight,
+            axes: self.axes.as_deref(),
+            unicode_range: self.unicode_range.as_ref(),
+        }
+    }
+}
 
 /// An axis of variation for a variable font.
 ///
@@ -575,9 +608,7 @@ mod tests {
 
         let synthesis = font.synthesis(FontWidth::NORMAL, FontStyle::Normal, FontWeight::NORMAL);
         assert_eq!(
-            synthesis
-                .variation_settings()
-                .collect::<alloc::vec::Vec<_>>(),
+            synthesis.variation_settings().collect::<Vec<_>>(),
             [(parlance::Tag::new(b"wght"), FontWeight::NORMAL.value())]
         );
         assert!(!synthesis.embolden());
@@ -596,18 +627,14 @@ mod tests {
 
         let synthesis = font.synthesis(FontWidth::NORMAL, FontStyle::Normal, FontWeight::BOLD);
         assert_eq!(
-            synthesis
-                .variation_settings()
-                .collect::<alloc::vec::Vec<_>>(),
+            synthesis.variation_settings().collect::<Vec<_>>(),
             [(parlance::Tag::new(b"wght"), 500.)]
         );
         assert!(!synthesis.embolden());
 
         let synthesis = font.synthesis(FontWidth::NORMAL, FontStyle::Normal, FontWeight::THIN);
         assert_eq!(
-            synthesis
-                .variation_settings()
-                .collect::<alloc::vec::Vec<_>>(),
+            synthesis.variation_settings().collect::<Vec<_>>(),
             [(parlance::Tag::new(b"wght"), 300.)]
         );
     }

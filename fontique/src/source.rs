@@ -4,6 +4,7 @@
 //! Model for font data.
 
 use crate::AtomicCounter;
+use alloc::boxed::Box;
 use core::sync::atomic::Ordering;
 use linebender_resource_handle::Blob;
 #[cfg(feature = "std")]
@@ -71,18 +72,35 @@ pub enum PendingFontStatus {
     Failed,
 }
 
+/// A descriptor-only font registered with
+/// [`Collection::register_pending_font`](crate::Collection::register_pending_font).
+#[derive(Clone)]
+pub struct PendingSource {
+    pub(crate) key: u64,
+    pub(crate) status: PendingFontStatus,
+    /// The descriptors the font was registered with, applied to its data when it arrives.
+    pub(crate) overrides: Box<crate::font::PendingOverrides>,
+}
+
+impl PendingSource {
+    /// The key the application registered the font with.
+    pub fn key(&self) -> u64 {
+        self.key
+    }
+
+    /// Whether the font's data has been requested, or failed to load.
+    pub fn status(&self) -> PendingFontStatus {
+        self.status
+    }
+}
+
 /// Font data that is either a path to the font file or shared data in memory.
 ///
 /// See [`SourceInfo`].
 #[derive(Clone)]
 pub enum SourceKind {
-    /// Descriptor-only font without data, identified by an application key.
-    Pending {
-        /// The key the application registered the font with.
-        key: u64,
-        /// Whether the font's data has been requested, or failed to load.
-        status: PendingFontStatus,
-    },
+    /// Descriptor-only font without data.
+    Pending(PendingSource),
     /// Shared data containing the content of the font file.
     Memory(Blob<u8>),
     #[cfg(feature = "std")]
@@ -94,7 +112,7 @@ impl SourceKind {
     /// The application key of a descriptor-only font.
     pub(crate) fn pending_key(&self) -> Option<u64> {
         match self {
-            Self::Pending { key, .. } => Some(*key),
+            Self::Pending(pending) => Some(pending.key),
             _ => None,
         }
     }
@@ -103,7 +121,7 @@ impl SourceKind {
 impl core::fmt::Debug for SourceKind {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
-            Self::Pending { key, status } => write!(f, "Pending({key}, {status:?})"),
+            Self::Pending(pending) => write!(f, "Pending({}, {:?})", pending.key, pending.status),
             #[cfg(feature = "std")]
             Self::Path(path) => {
                 write!(f, "Path({path:?})")

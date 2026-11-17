@@ -94,7 +94,7 @@ pub use parlance::{
     FontRange, FontStyle, FontStyleRange, FontWeight, FontWeightRange, FontWidth, FontWidthRange,
     GenericFamily, Language, Script, Synthesis,
 };
-pub use source::{PendingFontStatus, SourceId, SourceInfo, SourceKind};
+pub use source::{PendingFontStatus, PendingSource, SourceId, SourceInfo, SourceKind};
 
 #[cfg(all(feature = "system", target_vendor = "apple"))]
 use objc2 as _;

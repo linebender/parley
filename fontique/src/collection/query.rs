@@ -250,10 +250,10 @@ impl CachedFont {
         attributes: Attributes,
         cache: &mut SourceCache,
     ) -> Option<Self> {
-        if let Some((key, status)) = info.pending_status() {
+        if let Some(pending) = info.pending() {
             // Only a font whose data has not been requested yet is reported.
-            return (status == PendingFontStatus::Unloaded).then(|| Self::Pending {
-                key,
+            return (pending.status() == PendingFontStatus::Unloaded).then(|| Self::Pending {
+                key: pending.key(),
                 family_index,
                 unicode_range: info.unicode_range().cloned(),
             });
