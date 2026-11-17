@@ -56,7 +56,7 @@ impl UnicodeRangeSet {
 
     /// Returns `true` if the set contains the given codepoint.
     #[inline]
-    pub fn contains(&self, codepoint: impl Into<u32>) -> bool {
+    pub(crate) fn contains(&self, codepoint: impl Into<u32>) -> bool {
         let c = codepoint.into();
         if c < self.min || c > self.max {
             return false;
