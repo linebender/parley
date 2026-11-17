@@ -21,7 +21,7 @@ pub struct UnicodeRangeSet {
     ranges: Arc<[(u32, u32)]>,
     /// The first and last codepoint of [`Self::ranges`] to be able to reject codepoints quickly.
     ///
-    /// 1 and 0 if the [`Self::ranges`] is empty.
+    /// 1 and 0 if [`Self::ranges`] is empty.
     min: u32,
     max: u32,
 }
