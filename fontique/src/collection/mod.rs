@@ -5,7 +5,7 @@
 
 mod query;
 
-pub use query::{Query, QueryFamily, QueryFont, QueryStatus};
+pub use query::{Query, QueryCandidate, QueryFamily, QueryFont, QueryStatus};
 
 use crate::font::FontInfoOverride;
 
@@ -91,6 +91,12 @@ impl Collection {
     /// Removes a pending face, after registering its data or when loading fails.
     pub fn unregister_pending_font(&mut self, key: u64) -> bool {
         self.inner.unregister_pending_font(key)
+    }
+
+    /// Replaces a pending face with fonts from `data`, preserving its family position
+    /// and registered overrides. Returns false for an unknown key or invalid data.
+    pub fn resolve_pending_font(&mut self, key: u64, data: Blob<u8>) -> bool {
+        self.inner.resolve_pending_font(key, data)
     }
 
     /// Returns this collection's local load state. Clones have independent states.
@@ -309,6 +315,25 @@ struct Inner {
 }
 
 impl Inner {
+    fn resolve_pending_font(&mut self, key: u64, data: Blob<u8>) -> bool {
+        #[cfg(feature = "std")]
+        let resolved = if let Some(shared) = &self.shared {
+            let resolved = shared.data.lock().unwrap().resolve_pending_font(key, data);
+            if resolved {
+                shared.bump_version();
+            }
+            resolved
+        } else {
+            self.data.resolve_pending_font(key, data)
+        };
+        #[cfg(not(feature = "std"))]
+        let resolved = self.data.resolve_pending_font(key, data);
+        if resolved {
+            self.pending_states.remove(&key);
+        }
+        resolved
+    }
+
     fn register_pending_font(&mut self, key: u64, info: FontInfoOverride<'_>) -> Option<FamilyId> {
         #[cfg(feature = "std")]
         let result = if let Some(shared) = &self.shared {
@@ -780,10 +805,20 @@ impl System {
 #[derive(Clone, Default)]
 struct CommonData {
     pending_fonts: HashMap<u64, FamilyId>,
+    pending_overrides: HashMap<u64, PendingOverride>,
     family_names: FamilyNameMap,
     families: FamilyMap,
     generic_families: GenericFamilyMap,
     fallbacks: FallbackMap,
+}
+
+#[derive(Clone)]
+struct PendingOverride {
+    width: Option<FontWidthRange>,
+    style: Option<FontStyleRange>,
+    weight: Option<FontWeightRange>,
+    axes: Option<Vec<(read_fonts::types::Tag, f32)>>,
+    unicode_range: Option<crate::UnicodeRangeSet>,
 }
 
 impl CommonData {
@@ -798,13 +833,72 @@ impl CommonData {
         families.insert(id, (name, alloc::vec![FontInfo::pending(key, &info)]));
         self.merge_families(&families);
         self.pending_fonts.insert(key, id);
+        self.pending_overrides.insert(
+            key,
+            PendingOverride {
+                width: info.width,
+                style: info.style,
+                weight: info.weight,
+                axes: info.axes.map(<[_]>::to_vec),
+                unicode_range: info.unicode_range.cloned(),
+            },
+        );
         Some(id)
+    }
+
+    fn resolve_pending_font(&mut self, key: u64, data: Blob<u8>) -> bool {
+        let Some(&id) = self.pending_fonts.get(&key) else {
+            return false;
+        };
+        let Some(info) = self.pending_overrides.get(&key) else {
+            return false;
+        };
+        let source = SourceInfo {
+            id: SourceId::new(),
+            kind: SourceKind::Memory(data.clone()),
+        };
+        let mut replacements = Vec::new();
+        crate::scan::scan_memory(data.as_ref(), |scanned| {
+            if let Some(mut font) =
+                FontInfo::from_font_ref(&scanned.font, source.clone(), scanned.index)
+            {
+                font.apply_override(&FontInfoOverride {
+                    width: info.width,
+                    style: info.style,
+                    weight: info.weight,
+                    axes: info.axes.as_deref(),
+                    unicode_range: info.unicode_range.as_ref(),
+                    ..FontInfoOverride::default()
+                });
+                replacements.push(font);
+            }
+        });
+        if replacements.is_empty() {
+            return false;
+        }
+        let Some(Some(family)) = self.families.get_mut(&id) else {
+            return false;
+        };
+        let name = self.family_names.get_by_id(id).unwrap().clone();
+        let mut fonts = Vec::new();
+        for font in family.fonts() {
+            if matches!(font.source().kind(), SourceKind::Pending(k) if *k == key) {
+                fonts.extend(replacements.iter().cloned());
+            } else {
+                fonts.push(font.clone());
+            }
+        }
+        *family = FamilyInfo::new(name, fonts);
+        self.pending_fonts.remove(&key);
+        self.pending_overrides.remove(&key);
+        true
     }
 
     fn unregister_pending_font(&mut self, key: u64) -> bool {
         let Some(id) = self.pending_fonts.remove(&key) else {
             return false;
         };
+        self.pending_overrides.remove(&key);
         if let Some(Some(family)) = self.families.get_mut(&id) {
             let name = self.family_names.get_by_id(id).unwrap().clone();
             let fonts = family
@@ -958,6 +1052,8 @@ impl CommonData {
                     .iter()
                     .any(|font| matches!(font.source().kind(), SourceKind::Pending(k) if k == key))
         });
+        self.pending_overrides
+            .retain(|key, _| self.pending_fonts.contains_key(key));
 
         Some(())
     }

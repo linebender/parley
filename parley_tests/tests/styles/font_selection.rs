@@ -114,10 +114,7 @@ fn pending_font_requests_use_unicode_range_and_fallback() {
                 fallback.id()
             );
         }
-        fonts
-            .collection
-            .register_fonts(fallback.clone(), Some(info));
-        assert!(fonts.collection.unregister_pending_font(1));
+        assert!(fonts.collection.resolve_pending_font(1, fallback.clone()));
         assert!(!fonts.collection.unregister_pending_font(1));
         assert_eq!(fonts.collection.pending_font_state(1), None);
         if shared {
@@ -136,6 +133,78 @@ fn pending_font_requests_use_unicode_range_and_fallback() {
         fonts.collection.register_pending_font(2, info).unwrap();
         assert!(fonts.collection.unregister_pending_font(2));
         assert_eq!(fonts.collection.pending_font_state(2), None);
+    }
+}
+
+#[test]
+fn pending_metrics_and_resolution_preserve_face_priority() {
+    use fontique::{
+        Blob, Collection, CollectionOptions, QueryCandidate, QueryStatus, SourceCache,
+        UnicodeRangeSet,
+    };
+    use std::sync::Arc;
+
+    let bytes = include_bytes!("../../../parley_dev/assets/fonts/roboto_fonts/Roboto-Regular.ttf");
+    for shared in [false, true] {
+        for order in [[1, 2], [2, 1]] {
+            let mut collection = Collection::new(CollectionOptions {
+                shared,
+                system_fonts: false,
+            });
+            let range = UnicodeRangeSet::new(std::iter::once(32..=127));
+            let info = FontInfoOverride {
+                family_name: Some("Metrics"),
+                unicode_range: Some(&range),
+                ..FontInfoOverride::default()
+            };
+            let family = collection.register_pending_font(1, info).unwrap();
+            collection.register_pending_font(2, info).unwrap();
+            let mut cache = SourceCache::default();
+            {
+                let mut query = collection.query(&mut cache);
+                query.set_families([family]);
+                query.matches_with(|_| panic!("pending faces must not yield loaded fonts"));
+                let mut keys = Vec::new();
+                assert!(
+                    query
+                        .first_available_font_with(|key| keys.push(key))
+                        .is_none()
+                );
+                assert_eq!(keys, [2, 1]);
+                let mut candidates = Vec::new();
+                query.matches_with_pending(|candidate| {
+                    let QueryCandidate::Pending { key, unicode_range } = candidate else {
+                        panic!("unexpected loaded font")
+                    };
+                    assert!(unicode_range.unwrap().contains(' '));
+                    candidates.push(key);
+                    QueryStatus::Continue
+                });
+                assert_eq!(candidates, [2, 1]);
+            }
+            assert!(!collection.resolve_pending_font(99, Blob::new(Arc::new(bytes.to_vec()))));
+            assert!(!collection.resolve_pending_font(1, Blob::new(Arc::new(Vec::<u8>::new()))));
+            let fonts = [
+                Blob::new(Arc::new(bytes.to_vec())),
+                Blob::new(Arc::new(bytes.to_vec())),
+            ];
+            for key in order {
+                assert!(collection.resolve_pending_font(key, fonts[key as usize - 1].clone()));
+            }
+            let family_info = collection.family(family).unwrap();
+            let loaded: Vec<_> = family_info
+                .fonts()
+                .iter()
+                .map(|font| font.load(None).unwrap().id())
+                .collect();
+            assert_eq!(loaded, [fonts[1].id(), fonts[0].id()]);
+            let mut query = collection.query(&mut cache);
+            query.set_families([family]);
+            assert_eq!(
+                query.first_available_font().unwrap().blob.id(),
+                fonts[1].id()
+            );
+        }
     }
 }
 

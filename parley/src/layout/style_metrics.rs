@@ -110,6 +110,7 @@ pub(crate) fn resolve_style_metrics<B: Brush>(
     shaped_text: &ShapedText,
     quantize: bool,
     out: &mut Vec<StyleMetrics>,
+    pending: &mut hashbrown::HashSet<u64>,
 ) {
     out.clear();
     out.reserve(styles.len());
@@ -117,7 +118,7 @@ pub(crate) fn resolve_style_metrics<B: Brush>(
     let mut query = fcx.collection.query(&mut fcx.source_cache);
 
     for (index, style) in styles.iter().enumerate() {
-        let font_metrics = first_available_font(&mut query, rcx, style)
+        let font_metrics = first_available_font(&mut query, rcx, style, pending)
             .and_then(|font| {
                 let variations = rcx.variations(style.font_variations).unwrap_or(&[]);
                 shaped_run_metrics(shaped_text, &font, style.font_size, variations)
@@ -360,6 +361,7 @@ fn first_available_font<B: Brush>(
     query: &mut Query<'_>,
     rcx: &ResolveContext,
     style: &ResolvedStyle<B>,
+    pending: &mut hashbrown::HashSet<u64>,
 ) -> Option<FontInstance> {
     let families = rcx.stack(style.font_family).unwrap_or(&[]);
     query.set_families(families.iter().copied().map(QueryFamily::Id));
@@ -368,7 +370,9 @@ fn first_available_font<B: Brush>(
         weight: style.font_weight,
         style: style.font_style,
     });
-    let font = query.first_available_font()?;
+    let font = query.first_available_font_with(|key| {
+        pending.insert(key);
+    })?;
     Some(FontInstance {
         font: FontData {
             data: font.blob,

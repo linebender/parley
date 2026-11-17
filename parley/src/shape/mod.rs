@@ -375,8 +375,8 @@ impl<'a, 'b, B: Brush> parley_engine::FontSelector for FontSelector<'a, 'b, B> {
             yields_font
         });
         if !query_yields_font {
-            self.query.matches_with(|font| {
-                record_pending_font(font, cluster, self.pending_font_requests);
+            self.query.matches_with_pending(|candidate| {
+                record_pending_font(candidate, cluster, self.pending_font_requests);
                 fontique::QueryStatus::Continue
             });
             if matches!(self.last_resort_font, LastResortFont::Unresolved) {
@@ -405,10 +405,13 @@ impl<'a, 'b, B: Brush> parley_engine::FontSelector for FontSelector<'a, 'b, B> {
         let mut selected_font = None;
         let mut best_coverage = Coverage::NONE;
 
-        self.query.matches_with(|font| {
-            if record_pending_font(font, cluster, self.pending_font_requests) {
+        self.query.matches_with_pending(|candidate| {
+            if record_pending_font(candidate, cluster, self.pending_font_requests) {
                 return fontique::QueryStatus::Continue;
             }
+            let fontique::QueryCandidate::Font(font) = candidate else {
+                unreachable!()
+            };
             // Only create the charmap if the character is the unicode range, as the the range check
             // is a lot cheaper than creating the charmap. That matters if families are split into
             // many subsets.
@@ -474,9 +477,6 @@ fn any_font(query: &mut Query<'_>) -> Option<QueryFont> {
     query.matches_with(
         #[inline]
         |font: &QueryFont| {
-            if font.pending.is_some() {
-                return fontique::QueryStatus::Continue;
-            }
             found = Some(font.clone());
             fontique::QueryStatus::Stop
         },
@@ -486,17 +486,17 @@ fn any_font(query: &mut Query<'_>) -> Option<QueryFont> {
 }
 
 fn record_pending_font(
-    font: &QueryFont,
+    candidate: fontique::QueryCandidate<'_>,
     cluster: &CharCluster,
     requests: &mut hashbrown::HashSet<u64>,
 ) -> bool {
-    let Some(key) = font.pending else {
+    let fontique::QueryCandidate::Pending { key, unicode_range } = candidate else {
         return false;
     };
     if cluster
         .chars()
         .iter()
-        .any(|ch| font.in_unicode_range(ch.ch))
+        .any(|ch| unicode_range.is_none_or(|range| range.contains(ch.ch)))
     {
         requests.insert(key);
     }
