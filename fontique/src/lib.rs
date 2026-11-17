@@ -84,8 +84,7 @@ pub use script::ScriptExt;
 pub use attributes::Attributes;
 pub use charmap::{Charmap, CharmapIndex, UnicodeRangeSet};
 pub use collection::{
-    Collection, CollectionOptions, PendingFontStatus, Query, QueryCandidate, QueryFamily,
-    QueryFont, QueryStatus,
+    Collection, CollectionOptions, Query, QueryCandidate, QueryFamily, QueryFont, QueryStatus,
 };
 pub use fallback::FallbackKey;
 pub use family::{FamilyId, FamilyInfo};
@@ -95,7 +94,7 @@ pub use parlance::{
     FontRange, FontStyle, FontStyleRange, FontWeight, FontWeightRange, FontWidth, FontWidthRange,
     GenericFamily, Language, Script, Synthesis,
 };
-pub use source::{SourceId, SourceInfo, SourceKind};
+pub use source::{PendingFontStatus, SourceId, SourceInfo, SourceKind};
 
 #[cfg(all(feature = "system", target_vendor = "apple"))]
 use objc2 as _;

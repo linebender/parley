@@ -3,7 +3,7 @@
 
 //! Query support.
 
-use crate::{Charmap, CharmapIndex, FontInfo, SourceKind, UnicodeRangeSet};
+use crate::{Charmap, CharmapIndex, FontInfo, PendingFontStatus, UnicodeRangeSet};
 
 use super::super::{Collection, SourceCache, matching::match_fonts};
 
@@ -250,12 +250,10 @@ impl CachedFont {
         attributes: Attributes,
         cache: &mut SourceCache,
     ) -> Option<Self> {
-        if let SourceKind::Failed(_) = info.source().kind() {
-            return None;
-        }
-        if let SourceKind::Pending(key) = info.source().kind() {
-            return Some(Self::Pending {
-                key: *key,
+        if let Some((key, status)) = info.pending_status() {
+            // Only a font whose data has not been requested yet is reported.
+            return (status == PendingFontStatus::Unloaded).then(|| Self::Pending {
+                key,
                 family_index,
                 unicode_range: info.unicode_range().cloned(),
             });

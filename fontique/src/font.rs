@@ -5,7 +5,7 @@
 
 use crate::{CharmapIndex, UnicodeRangeSet};
 
-use super::source::{SourceInfo, SourceKind};
+use super::source::{PendingFontStatus, SourceInfo, SourceKind};
 use super::{Blob, source_cache::SourceCache};
 use crate::{FontStyle, FontStyleRange, FontWeight, FontWeightRange, FontWidth, FontWidthRange};
 use parlance::Synthesis;
@@ -32,7 +32,7 @@ impl FontInfo {
     /// Creates a new font object from the given source and index.
     pub fn from_source(source: SourceInfo, index: u32) -> Option<Self> {
         match &source.kind {
-            SourceKind::Pending(_) | SourceKind::Failed(_) => None,
+            SourceKind::Pending { .. } => None,
             #[cfg(feature = "std")]
             SourceKind::Path(path) => {
                 let file = std::fs::File::open(&**path).ok()?;
@@ -64,7 +64,7 @@ impl FontInfo {
             source_cache.get(&self.source)
         } else {
             match &self.source.kind {
-                SourceKind::Pending(_) | SourceKind::Failed(_) => None,
+                SourceKind::Pending { .. } => None,
                 SourceKind::Memory(blob) => Some(blob.clone()),
                 #[cfg(feature = "std")]
                 SourceKind::Path(path) => super::source_cache::load_blob(path),
@@ -232,7 +232,13 @@ impl FontInfo {
 impl FontInfo {
     pub(crate) fn pending(key: u64, info: &FontInfoOverride<'_>) -> Self {
         let mut font = Self {
-            source: SourceInfo::new(super::source::SourceId::new(), SourceKind::Pending(key)),
+            source: SourceInfo::new(
+                super::source::SourceId::new(),
+                SourceKind::Pending {
+                    key,
+                    status: PendingFontStatus::Unloaded,
+                },
+            ),
             index: 0,
             width: FontWidthRange::default(),
             style: FontStyleRange::default(),
@@ -246,10 +252,17 @@ impl FontInfo {
         font
     }
 
-    /// Marks a pending face as failed, so that it is no longer matched.
-    pub(crate) fn fail_pending(&mut self) {
-        if let SourceKind::Pending(key) = self.source.kind {
-            self.source.kind = SourceKind::Failed(key);
+    /// The key and load status of a descriptor-only font.
+    pub(crate) fn pending_status(&self) -> Option<(u64, PendingFontStatus)> {
+        match self.source.kind {
+            SourceKind::Pending { key, status } => Some((key, status)),
+            _ => None,
+        }
+    }
+
+    pub(crate) fn set_pending_status(&mut self, new_status: PendingFontStatus) {
+        if let SourceKind::Pending { status, .. } = &mut self.source.kind {
+            *status = new_status;
         }
     }
 

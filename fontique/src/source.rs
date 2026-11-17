@@ -58,15 +58,31 @@ impl SourceInfo {
     }
 }
 
+/// Load status of a descriptor-only font registered with
+/// [`Collection::register_pending_font`](crate::Collection::register_pending_font).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PendingFontStatus {
+    /// The font's data has not been requested. Queries report the font as
+    /// [`QueryCandidate::Pending`](crate::QueryCandidate::Pending) where it matches.
+    Unloaded,
+    /// The font's data has been requested. Queries skip the font.
+    Loading,
+    /// Loading the font's data failed. Queries skip the font.
+    Failed,
+}
+
 /// Font data that is either a path to the font file or shared data in memory.
 ///
 /// See [`SourceInfo`].
 #[derive(Clone)]
 pub enum SourceKind {
-    /// Descriptor-only font awaiting data, identified by an application key.
-    Pending(u64),
-    /// Descriptor-only font whose data failed to load. It is never matched.
-    Failed(u64),
+    /// Descriptor-only font without data, identified by an application key.
+    Pending {
+        /// The key the application registered the font with.
+        key: u64,
+        /// Whether the font's data has been requested, or failed to load.
+        status: PendingFontStatus,
+    },
     /// Shared data containing the content of the font file.
     Memory(Blob<u8>),
     #[cfg(feature = "std")]
@@ -75,10 +91,10 @@ pub enum SourceKind {
 }
 
 impl SourceKind {
-    /// The application key of a descriptor-only font, whether awaiting data or failed.
-    pub(crate) fn descriptor_key(&self) -> Option<u64> {
+    /// The application key of a descriptor-only font.
+    pub(crate) fn pending_key(&self) -> Option<u64> {
         match self {
-            Self::Pending(key) | Self::Failed(key) => Some(*key),
+            Self::Pending { key, .. } => Some(*key),
             _ => None,
         }
     }
@@ -87,8 +103,7 @@ impl SourceKind {
 impl core::fmt::Debug for SourceKind {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
-            Self::Pending(key) => write!(f, "Pending({key})"),
-            Self::Failed(key) => write!(f, "Failed({key})"),
+            Self::Pending { key, status } => write!(f, "Pending({key}, {status:?})"),
             #[cfg(feature = "std")]
             Self::Path(path) => {
                 write!(f, "Path({path:?})")
