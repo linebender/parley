@@ -3,7 +3,7 @@
 
 //! Model for a font.
 
-use crate::CharmapIndex;
+use crate::{CharmapIndex, UnicodeRangeSet};
 
 use super::source::{SourceInfo, SourceKind};
 use super::{Blob, source_cache::SourceCache};
@@ -25,6 +25,7 @@ pub struct FontInfo {
     axes: AxisVec,
     attr_axes: u8,
     charmap_index: CharmapIndex,
+    unicode_range: Option<UnicodeRangeSet>,
 }
 
 impl FontInfo {
@@ -203,6 +204,13 @@ impl FontInfo {
     pub fn charmap_index(&self) -> CharmapIndex {
         self.charmap_index
     }
+
+    /// Returns the codepoints the font may be used for.
+    ///
+    /// See [`FontInfoOverride::unicode_range`].
+    pub fn unicode_range(&self) -> Option<&UnicodeRangeSet> {
+        self.unicode_range.as_ref()
+    }
 }
 
 impl FontInfo {
@@ -248,6 +256,7 @@ impl FontInfo {
             axes,
             attr_axes,
             charmap_index,
+            unicode_range: None,
         })
     }
 
@@ -287,6 +296,9 @@ impl FontInfo {
                     axis.default = *value;
                 }
             }
+        }
+        if let Some(unicode_range) = info_override.unicode_range {
+            self.unicode_range = Some(unicode_range.clone());
         }
     }
 }
@@ -425,6 +437,12 @@ pub struct FontInfoOverride<'a> {
     /// Default values for the font's variation axes. Axes not included within
     /// the font will be ignored.
     pub axes: Option<&'a [(Tag, f32)]>,
+    /// The codepoints the font may be used for. The font is ignored for all other codepoints.
+    ///
+    /// This can be used to implement CSS's [`unicode-range`].
+    ///
+    /// [`unicode-range`]: https://www.w3.org/TR/css-fonts-4/#unicode-range-desc
+    pub unicode_range: Option<&'a UnicodeRangeSet>,
 }
 
 #[cfg(test)]
