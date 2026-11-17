@@ -505,6 +505,7 @@ fn build_into_layout<B: Brush>(
             text,
             layout,
             &mut lcx.style_features,
+            &mut lcx.pending_font_requests,
         );
     }
 

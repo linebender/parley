@@ -32,6 +32,7 @@ impl FontInfo {
     /// Creates a new font object from the given source and index.
     pub fn from_source(source: SourceInfo, index: u32) -> Option<Self> {
         match &source.kind {
+            SourceKind::Pending(_) => None,
             #[cfg(feature = "std")]
             SourceKind::Path(path) => {
                 let file = std::fs::File::open(&**path).ok()?;
@@ -63,6 +64,7 @@ impl FontInfo {
             source_cache.get(&self.source)
         } else {
             match &self.source.kind {
+                SourceKind::Pending(_) => None,
                 SourceKind::Memory(blob) => Some(blob.clone()),
                 #[cfg(feature = "std")]
                 SourceKind::Path(path) => super::source_cache::load_blob(path),
@@ -228,6 +230,22 @@ impl FontInfo {
 }
 
 impl FontInfo {
+    pub(crate) fn pending(key: u64, info: &FontInfoOverride<'_>) -> Self {
+        let mut font = Self {
+            source: SourceInfo::new(super::source::SourceId::new(), SourceKind::Pending(key)),
+            index: 0,
+            width: FontWidthRange::default(),
+            style: FontStyleRange::default(),
+            weight: FontWeightRange::default(),
+            axes: AxisVec::default(),
+            attr_axes: 0,
+            charmap_index: CharmapIndex::default(),
+            unicode_range: None,
+        };
+        font.apply_override(info);
+        font
+    }
+
     pub(crate) fn from_font_ref(
         font: &FontRef<'_>,
         source: SourceInfo,

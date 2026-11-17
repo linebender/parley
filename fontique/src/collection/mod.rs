@@ -32,6 +32,15 @@ use std::sync::{Mutex, atomic::Ordering};
 
 type FamilyMap = HashMap<FamilyId, Option<FamilyInfo>>;
 
+/// Application-managed load state of a descriptor-only font.
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PendingFontState {
+    /// No request has been started.
+    Unloaded,
+    /// A request is in progress.
+    Loading,
+}
+
 /// Options for a [font collection](Collection).
 #[derive(Copy, Clone, Debug)]
 pub struct CollectionOptions {
@@ -69,6 +78,43 @@ pub struct Collection {
 }
 
 impl Collection {
+    /// Registers a descriptor-only face. Requires a nonempty family name and a unique key.
+    /// Missing attribute ranges default to normal. No data is loaded.
+    pub fn register_pending_font(
+        &mut self,
+        key: u64,
+        info_override: FontInfoOverride<'_>,
+    ) -> Option<FamilyId> {
+        self.inner.register_pending_font(key, info_override)
+    }
+
+    /// Removes a pending face, after registering its data or when loading fails.
+    pub fn unregister_pending_font(&mut self, key: u64) -> bool {
+        self.inner.unregister_pending_font(key)
+    }
+
+    /// Returns this collection's local load state. Clones have independent states.
+    pub fn pending_font_state(&mut self, key: u64) -> Option<PendingFontState> {
+        self.inner.sync_shared();
+        self.inner.data.pending_fonts.get(&key)?;
+        Some(
+            *self
+                .inner
+                .pending_states
+                .entry(key)
+                .or_insert(PendingFontState::Unloaded),
+        )
+    }
+
+    /// Sets this collection's local load state, returning false for an unknown key.
+    pub fn set_pending_font_state(&mut self, key: u64, state: PendingFontState) -> bool {
+        if self.pending_font_state(key).is_none() {
+            return false;
+        }
+        self.inner.pending_states.insert(key, state);
+        true
+    }
+
     /// Creates a new collection with the given options.
     ///
     /// If `fontique` was compiled with the `"system"` feature and
@@ -252,6 +298,7 @@ impl Default for Collection {
 /// Collection of fonts.
 #[derive(Clone)]
 struct Inner {
+    pending_states: HashMap<u64, PendingFontState>,
     system: Option<System>,
     data: CommonData,
     #[allow(unused)]
@@ -262,11 +309,44 @@ struct Inner {
 }
 
 impl Inner {
+    fn register_pending_font(&mut self, key: u64, info: FontInfoOverride<'_>) -> Option<FamilyId> {
+        #[cfg(feature = "std")]
+        let result = if let Some(shared) = &self.shared {
+            let result = shared.data.lock().unwrap().register_pending_font(key, info);
+            shared.bump_version();
+            result
+        } else {
+            self.data.register_pending_font(key, info)
+        };
+        #[cfg(not(feature = "std"))]
+        let result = self.data.register_pending_font(key, info);
+        if result.is_some() {
+            self.pending_states.insert(key, PendingFontState::Unloaded);
+        }
+        result
+    }
+
+    fn unregister_pending_font(&mut self, key: u64) -> bool {
+        #[cfg(feature = "std")]
+        let removed = if let Some(shared) = &self.shared {
+            let removed = shared.data.lock().unwrap().unregister_pending_font(key);
+            shared.bump_version();
+            removed
+        } else {
+            self.data.unregister_pending_font(key)
+        };
+        #[cfg(not(feature = "std"))]
+        let removed = self.data.unregister_pending_font(key);
+        self.pending_states.remove(&key);
+        removed
+    }
+
     /// Creates a new collection with the given options.
     pub fn new(options: CollectionOptions) -> Self {
         let system = options.system_fonts.then(System::new);
         let shared = options.shared.then(|| Arc::new(Shared::default()));
         Self {
+            pending_states: HashMap::default(),
             system,
             data: CommonData::default(),
             shared,
@@ -587,6 +667,7 @@ impl Inner {
             self.data.clear();
         }
         self.data.clear();
+        self.pending_states.clear();
     }
 
     fn sync_shared(&mut self) {
@@ -599,6 +680,8 @@ impl Inner {
                 // If this becomes a problem, do more fine grained tracking
                 // of changes.
                 self.data = shared.data.lock().unwrap().clone();
+                self.pending_states
+                    .retain(|key, _| self.data.pending_fonts.contains_key(key));
                 self.shared_version = version;
                 self.fallback_cache.reset();
             }
@@ -696,6 +779,7 @@ impl System {
 /// Common data for base and shared collections.
 #[derive(Clone, Default)]
 struct CommonData {
+    pending_fonts: HashMap<u64, FamilyId>,
     family_names: FamilyNameMap,
     families: FamilyMap,
     generic_families: GenericFamilyMap,
@@ -703,6 +787,36 @@ struct CommonData {
 }
 
 impl CommonData {
+    fn register_pending_font(&mut self, key: u64, info: FontInfoOverride<'_>) -> Option<FamilyId> {
+        let family_name = info.family_name.filter(|name| !name.is_empty())?;
+        if self.pending_fonts.contains_key(&key) {
+            return None;
+        }
+        let name = self.family_names.get_or_insert(family_name);
+        let id = name.id();
+        let mut families = HashMap::default();
+        families.insert(id, (name, alloc::vec![FontInfo::pending(key, &info)]));
+        self.merge_families(&families);
+        self.pending_fonts.insert(key, id);
+        Some(id)
+    }
+
+    fn unregister_pending_font(&mut self, key: u64) -> bool {
+        let Some(id) = self.pending_fonts.remove(&key) else {
+            return false;
+        };
+        if let Some(Some(family)) = self.families.get_mut(&id) {
+            let name = self.family_names.get_by_id(id).unwrap().clone();
+            let fonts = family
+                .fonts()
+                .iter()
+                .filter(|font| !matches!(font.source().kind(), SourceKind::Pending(k) if *k == key))
+                .cloned();
+            *family = FamilyInfo::new(name, fonts);
+        }
+        true
+    }
+
     #[cfg(feature = "std")]
     fn load_fonts_from_paths(&mut self, paths: impl IntoIterator<Item = impl AsRef<Path>>) {
         let mut families: HashMap<FamilyId, (FamilyName, Vec<FontInfo>)> = HashMap::default();
@@ -836,6 +950,14 @@ impl CommonData {
             .filter(|f| f.width() != width || f.style() != style || f.weight() != weight)
             .cloned();
         *family = FamilyInfo::new(family_name.clone(), new_fonts);
+
+        self.pending_fonts.retain(|key, id| {
+            *id != family.id()
+                || family
+                    .fonts()
+                    .iter()
+                    .any(|font| matches!(font.source().kind(), SourceKind::Pending(k) if k == key))
+        });
 
         Some(())
     }

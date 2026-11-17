@@ -63,6 +63,8 @@ impl SourceInfo {
 /// See [`SourceInfo`].
 #[derive(Clone)]
 pub enum SourceKind {
+    /// Descriptor-only font awaiting data, identified by an application key.
+    Pending(u64),
     /// Shared data containing the content of the font file.
     Memory(Blob<u8>),
     #[cfg(feature = "std")]
@@ -73,6 +75,7 @@ pub enum SourceKind {
 impl core::fmt::Debug for SourceKind {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
+            Self::Pending(key) => write!(f, "Pending({key})"),
             #[cfg(feature = "std")]
             Self::Path(path) => {
                 write!(f, "Path({path:?})")

@@ -67,7 +67,7 @@ impl UnicodeRangeSet {
 }
 
 /// Metadata for constructing a character map from font data.
-#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+#[derive(Copy, Clone, Default, PartialEq, Eq, Debug)]
 pub struct CharmapIndex {
     subtable_offset: u32,
     is_symbol: bool,

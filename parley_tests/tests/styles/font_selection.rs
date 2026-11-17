@@ -25,6 +25,120 @@ fn build_with_font_size(env: &mut TestEnv, text: &str, size: f32) -> Layout<Colo
 // ============================================================================
 
 #[test]
+fn pending_font_requests_use_unicode_range_and_fallback() {
+    use fontique::{
+        Blob, Collection, CollectionOptions, PendingFontState, QueryFamily, UnicodeRangeSet,
+    };
+    use parley::style::FontFamily;
+    use parley::{FontContext, LayoutContext};
+    use std::sync::Arc;
+
+    const ROBOTO: &[u8] =
+        include_bytes!("../../../parley_dev/assets/fonts/roboto_fonts/Roboto-Regular.ttf");
+    for shared in [false, true] {
+        let mut fonts = FontContext {
+            collection: Collection::new(CollectionOptions {
+                shared,
+                system_fonts: false,
+            }),
+            source_cache: Default::default(),
+        };
+        let fallback = Blob::new(Arc::new(ROBOTO.to_vec()));
+        fonts.collection.register_fonts(
+            fallback.clone(),
+            Some(FontInfoOverride {
+                family_name: Some("Fallback"),
+                ..Default::default()
+            }),
+        );
+        assert!(
+            fonts
+                .collection
+                .register_pending_font(1, FontInfoOverride::default())
+                .is_none()
+        );
+        let range = UnicodeRangeSet::new([u32::from('a')..=u32::from('z')]);
+        let info = FontInfoOverride {
+            family_name: Some("A"),
+            unicode_range: Some(&range),
+            ..Default::default()
+        };
+        let family = fonts.collection.register_pending_font(1, info).unwrap();
+        assert_eq!(fonts.collection.family_id("A"), Some(family));
+        assert!(fonts.collection.register_pending_font(1, info).is_none());
+        let mut cloned = fonts.collection.clone();
+        assert!(
+            fonts
+                .collection
+                .set_pending_font_state(1, PendingFontState::Loading)
+        );
+        assert_eq!(
+            fonts.collection.pending_font_state(1),
+            Some(PendingFontState::Loading)
+        );
+        assert_eq!(
+            cloned.pending_font_state(1),
+            Some(PendingFontState::Unloaded)
+        );
+        assert!(
+            !fonts
+                .collection
+                .set_pending_font_state(99, PendingFontState::Loading)
+        );
+
+        let mut context = LayoutContext::<[u8; 4]>::new();
+        for (text, expected) in [("abc abc", vec![1]), ("123", vec![]), ("", vec![])] {
+            let mut builder = context.ranged_builder(&mut fonts, text, 1.0, true);
+            builder.push_default(StyleProperty::FontFamily(FontFamily::Source(
+                "A, Fallback".into(),
+            )));
+            let mut layout = builder.build(text);
+            layout.break_all_lines(None);
+            assert_eq!(
+                context.drain_pending_font_requests().collect::<Vec<_>>(),
+                expected
+            );
+            assert_eq!(context.drain_pending_font_requests().count(), 0);
+            let runs: Vec<_> = layout.lines().flat_map(|line| line.runs()).collect();
+            if !text.is_empty() {
+                assert!(!runs.is_empty());
+                assert!(runs.iter().all(|run| run.font().data.id() == fallback.id()));
+            }
+        }
+        {
+            let mut query = fonts.collection.query(&mut fonts.source_cache);
+            query.set_families([QueryFamily::Named("A"), QueryFamily::Named("Fallback")]);
+            assert_eq!(
+                query.first_available_font().unwrap().blob.id(),
+                fallback.id()
+            );
+        }
+        fonts
+            .collection
+            .register_fonts(fallback.clone(), Some(info));
+        assert!(fonts.collection.unregister_pending_font(1));
+        assert!(!fonts.collection.unregister_pending_font(1));
+        assert_eq!(fonts.collection.pending_font_state(1), None);
+        if shared {
+            assert_eq!(cloned.pending_font_state(1), None);
+        }
+        assert!(
+            fonts
+                .collection
+                .family(family)
+                .unwrap()
+                .fonts()
+                .iter()
+                .all(|font| font.load(None).is_some())
+        );
+
+        fonts.collection.register_pending_font(2, info).unwrap();
+        assert!(fonts.collection.unregister_pending_font(2));
+        assert_eq!(fonts.collection.pending_font_state(2), None);
+    }
+}
+
+#[test]
 fn style_font_size_values() {
     let mut env = TestEnv::new(test_name!(), None);
     let text = samples::LATIN;

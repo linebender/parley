@@ -94,6 +94,7 @@ impl SourceCache {
     /// [blob]: Blob
     pub fn get(&mut self, source: &SourceInfo) -> Option<Blob<u8>> {
         match &source.kind {
+            SourceKind::Pending(_) => None,
             SourceKind::Memory(memory) => Some(memory.clone()),
             #[cfg(feature = "std")]
             SourceKind::Path(path) => {

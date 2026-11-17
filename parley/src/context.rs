@@ -24,6 +24,7 @@ use smallvec::SmallVec;
 ///
 /// This type is designed to be a global resource with only one per-application (or per-thread).
 pub struct LayoutContext<B: Brush = [u8; 4]> {
+    pub(crate) pending_font_requests: hashbrown::HashSet<u64>,
     pub(crate) rcx: ResolveContext,
     pub(crate) style_table: Vec<ResolvedStyle<B>>,
     /// Font features for each style, parallel to `style_table`.
@@ -50,6 +51,7 @@ pub struct LayoutContext<B: Brush = [u8; 4]> {
 impl<B: Brush> LayoutContext<B> {
     pub fn new() -> Self {
         Self {
+            pending_font_requests: hashbrown::HashSet::default(),
             rcx: ResolveContext::default(),
             style_table: vec![],
             style_features: Vec::new(),
@@ -65,6 +67,12 @@ impl<B: Brush> LayoutContext<B> {
             char_style_indices: vec![],
             scx: Shaper::default(),
         }
+    }
+
+    /// Drains deduplicated pending face keys encountered while shaping, across layouts.
+    /// The application should load these faces and rebuild affected layouts when ready.
+    pub fn drain_pending_font_requests(&mut self) -> impl Iterator<Item = u64> + '_ {
+        self.pending_font_requests.drain()
     }
 
     fn resolve_style_set(

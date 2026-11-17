@@ -52,6 +52,7 @@ pub(crate) fn shape_text<'a, B: Brush>(
     text: &str,
     layout: &mut Layout<B>,
     style_features: &'a mut Vec<SmallVec<[FontFeature; 8]>>,
+    pending_font_requests: &mut hashbrown::HashSet<u64>,
 ) {
     let scale = layout.data.scale;
 
@@ -178,7 +179,7 @@ pub(crate) fn shape_text<'a, B: Brush>(
         })
     };
 
-    let font_selector = FontSelector::new(&mut fq, rcx, styles);
+    let font_selector = FontSelector::new(&mut fq, rcx, styles, pending_font_requests);
 
     scx.shape_text(
         text,
@@ -260,6 +261,7 @@ enum LastResortFont {
 }
 
 struct FontSelector<'a, 'b, B: Brush> {
+    pending_font_requests: &'b mut hashbrown::HashSet<u64>,
     query: &'b mut Query<'a>,
     fonts_id: Option<usize>,
     rcx: &'a ResolveContext,
@@ -283,10 +285,12 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
         query: &'b mut Query<'a>,
         rcx: &'a ResolveContext,
         styles: &'a [ResolvedStyle<B>],
+        pending_font_requests: &'b mut hashbrown::HashSet<u64>,
     ) -> Self {
         let attrs = fontique::Attributes::default();
 
         Self {
+            pending_font_requests,
             query,
             fonts_id: None,
             rcx,
@@ -371,6 +375,10 @@ impl<'a, 'b, B: Brush> parley_engine::FontSelector for FontSelector<'a, 'b, B> {
             yields_font
         });
         if !query_yields_font {
+            self.query.matches_with(|font| {
+                record_pending_font(font, cluster, self.pending_font_requests);
+                fontique::QueryStatus::Continue
+            });
             if matches!(self.last_resort_font, LastResortFont::Unresolved) {
                 if let Some(font) = any_font(self.query) {
                     self.last_resort_font = LastResortFont::Resolved(FontInstance {
@@ -398,6 +406,9 @@ impl<'a, 'b, B: Brush> parley_engine::FontSelector for FontSelector<'a, 'b, B> {
         let mut best_coverage = Coverage::NONE;
 
         self.query.matches_with(|font| {
+            if record_pending_font(font, cluster, self.pending_font_requests) {
+                return fontique::QueryStatus::Continue;
+            }
             // Only create the charmap if the character is the unicode range, as the the range check
             // is a lot cheaper than creating the charmap. That matters if families are split into
             // many subsets.
@@ -463,10 +474,31 @@ fn any_font(query: &mut Query<'_>) -> Option<QueryFont> {
     query.matches_with(
         #[inline]
         |font: &QueryFont| {
+            if font.pending.is_some() {
+                return fontique::QueryStatus::Continue;
+            }
             found = Some(font.clone());
             fontique::QueryStatus::Stop
         },
     );
 
     found
+}
+
+fn record_pending_font(
+    font: &QueryFont,
+    cluster: &CharCluster,
+    requests: &mut hashbrown::HashSet<u64>,
+) -> bool {
+    let Some(key) = font.pending else {
+        return false;
+    };
+    if cluster
+        .chars()
+        .iter()
+        .any(|ch| font.in_unicode_range(ch.ch))
+    {
+        requests.insert(key);
+    }
+    true
 }
