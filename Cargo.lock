@@ -2794,7 +2794,6 @@ version = "0.13.0"
 name = "parley_engine"
 version = "0.13.0"
 dependencies = [
- "fontique",
  "harfrust",
  "hashbrown",
  "icu_locale_core",

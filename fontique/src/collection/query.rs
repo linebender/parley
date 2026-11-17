@@ -264,6 +264,7 @@ impl QueryFont {
     ///
     /// This maps all codepoints the font has glyphs for, including those outside its
     /// [unicode range](Self::unicode_range).
+    #[inline]
     pub fn charmap(&self) -> Option<Charmap<'_>> {
         self.charmap_index.charmap(self.blob.as_ref())
     }
