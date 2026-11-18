@@ -63,10 +63,12 @@ impl SourceInfo {
 /// [`Collection::register_pending_font`](crate::Collection::register_pending_font).
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 pub enum PendingFontStatus {
-    /// The font's data has not been requested. Queries report the font as
-    /// [`QueryCandidate::Pending`](crate::QueryCandidate::Pending) where it matches.
+    /// The font's data is not being loaded. Queries yield the font as
+    /// [`QueryCandidate::Pending`](crate::QueryCandidate::Pending) where it matches, and
+    /// can [request](crate::PendingFont::request) it.
     Unloaded,
-    /// The font's data has been requested. Queries skip the font.
+    /// The font's data is being loaded. Queries yield the font as for
+    /// [`Self::Unloaded`], but requesting it does nothing.
     Loading,
     /// Loading the font's data failed. Queries skip the font.
     Failed,

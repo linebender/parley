@@ -505,7 +505,6 @@ fn build_into_layout<B: Brush>(
             text,
             layout,
             &mut lcx.style_features,
-            &mut lcx.pending_font_requests,
         );
     }
 
@@ -517,7 +516,6 @@ fn build_into_layout<B: Brush>(
         &layout.data.shaped_text,
         options.quantize,
         &mut layout.data.style_metrics,
-        &mut lcx.pending_font_requests,
     );
 
     // Move inline boxes into the layout

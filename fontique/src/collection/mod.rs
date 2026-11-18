@@ -5,7 +5,7 @@
 
 mod query;
 
-pub use query::{Query, QueryCandidate, QueryFamily, QueryFont, QueryStatus};
+pub use query::{PendingFont, Query, QueryCandidate, QueryFamily, QueryFont, QueryStatus};
 
 use crate::font::FontInfoOverride;
 
@@ -23,7 +23,7 @@ use super::{
 };
 use crate::{AtomicCounter, CounterInt};
 use alloc::{string::String, sync::Arc, vec::Vec};
-use hashbrown::HashMap;
+use hashbrown::{HashMap, HashSet};
 use read_fonts::types::NameId;
 #[cfg(feature = "std")]
 use std::path::Path;
@@ -66,6 +66,8 @@ impl Default for CollectionOptions {
 pub struct Collection {
     inner: Inner,
     query_state: query::QueryState,
+    /// The pending fonts that queries requested, see [`Self::take_font_requests`].
+    font_requests: HashSet<FontId>,
 }
 
 impl Collection {
@@ -87,11 +89,12 @@ impl Collection {
     /// Sets the load status of a pending face, returning true if it changed. Returns
     /// false for an unknown identifier, a font that is not pending, or a face that already has that status.
     ///
-    /// A face starts as [`PendingFontStatus::Unloaded`], and queries report it where it
-    /// matches. Set it to [`PendingFontStatus::Loading`] once its data has been
-    /// requested, so that it is reported only once, and to [`PendingFontStatus::Failed`]
-    /// if the data cannot be loaded. In both of those states the face keeps its family
-    /// position and descriptors but is skipped by queries.
+    /// A face starts as [`PendingFontStatus::Unloaded`], and queries can
+    /// [request](PendingFont::request) it where it matches. Set it to
+    /// [`PendingFontStatus::Loading`] once its data is being loaded, so that it is not
+    /// requested again, and to [`PendingFontStatus::Failed`] if the data cannot be
+    /// loaded, after which queries skip it. In both of those states the face keeps its
+    /// family position and descriptors.
     pub fn set_pending_font_status(&mut self, id: FontId, status: PendingFontStatus) -> bool {
         self.inner.set_pending_font_status(id, status)
     }
@@ -113,6 +116,16 @@ impl Collection {
         self.inner.resolve_pending_font(id, data, index)
     }
 
+    /// Returns the identifiers of the pending fonts that queries
+    /// [requested](PendingFont::request) since the last call, in no particular order.
+    ///
+    /// The requests are those made through this collection, not through its clones. A
+    /// font is requested again by later queries until its status is no longer
+    /// [`PendingFontStatus::Unloaded`].
+    pub fn take_font_requests(&mut self) -> impl Iterator<Item = FontId> + '_ {
+        self.font_requests.drain()
+    }
+
     /// Creates a new collection with the given options.
     ///
     /// If `fontique` was compiled with the `"system"` feature and
@@ -126,6 +139,7 @@ impl Collection {
         Self {
             inner: Inner::new(options),
             query_state: query::QueryState::default(),
+            font_requests: HashSet::default(),
         }
     }
 
@@ -324,6 +338,7 @@ impl Collection {
     ///
     /// Returns true if a font was removed from its family, false otherwise.
     pub fn unregister_font(&mut self, id: FontId) -> bool {
+        self.font_requests.remove(&id);
         self.inner.unregister_font(id)
     }
 
@@ -331,6 +346,7 @@ impl Collection {
     /// [`Self::register_font`], and unsets all previously-set generic families
     /// and fallbacks. This will not remove any system fonts.
     pub fn clear(&mut self) {
+        self.font_requests.clear();
         self.inner.clear();
     }
 }

@@ -52,7 +52,6 @@ pub(crate) fn shape_text<'a, B: Brush>(
     text: &str,
     layout: &mut Layout<B>,
     style_features: &'a mut Vec<SmallVec<[FontFeature; 8]>>,
-    pending_font_requests: &mut hashbrown::HashSet<fontique::FontId>,
 ) {
     let scale = layout.data.scale;
 
@@ -179,7 +178,7 @@ pub(crate) fn shape_text<'a, B: Brush>(
         })
     };
 
-    let font_selector = FontSelector::new(&mut fq, rcx, styles, pending_font_requests);
+    let font_selector = FontSelector::new(&mut fq, rcx, styles);
 
     scx.shape_text(
         text,
@@ -261,7 +260,6 @@ enum LastResortFont {
 }
 
 struct FontSelector<'a, 'b, B: Brush> {
-    pending_font_requests: &'b mut hashbrown::HashSet<fontique::FontId>,
     query: &'b mut Query<'a>,
     fonts_id: Option<usize>,
     rcx: &'a ResolveContext,
@@ -285,12 +283,10 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
         query: &'b mut Query<'a>,
         rcx: &'a ResolveContext,
         styles: &'a [ResolvedStyle<B>],
-        pending_font_requests: &'b mut hashbrown::HashSet<fontique::FontId>,
     ) -> Self {
         let attrs = fontique::Attributes::default();
 
         Self {
-            pending_font_requests,
             query,
             fonts_id: None,
             rcx,
@@ -375,10 +371,16 @@ impl<'a, 'b, B: Brush> parley_engine::FontSelector for FontSelector<'a, 'b, B> {
             yields_font
         });
         if !query_yields_font {
-            self.query.matches_with_pending(|candidate| {
-                record_pending_font(candidate, cluster, self.pending_font_requests);
-                fontique::QueryStatus::Continue
-            });
+            // The query may still yield pending fonts. Request the first that the cluster
+            // is in range of.
+            self.query
+                .matches_with_pending(|candidate| match candidate {
+                    fontique::QueryCandidate::Pending(font) if in_unicode_range(&font, cluster) => {
+                        font.request();
+                        fontique::QueryStatus::Stop
+                    }
+                    _ => fontique::QueryStatus::Continue,
+                });
             if matches!(self.last_resort_font, LastResortFont::Unresolved) {
                 if let Some(font) = any_font(self.query) {
                     self.last_resort_font = LastResortFont::Resolved(FontInstance {
@@ -405,12 +407,21 @@ impl<'a, 'b, B: Brush> parley_engine::FontSelector for FontSelector<'a, 'b, B> {
         let mut selected_font = None;
         let mut best_coverage = Coverage::NONE;
 
+        let mut requested = false;
+
         self.query.matches_with_pending(|candidate| {
-            if record_pending_font(candidate, cluster, self.pending_font_requests) {
-                return fontique::QueryStatus::Continue;
-            }
-            let fontique::QueryCandidate::Font(font) = candidate else {
-                unreachable!()
+            let font = match candidate {
+                fontique::QueryCandidate::Font(font) => font,
+                fontique::QueryCandidate::Pending(font) => {
+                    // Only the first pending font that the cluster is in range of is
+                    // requested. The later ones are requested once it is loaded or has
+                    // failed, if it turns out not to be the font to use.
+                    if !requested && in_unicode_range(&font, cluster) {
+                        requested = true;
+                        font.request();
+                    }
+                    return fontique::QueryStatus::Continue;
+                }
             };
             // Only create the charmap if the character is the unicode range, as the the range check
             // is a lot cheaper than creating the charmap. That matters if families are split into
@@ -485,20 +496,10 @@ fn any_font(query: &mut Query<'_>) -> Option<QueryFont> {
     found
 }
 
-fn record_pending_font(
-    candidate: fontique::QueryCandidate<'_>,
-    cluster: &CharCluster,
-    requests: &mut hashbrown::HashSet<fontique::FontId>,
-) -> bool {
-    let fontique::QueryCandidate::Pending { id, unicode_range } = candidate else {
-        return false;
-    };
-    if cluster
+/// Returns `true` if `font` may be used for part of `cluster` once its data is available.
+fn in_unicode_range(font: &fontique::PendingFont<'_, '_>, cluster: &CharCluster) -> bool {
+    cluster
         .chars()
         .iter()
-        .any(|ch| unicode_range.is_none_or(|range| range.contains(ch.ch)))
-    {
-        requests.insert(id);
-    }
-    true
+        .any(|ch| font.in_unicode_range(ch.ch))
 }

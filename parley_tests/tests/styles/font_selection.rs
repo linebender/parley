@@ -79,10 +79,10 @@ fn pending_font_requests_use_unicode_range_and_fallback() {
             let mut layout = builder.build(text);
             layout.break_all_lines(None);
             assert_eq!(
-                context.drain_pending_font_requests().collect::<Vec<_>>(),
+                fonts.collection.take_font_requests().collect::<Vec<_>>(),
                 expected
             );
-            assert_eq!(context.drain_pending_font_requests().count(), 0);
+            assert_eq!(fonts.collection.take_font_requests().count(), 0);
             let runs: Vec<_> = layout.lines().flat_map(|line| line.runs()).collect();
             if !text.is_empty() {
                 assert!(!runs.is_empty());
@@ -157,24 +157,23 @@ fn pending_metrics_and_resolution_preserve_face_priority() {
                 let mut query = collection.query(&mut cache);
                 query.set_families([family]);
                 query.matches_with(|_| panic!("pending faces must not yield loaded fonts"));
-                let mut keys = Vec::new();
-                assert!(
-                    query
-                        .first_available_font_with(|key| keys.push(key))
-                        .is_none()
-                );
-                assert_eq!(keys, [ids[1], ids[0]]);
+                assert!(query.first_available_font().is_none());
                 let mut candidates = Vec::new();
                 query.matches_with_pending(|candidate| {
-                    let QueryCandidate::Pending { id, unicode_range } = candidate else {
+                    let QueryCandidate::Pending(font) = candidate else {
                         panic!("unexpected loaded font")
                     };
-                    assert!(unicode_range.unwrap().contains(' '));
-                    candidates.push(id);
+                    assert!(font.in_unicode_range(' ') && !font.in_unicode_range(128_u32));
+                    candidates.push(font.id());
                     QueryStatus::Continue
                 });
                 assert_eq!(candidates, [ids[1], ids[0]]);
             }
+            // Metrics request only the first pending face in range.
+            assert_eq!(
+                collection.take_font_requests().collect::<Vec<_>>(),
+                [ids[1]]
+            );
             let font = Blob::new(Arc::new(bytes.to_vec()));
             assert!(!collection.resolve_pending_font(FontId::new(), font.clone(), 0));
             // The data holds a single font, so only index 0 names one.
@@ -219,27 +218,26 @@ fn pending_font_status_controls_reporting() {
     };
     use std::sync::Arc;
 
-    fn reported(collection: &mut Collection, family: fontique::FamilyId) -> Vec<FontId> {
+    /// The face that the first available font lookup requests, and the pending faces
+    /// that the query yields.
+    fn reported(
+        collection: &mut Collection,
+        family: fontique::FamilyId,
+    ) -> (Vec<FontId>, Vec<(FontId, PendingFontStatus)>) {
         let mut cache = SourceCache::default();
         let mut query = collection.query(&mut cache);
         query.set_families([family]);
-        let mut metrics_keys = Vec::new();
-        assert!(
-            query
-                .first_available_font_with(|key| metrics_keys.push(key))
-                .is_none()
-        );
-        let mut keys = Vec::new();
+        assert!(query.first_available_font().is_none());
+        let mut yielded = Vec::new();
         query.matches_with_pending(|candidate| {
-            if let fontique::QueryCandidate::Pending { id, .. } = candidate {
-                keys.push(id);
+            if let fontique::QueryCandidate::Pending(font) = candidate {
+                yielded.push((font.id(), font.status()));
             }
             QueryStatus::Continue
         });
-        assert_eq!(keys, metrics_keys);
-        keys
+        drop(query);
+        (collection.take_font_requests().collect(), yielded)
     }
-
     let bytes = include_bytes!("../../../parley_dev/assets/fonts/roboto_fonts/Roboto-Regular.ttf");
     for shared in [false, true] {
         let mut collection = Collection::new(CollectionOptions {
@@ -258,9 +256,19 @@ fn pending_font_status_controls_reporting() {
             collection.pending_font_status(one),
             Some(PendingFontStatus::Unloaded)
         );
-        assert_eq!(reported(&mut collection, family), [two, one]);
+        // Only the first face is requested.
+        assert_eq!(
+            reported(&mut collection, family),
+            (
+                vec![two],
+                vec![
+                    (two, PendingFontStatus::Unloaded),
+                    (one, PendingFontStatus::Unloaded)
+                ]
+            )
+        );
 
-        // A face that is loading is reported no more, on this collection.
+        // A face that is loading is still yielded, on this collection.
         assert!(!collection.set_pending_font_status(FontId::new(), PendingFontStatus::Loading));
         assert!(!collection.set_pending_font_status(one, PendingFontStatus::Unloaded));
         assert!(collection.set_pending_font_status(one, PendingFontStatus::Loading));
@@ -269,7 +277,16 @@ fn pending_font_status_controls_reporting() {
             collection.pending_font_status(one),
             Some(PendingFontStatus::Loading)
         );
-        assert_eq!(reported(&mut collection, family), [two]);
+        assert_eq!(
+            reported(&mut collection, family),
+            (
+                vec![two],
+                vec![
+                    (two, PendingFontStatus::Unloaded),
+                    (one, PendingFontStatus::Loading)
+                ]
+            )
+        );
         // The status is shared only between clones of a shared collection.
         let clone_status = if shared {
             PendingFontStatus::Loading
@@ -278,15 +295,33 @@ fn pending_font_status_controls_reporting() {
         };
         assert_eq!(clone.pending_font_status(one), Some(clone_status));
 
-        // A failed face keeps its slot and is not reported either.
-        assert!(collection.set_pending_font_status(one, PendingFontStatus::Failed));
+        // A loading face is not requested again, and holds back the faces after it.
+        assert!(collection.set_pending_font_status(one, PendingFontStatus::Unloaded));
+        assert!(collection.set_pending_font_status(two, PendingFontStatus::Loading));
+        assert_eq!(
+            reported(&mut collection, family),
+            (
+                vec![],
+                vec![
+                    (two, PendingFontStatus::Loading),
+                    (one, PendingFontStatus::Unloaded)
+                ]
+            )
+        );
+
+        // A failed face keeps its slot and is not yielded, so the next face is requested.
         assert!(collection.set_pending_font_status(two, PendingFontStatus::Failed));
+        assert_eq!(
+            reported(&mut collection, family),
+            (vec![one], vec![(one, PendingFontStatus::Unloaded)])
+        );
+        assert!(collection.set_pending_font_status(one, PendingFontStatus::Failed));
         assert_eq!(
             collection.pending_font_status(one),
             Some(PendingFontStatus::Failed)
         );
         assert_eq!(collection.family(family).unwrap().fonts().len(), 2);
-        assert_eq!(reported(&mut collection, family), []);
+        assert_eq!(reported(&mut collection, family), (vec![], vec![]));
 
         // A face in any status can still be resolved, in its original position, or removed.
         let font = Blob::new(Arc::new(bytes.to_vec()));

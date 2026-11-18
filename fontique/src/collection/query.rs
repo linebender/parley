@@ -8,6 +8,7 @@ use crate::{Charmap, CharmapIndex, FontId, FontInfo, PendingFontStatus, UnicodeR
 use super::super::{Collection, SourceCache, matching::match_fonts};
 
 use alloc::vec::Vec;
+use hashbrown::HashSet;
 use parlance::Script;
 use smallvec::SmallVec;
 
@@ -35,6 +36,7 @@ impl QueryState {
 pub struct Query<'a> {
     collection: &'a mut Inner,
     state: &'a mut QueryState,
+    requests: &'a mut HashSet<FontId>,
     source_cache: &'a mut SourceCache,
     attributes: Attributes,
     fallbacks: Option<FallbackKey>,
@@ -46,6 +48,7 @@ impl<'a> Query<'a> {
         Self {
             collection: &mut collection.inner,
             state: &mut collection.query_state,
+            requests: &mut collection.font_requests,
             source_cache,
             attributes: Attributes::default(),
             fallbacks: None,
@@ -122,14 +125,15 @@ impl<'a> Query<'a> {
     pub fn matches_with<'q>(&'q mut self, mut f: impl FnMut(&'q QueryFont) -> QueryStatus) {
         self.matches_with_pending(|candidate| match candidate {
             QueryCandidate::Font(font) => f(font),
-            QueryCandidate::Pending { .. } => QueryStatus::Continue,
+            QueryCandidate::Pending(_) => QueryStatus::Continue,
         });
     }
 
-    /// Walks loaded and descriptor-only candidates in font matching order.
+    /// Like [`matches_with`](Self::matches_with), but also yields the fonts whose data
+    /// is not available yet, in their place in the matching order.
     pub fn matches_with_pending<'q>(
         &'q mut self,
-        mut f: impl FnMut(QueryCandidate<'q>) -> QueryStatus,
+        mut f: impl FnMut(QueryCandidate<'q, '_>) -> QueryStatus,
     ) {
         for family in self
             .state
@@ -163,7 +167,7 @@ impl<'a> Query<'a> {
                 if font.family_index() == family_info.default_font_index() {
                     yielded_default = true;
                 }
-                if f(font.as_candidate()) == QueryStatus::Stop {
+                if f(font.as_candidate(self.requests)) == QueryStatus::Stop {
                     return;
                 }
             }
@@ -175,7 +179,7 @@ impl<'a> Query<'a> {
                 self.attributes,
                 &mut family.default,
                 self.source_cache,
-            ) && f(font.as_candidate()) == QueryStatus::Stop
+            ) && f(font.as_candidate(self.requests)) == QueryStatus::Stop
             {
                 return;
             }
@@ -185,53 +189,78 @@ impl<'a> Query<'a> {
     /// Returns the [first available font] for the current settings: the first
     /// font that [`matches_with`](Self::matches_with) would yield, if any.
     ///
-    /// As in CSS, fonts whose [unicode range] excludes U+0020 SPACE are skipped.
+    /// As in CSS, fonts whose [unicode range] excludes U+0020 SPACE are skipped. So are
+    /// [pending](QueryCandidate::Pending) fonts, the first of which is
+    /// [requested](PendingFont::request).
     ///
     /// [first available font]: https://drafts.csswg.org/css-fonts-4/#first-available-font
     /// [unicode range]: crate::FontInfoOverride::unicode_range
     pub fn first_available_font(&mut self) -> Option<QueryFont> {
-        self.first_available_font_with(|_| {})
-    }
-
-    /// Returns the first available font, reporting preceding pending faces whose
-    /// unicode range includes U+0020 SPACE to `pending`.
-    pub fn first_available_font_with(
-        &mut self,
-        mut pending: impl FnMut(FontId),
-    ) -> Option<QueryFont> {
         let mut found = None;
-        self.matches_with_pending(|candidate| {
-            let font = match candidate {
-                QueryCandidate::Font(font) => font,
-                QueryCandidate::Pending { id, unicode_range } => {
-                    if unicode_range.is_none_or(|range| range.contains(' ')) {
-                        pending(id);
-                    }
-                    return QueryStatus::Continue;
-                }
-            };
-            if !font.in_unicode_range(' ') {
-                return QueryStatus::Continue;
+        let mut requested = false;
+        self.matches_with_pending(|candidate| match candidate {
+            QueryCandidate::Font(font) if font.in_unicode_range(' ') => {
+                found = Some(font.clone());
+                QueryStatus::Stop
             }
-            found = Some(font.clone());
-            QueryStatus::Stop
+            QueryCandidate::Pending(font) if !requested && font.in_unicode_range(' ') => {
+                requested = true;
+                font.request();
+                QueryStatus::Continue
+            }
+            _ => QueryStatus::Continue,
         });
         found
     }
 }
 
-/// A loaded font or a descriptor-only face in a query's matching order.
-#[derive(Clone, Copy, Debug)]
-pub enum QueryCandidate<'a> {
-    /// A font with loaded bytes.
-    Font(&'a QueryFont),
-    /// An unloaded face and the codepoints for which it is eligible.
-    Pending {
-        /// Identifier the face was registered with.
-        id: FontId,
-        /// Eligible codepoints, or all codepoints when absent.
-        unicode_range: Option<&'a UnicodeRangeSet>,
-    },
+/// Candidate generated by [`Query::matches_with_pending`].
+#[derive(Debug)]
+pub enum QueryCandidate<'q, 'r> {
+    /// A font with loaded data.
+    Font(&'q QueryFont),
+    /// A font whose data is not available yet and has not failed to load.
+    Pending(PendingFont<'q, 'r>),
+}
+
+/// Candidate font generated by a [`Query`] whose data is not available yet.
+///
+/// It cannot be used, but its data can be [requested](Self::request).
+#[derive(Debug)]
+pub struct PendingFont<'q, 'r> {
+    id: FontId,
+    status: PendingFontStatus,
+    unicode_range: Option<&'q UnicodeRangeSet>,
+    requests: &'r mut HashSet<FontId>,
+}
+
+impl PendingFont<'_, '_> {
+    /// Returns the identifier the font was registered with.
+    pub fn id(&self) -> FontId {
+        self.id
+    }
+
+    /// Returns [`PendingFontStatus::Unloaded`] or [`PendingFontStatus::Loading`].
+    pub fn status(&self) -> PendingFontStatus {
+        self.status
+    }
+
+    /// Returns `true` if the font may be used for the given codepoint once its data is
+    /// available, see [`QueryFont::in_unicode_range`].
+    #[inline]
+    pub fn in_unicode_range(&self, codepoint: impl Into<u32>) -> bool {
+        self.unicode_range.is_none_or(|set| set.contains(codepoint))
+    }
+
+    /// Requests the data of the font: [`Collection::take_font_requests`] returns its
+    /// identifier. Does nothing for a font that is already
+    /// [loading](PendingFontStatus::Loading).
+    #[inline]
+    pub fn request(self) {
+        if self.status == PendingFontStatus::Unloaded {
+            self.requests.insert(self.id);
+        }
+    }
 }
 
 /// A query cache entry: a loaded font or a descriptor-only face.
@@ -240,6 +269,7 @@ enum CachedFont {
     Loaded(QueryFont),
     Pending {
         id: FontId,
+        status: PendingFontStatus,
         family_index: usize,
         unicode_range: Option<UnicodeRangeSet>,
     },
@@ -254,9 +284,11 @@ impl CachedFont {
         cache: &mut SourceCache,
     ) -> Option<Self> {
         if let Some(pending) = info.pending() {
-            // Only a font whose data has not been requested yet is reported.
-            return (pending.status() == PendingFontStatus::Unloaded).then(|| Self::Pending {
+            // A font that failed to load is never used.
+            let status = pending.status();
+            return (status != PendingFontStatus::Failed).then(|| Self::Pending {
                 id: info.id(),
+                status,
                 family_index,
                 unicode_range: info.unicode_range().cloned(),
             });
@@ -271,15 +303,21 @@ impl CachedFont {
         }
     }
 
-    fn as_candidate(&self) -> QueryCandidate<'_> {
+    #[inline]
+    fn as_candidate<'q, 'r>(&'q self, requests: &'r mut HashSet<FontId>) -> QueryCandidate<'q, 'r> {
         match self {
             Self::Loaded(font) => QueryCandidate::Font(font),
             Self::Pending {
-                id, unicode_range, ..
-            } => QueryCandidate::Pending {
+                id,
+                status,
+                unicode_range,
+                ..
+            } => QueryCandidate::Pending(PendingFont {
                 id: *id,
+                status: *status,
                 unicode_range: unicode_range.as_ref(),
-            },
+                requests,
+            }),
         }
     }
 }
