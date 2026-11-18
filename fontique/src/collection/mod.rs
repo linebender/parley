@@ -717,7 +717,7 @@ impl Inner {
     }
 
     /// Clears this collection. Un-registers all fonts previously registered via
-    /// [`Self::register_font`], and unsets all previously-set generic families
+    /// [`Collection::register_font`], and unsets all previously-set generic families
     /// and fallbacks. This will not remove any system fonts.
     pub fn clear(&mut self) {
         #[cfg(feature = "std")]
