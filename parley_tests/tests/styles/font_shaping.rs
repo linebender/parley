@@ -92,6 +92,48 @@ fn style_variations_multiple_axes() {
     env.check_layout_snapshot(&layout);
 }
 
+#[test]
+fn span_metrics_match_run_metrics() {
+    use parley::style::FontFamily;
+    use parley::{LayoutContext, PositionedLayoutItem};
+
+    use crate::util::{ColorBrush, env::create_font_context};
+
+    let text = "x";
+    let mut font_cx = create_font_context();
+    let mut layout_cx = LayoutContext::<ColorBrush>::new();
+
+    // In Roboto Flex, the `YTLC` axis varies the x-height.
+    let variations: [&[FontVariation]; 2] = [
+        &[],
+        &[FontVariation {
+            tag: Tag::new(b"YTLC"),
+            value: 570.0,
+        }],
+    ];
+    let x_heights = variations.map(|variations| {
+        let mut builder = layout_cx.ranged_builder(&mut font_cx, text, 1.0, false);
+        builder.push_default(StyleProperty::FontFamily(FontFamily::named("Roboto Flex")));
+        builder.push_default(StyleProperty::FontVariations(FontVariations::List(
+            Cow::Borrowed(variations),
+        )));
+        let mut layout = builder.build(text);
+        layout.break_all_lines(None);
+
+        let line = layout.lines().next().unwrap();
+        let Some(PositionedLayoutItem::GlyphRun(glyph_run)) = line.items().next() else {
+            panic!("expected a glyph run");
+        };
+        let span_metrics = glyph_run.span_metrics();
+        let font_metrics = glyph_run.run().font_metrics();
+        assert_eq!(span_metrics.ascent, font_metrics.ascent);
+        assert_eq!(span_metrics.descent, font_metrics.descent);
+        assert_eq!(Some(span_metrics.x_height), font_metrics.x_height);
+        span_metrics.x_height
+    });
+    assert_ne!(x_heights[0], x_heights[1]);
+}
+
 // ============================================================================
 // FontFeatures Tests
 // ============================================================================
