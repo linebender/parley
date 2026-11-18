@@ -80,7 +80,7 @@ pub fn scan_memory<'a>(buf: &'a [u8], mut f: impl FnMut(&ScannedFont<'a>)) {
 
 /// Returns the font at `index` in a memory buffer: the index of the font
 /// within a font collection, or 0 for a file that holds a single font.
-pub fn memory_font(buf: &[u8], index: u32) -> Option<ScannedFont<'_>> {
+pub(crate) fn scan_memory_font(buf: &[u8], index: u32) -> Option<ScannedFont<'_>> {
     let font = FontRef::from_index(buf, index).ok()?;
     #[allow(clippy::unit_arg)]
     scanned_font(font, ScanMemoryPathType::default(), index)

@@ -906,7 +906,7 @@ impl CommonData {
             id: SourceId::new(),
             kind: SourceKind::Memory(data.clone()),
         };
-        let Some(mut replacement) = crate::scan::memory_font(data.as_ref(), index)
+        let Some(mut replacement) = crate::scan::scan_memory_font(data.as_ref(), index)
             .and_then(|scanned| FontInfo::from_font_ref(&scanned.font, source, index))
         else {
             return false;
@@ -981,7 +981,7 @@ impl CommonData {
         if self.font_families.contains_key(&id) {
             return None;
         }
-        let scanned_font = super::scan::memory_font(data.as_ref(), index)?;
+        let scanned_font = super::scan::scan_memory_font(data.as_ref(), index)?;
         let source = SourceInfo {
             id: SourceId::new(),
             kind: SourceKind::Memory(data.clone()),
