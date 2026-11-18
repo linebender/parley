@@ -46,7 +46,6 @@ fn pending_font_requests_use_unicode_range_and_fallback() {
         let (one, two) = (FontId::new(), FontId::new());
         let fallback = Blob::new(Arc::new(ROBOTO.to_vec()));
         fonts.collection.register_font(
-            FontId::new(),
             fallback.clone(),
             0,
             Some(FontInfoOverride {
