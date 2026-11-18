@@ -24,8 +24,8 @@ use windows::{
 };
 
 use super::{
-    FallbackKey, FamilyId, FamilyInfo, FamilyNameMap, FontInfo, GenericFamily, GenericFamilyMap,
-    ScriptExt, SourcePathMap,
+    FallbackFamilies, FallbackKey, FamilyId, FamilyInfo, FamilyNameMap, FontInfo, GenericFamily,
+    GenericFamilyMap, ScriptExt, SourcePathMap,
 };
 
 const DEFAULT_GENERIC_FAMILIES: &[(GenericFamily, &[&str])] = &[
@@ -111,12 +111,28 @@ impl SystemFonts {
         None
     }
 
-    pub(crate) fn fallback(&mut self, key: impl Into<FallbackKey>) -> Option<FamilyId> {
+    pub(crate) fn fallback(&mut self, key: impl Into<FallbackKey>) -> FallbackFamilies {
         // DirectWrite does not have a function to get the default font for a script and locale pair
         // so here we provide a sample of the intended script instead.
+        let mut families = FallbackFamilies::new();
         let key = key.into();
-        let text = key.script().sample()?;
+        let Some(text) = key.script().sample() else {
+            return families;
+        };
         let locale = key.locale_str();
+        if let Some(family_name) = self.dwrite_fonts.family_name_for_text(text, locale)
+            && let Some(name) = self.name_map.get(&family_name)
+        {
+            families.push(name.id());
+        }
+        families
+    }
+
+    pub(crate) fn fallback_for_text(
+        &mut self,
+        text: &str,
+        locale: Option<&str>,
+    ) -> Option<FamilyId> {
         let family_name = self.dwrite_fonts.family_name_for_text(text, locale)?;
         self.name_map.get(&family_name).map(|name| name.id())
     }
