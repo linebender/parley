@@ -95,7 +95,11 @@ fn pending_font_requests_use_unicode_range_and_fallback() {
                 fallback.id()
             );
         }
-        assert!(fonts.collection.resolve_pending_font(1, fallback.clone()));
+        assert!(
+            fonts
+                .collection
+                .resolve_pending_font(1, fallback.clone(), 0)
+        );
         assert!(!fonts.collection.unregister_pending_font(1));
         if shared {
             assert!(!cloned.unregister_pending_font(1));
@@ -161,14 +165,17 @@ fn pending_metrics_and_resolution_preserve_face_priority() {
                 });
                 assert_eq!(candidates, [2, 1]);
             }
-            assert!(!collection.resolve_pending_font(99, Blob::new(Arc::new(bytes.to_vec()))));
-            assert!(!collection.resolve_pending_font(1, Blob::new(Arc::new(Vec::<u8>::new()))));
+            let font = Blob::new(Arc::new(bytes.to_vec()));
+            assert!(!collection.resolve_pending_font(99, font.clone(), 0));
+            // The data holds a single font, so only index 0 names one.
+            assert!(!collection.resolve_pending_font(1, font, 1));
+            assert!(!collection.resolve_pending_font(1, Blob::new(Arc::new(Vec::<u8>::new())), 0));
             let fonts = [
                 Blob::new(Arc::new(bytes.to_vec())),
                 Blob::new(Arc::new(bytes.to_vec())),
             ];
             for key in order {
-                assert!(collection.resolve_pending_font(key, fonts[key as usize - 1].clone()));
+                assert!(collection.resolve_pending_font(key, fonts[key as usize - 1].clone(), 0));
             }
             let family_info = collection.family(family).unwrap();
             let loaded: Vec<_> = family_info
@@ -264,7 +271,7 @@ fn pending_font_status_controls_reporting() {
 
         // A face in any status can still be resolved, in its original position, or removed.
         let font = Blob::new(Arc::new(bytes.to_vec()));
-        assert!(collection.resolve_pending_font(1, font.clone()));
+        assert!(collection.resolve_pending_font(1, font.clone(), 0));
         assert_eq!(collection.pending_font_status(1), None);
         let fonts = collection.family(family).unwrap();
         assert_eq!(fonts.fonts()[1].load(None).unwrap().id(), font.id());

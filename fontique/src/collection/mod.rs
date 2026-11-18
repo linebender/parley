@@ -104,11 +104,14 @@ impl Collection {
         self.inner.unregister_pending_font(key)
     }
 
-    /// Replaces a pending face in any status with fonts from `data`, preserving its family
-    /// position and registered overrides. Returns false for an unknown key or invalid
-    /// data, leaving the face as it was.
-    pub fn resolve_pending_font(&mut self, key: u64, data: Blob<u8>) -> bool {
-        self.inner.resolve_pending_font(key, data)
+    /// Replaces a pending face in any status with the font at `index` in `data`,
+    /// preserving its family position and registered overrides.
+    ///
+    /// `index` is the index of the font within a font collection file, and 0 for a
+    /// file that holds a single font. Returns false for an unknown key, invalid data
+    /// or an index the data does not contain, leaving the face as it was.
+    pub fn resolve_pending_font(&mut self, key: u64, data: Blob<u8>, index: u32) -> bool {
+        self.inner.resolve_pending_font(key, data, index)
     }
 
     /// Creates a new collection with the given options.
@@ -304,19 +307,23 @@ struct Inner {
 }
 
 impl Inner {
-    fn resolve_pending_font(&mut self, key: u64, data: Blob<u8>) -> bool {
+    fn resolve_pending_font(&mut self, key: u64, data: Blob<u8>, index: u32) -> bool {
         #[cfg(feature = "std")]
         let resolved = if let Some(shared) = &self.shared {
-            let resolved = shared.data.lock().unwrap().resolve_pending_font(key, data);
+            let resolved = shared
+                .data
+                .lock()
+                .unwrap()
+                .resolve_pending_font(key, data, index);
             if resolved {
                 shared.bump_version();
             }
             resolved
         } else {
-            self.data.resolve_pending_font(key, data)
+            self.data.resolve_pending_font(key, data, index)
         };
         #[cfg(not(feature = "std"))]
-        let resolved = self.data.resolve_pending_font(key, data);
+        let resolved = self.data.resolve_pending_font(key, data, index);
         resolved
     }
 
@@ -825,7 +832,7 @@ impl CommonData {
         Some(id)
     }
 
-    fn resolve_pending_font(&mut self, key: u64, data: Blob<u8>) -> bool {
+    fn resolve_pending_font(&mut self, key: u64, data: Blob<u8>, index: u32) -> bool {
         let Some(&id) = self.pending_fonts.get(&key) else {
             return false;
         };
@@ -839,30 +846,31 @@ impl CommonData {
             id: SourceId::new(),
             kind: SourceKind::Memory(data.clone()),
         };
-        let mut replacements = Vec::new();
+        let mut replacement = None;
         crate::scan::scan_memory(data.as_ref(), |scanned| {
-            if let Some(mut font) =
-                FontInfo::from_font_ref(&scanned.font, source.clone(), scanned.index)
-            {
-                font.apply_override(&overrides.as_override());
-                replacements.push(font);
+            if scanned.index == index {
+                replacement = FontInfo::from_font_ref(&scanned.font, source.clone(), index);
             }
         });
-        if replacements.is_empty() {
+        let Some(mut replacement) = replacement else {
             return false;
-        }
+        };
+        replacement.apply_override(&overrides.as_override());
         let Some(Some(family)) = self.families.get_mut(&id) else {
             return false;
         };
         let name = self.family_names.get_by_id(id).unwrap().clone();
-        let mut fonts = Vec::new();
-        for font in family.fonts() {
-            if font.source().kind().pending_key() == Some(key) {
-                fonts.extend(replacements.iter().cloned());
-            } else {
-                fonts.push(font.clone());
-            }
-        }
+        let fonts: Vec<_> = family
+            .fonts()
+            .iter()
+            .map(|font| {
+                if font.source().kind().pending_key() == Some(key) {
+                    replacement.clone()
+                } else {
+                    font.clone()
+                }
+            })
+            .collect();
         *family = FamilyInfo::new(name, fonts);
         self.pending_fonts.remove(&key);
         true
