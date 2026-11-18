@@ -74,7 +74,7 @@ impl Collection {
     /// Missing attribute ranges default to normal. No data is loaded.
     ///
     /// The face is a font of its family like any other: [`Self::font`] finds it and
-    /// [`Self::unregister_font_by_id`] removes it in any status. Registering the same
+    /// [`Self::unregister_font`] removes it in any status. Registering the same
     /// identifier in several collections lets one loaded file resolve all of them.
     pub fn register_pending_font(
         &mut self,

@@ -45,8 +45,10 @@ fn pending_font_requests_use_unicode_range_and_fallback() {
         };
         let (one, two) = (FontId::new(), FontId::new());
         let fallback = Blob::new(Arc::new(ROBOTO.to_vec()));
-        fonts.collection.register_fonts(
+        fonts.collection.register_font(
+            FontId::new(),
             fallback.clone(),
+            0,
             Some(FontInfoOverride {
                 family_name: Some("Fallback"),
                 ..Default::default()
@@ -120,7 +122,7 @@ fn pending_font_requests_use_unicode_range_and_fallback() {
         );
 
         fonts.collection.register_pending_font(two, info).unwrap();
-        assert!(fonts.collection.unregister_font_by_id(two));
+        assert!(fonts.collection.unregister_font(two));
         assert!(fonts.collection.font(two).is_none());
         // An identifier can be registered again once its font is removed.
         assert!(fonts.collection.register_pending_font(two, info).is_some());
@@ -293,7 +295,7 @@ fn pending_font_status_controls_reporting() {
         assert_eq!(collection.pending_font_status(one), None);
         let fonts = collection.family(family).unwrap();
         assert_eq!(fonts.fonts()[1].load(None).unwrap().id(), font.id());
-        assert!(collection.unregister_font_by_id(two));
+        assert!(collection.unregister_font(two));
         assert_eq!(collection.pending_font_status(two), None);
         assert_eq!(collection.family(family).unwrap().fonts().len(), 1);
     }

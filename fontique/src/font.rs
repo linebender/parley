@@ -303,10 +303,6 @@ impl FontInfo {
         }
     }
 
-    pub(crate) fn set_id(&mut self, id: FontId) {
-        self.id = id;
-    }
-
     pub(crate) fn set_pending_status(&mut self, status: PendingFontStatus) {
         if let SourceKind::Pending(pending) = &mut self.source.kind {
             pending.status = status;
