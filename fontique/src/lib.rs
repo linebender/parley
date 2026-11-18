@@ -88,7 +88,7 @@ pub use collection::{
 };
 pub use fallback::FallbackKey;
 pub use family::{FamilyId, FamilyInfo};
-pub use font::{AxisInfo, FontInfo, FontInfoOverride};
+pub use font::{AxisInfo, FontId, FontInfo, FontInfoOverride};
 pub use impl_fontconfig::FromFontconfig;
 pub use parlance::{
     FontRange, FontStyle, FontStyleRange, FontWeight, FontWeightRange, FontWidth, FontWidthRange,

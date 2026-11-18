@@ -110,7 +110,7 @@ pub(crate) fn resolve_style_metrics<B: Brush>(
     shaped_text: &ShapedText,
     quantize: bool,
     out: &mut Vec<StyleMetrics>,
-    pending: &mut hashbrown::HashSet<u64>,
+    pending: &mut hashbrown::HashSet<fontique::FontId>,
 ) {
     out.clear();
     out.reserve(styles.len());
@@ -361,7 +361,7 @@ fn first_available_font<B: Brush>(
     query: &mut Query<'_>,
     rcx: &ResolveContext,
     style: &ResolvedStyle<B>,
-    pending: &mut hashbrown::HashSet<u64>,
+    pending: &mut hashbrown::HashSet<fontique::FontId>,
 ) -> Option<FontInstance> {
     let families = rcx.stack(style.font_family).unwrap_or(&[]);
     query.set_families(families.iter().copied().map(QueryFamily::Id));
@@ -370,8 +370,8 @@ fn first_available_font<B: Brush>(
         weight: style.font_weight,
         style: style.font_style,
     });
-    let font = query.first_available_font_with(|key| {
-        pending.insert(key);
+    let font = query.first_available_font_with(|id| {
+        pending.insert(id);
     })?;
     Some(FontInstance {
         font: FontData {

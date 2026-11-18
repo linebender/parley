@@ -17,7 +17,7 @@ use super::{
     fallback::{FallbackKey, FallbackMap},
     family::{FamilyId, FamilyInfo},
     family_name::{FamilyName, FamilyNameMap},
-    font::FontInfo,
+    font::{FontId, FontInfo},
     generic::GenericFamilyMap,
     source::{PendingFontStatus, SourceId, SourceInfo, SourceKind},
 };
@@ -69,49 +69,48 @@ pub struct Collection {
 }
 
 impl Collection {
-    /// Registers a descriptor-only face. Requires a nonempty family name and a unique key.
+    /// Registers a descriptor-only face under an identifier made with [`FontId::new`].
+    /// Requires a nonempty family name and an identifier this collection does not hold.
     /// Missing attribute ranges default to normal. No data is loaded.
+    ///
+    /// The face is a font of its family like any other: [`Self::font`] finds it and
+    /// [`Self::unregister_font_by_id`] removes it in any status. Registering the same
+    /// identifier in several collections lets one loaded file resolve all of them.
     pub fn register_pending_font(
         &mut self,
-        key: u64,
+        id: FontId,
         info_override: FontInfoOverride<'_>,
     ) -> Option<FamilyId> {
-        self.inner.register_pending_font(key, info_override)
+        self.inner.register_pending_font(id, info_override)
     }
 
     /// Sets the load status of a pending face, returning true if it changed. Returns
-    /// false for an unknown key or a face that already has that status.
+    /// false for an unknown identifier, a font that is not pending, or a face that already has that status.
     ///
     /// A face starts as [`PendingFontStatus::Unloaded`], and queries report it where it
     /// matches. Set it to [`PendingFontStatus::Loading`] once its data has been
     /// requested, so that it is reported only once, and to [`PendingFontStatus::Failed`]
     /// if the data cannot be loaded. In both of those states the face keeps its family
     /// position and descriptors but is skipped by queries.
-    pub fn set_pending_font_status(&mut self, key: u64, status: PendingFontStatus) -> bool {
-        self.inner.set_pending_font_status(key, status)
+    pub fn set_pending_font_status(&mut self, id: FontId, status: PendingFontStatus) -> bool {
+        self.inner.set_pending_font_status(id, status)
     }
 
-    /// Returns the load status of a pending face, or `None` if the key is unknown or
-    /// the face has been resolved.
-    pub fn pending_font_status(&mut self, key: u64) -> Option<PendingFontStatus> {
+    /// Returns the load status of a pending face, or `None` if the identifier is unknown
+    /// or the face has been resolved.
+    pub fn pending_font_status(&mut self, id: FontId) -> Option<PendingFontStatus> {
         self.inner.sync_shared();
-        self.inner.data.pending_font_status(key)
-    }
-
-    /// Removes a pending face in any status, for example when its `@font-face` rule
-    /// is removed.
-    pub fn unregister_pending_font(&mut self, key: u64) -> bool {
-        self.inner.unregister_pending_font(key)
+        self.inner.data.pending_font_status(id)
     }
 
     /// Replaces a pending face in any status with the font at `index` in `data`,
-    /// preserving its family position and registered overrides.
+    /// preserving its identifier, family position and registered overrides.
     ///
     /// `index` is the index of the font within a font collection file, and 0 for a
-    /// file that holds a single font. Returns false for an unknown key, invalid data
+    /// file that holds a single font. Returns false for an unknown identifier, a font that is not pending, invalid data
     /// or an index the data does not contain, leaving the face as it was.
-    pub fn resolve_pending_font(&mut self, key: u64, data: Blob<u8>, index: u32) -> bool {
-        self.inner.resolve_pending_font(key, data, index)
+    pub fn resolve_pending_font(&mut self, id: FontId, data: Blob<u8>, index: u32) -> bool {
+        self.inner.resolve_pending_font(id, data, index)
     }
 
     /// Creates a new collection with the given options.
@@ -280,6 +279,28 @@ impl Collection {
         self.inner.unregister_font(family, width, style, weight)
     }
 
+    /// Returns the font with the given identifier.
+    ///
+    /// This finds fonts registered with [`Self::register_fonts`] or
+    /// [`Self::load_fonts_from_paths`], and system fonts whose family has
+    /// been loaded by this collection.
+    pub fn font(&mut self, id: FontId) -> Option<FontInfo> {
+        self.inner.font(id)
+    }
+
+    /// Returns the identifier of the family that holds the font with the given
+    /// identifier. This finds the same fonts as [`Self::font`].
+    pub fn font_family_id(&mut self, id: FontId) -> Option<FamilyId> {
+        self.inner.font_family_id(id)
+    }
+
+    /// Unregisters the font with the given identifier.
+    ///
+    /// Returns true if a font was removed from its family, false otherwise.
+    pub fn unregister_font_by_id(&mut self, id: FontId) -> bool {
+        self.inner.unregister_font_by_id(id)
+    }
+
     /// Clears this collection. Un-registers all fonts previously registered via
     /// [`Self::register_fonts`], and unsets all previously-set generic families
     /// and fallbacks. This will not remove any system fonts.
@@ -307,72 +328,62 @@ struct Inner {
 }
 
 impl Inner {
-    fn resolve_pending_font(&mut self, key: u64, data: Blob<u8>, index: u32) -> bool {
+    fn resolve_pending_font(&mut self, id: FontId, data: Blob<u8>, index: u32) -> bool {
         #[cfg(feature = "std")]
         let resolved = if let Some(shared) = &self.shared {
             let resolved = shared
                 .data
                 .lock()
                 .unwrap()
-                .resolve_pending_font(key, data, index);
+                .resolve_pending_font(id, data, index);
             if resolved {
                 shared.bump_version();
             }
             resolved
         } else {
-            self.data.resolve_pending_font(key, data, index)
+            self.data.resolve_pending_font(id, data, index)
         };
         #[cfg(not(feature = "std"))]
-        let resolved = self.data.resolve_pending_font(key, data, index);
+        let resolved = self.data.resolve_pending_font(id, data, index);
         resolved
     }
 
-    fn register_pending_font(&mut self, key: u64, info: FontInfoOverride<'_>) -> Option<FamilyId> {
+    fn register_pending_font(
+        &mut self,
+        id: FontId,
+        info: FontInfoOverride<'_>,
+    ) -> Option<FamilyId> {
         #[cfg(feature = "std")]
         let result = if let Some(shared) = &self.shared {
-            let result = shared.data.lock().unwrap().register_pending_font(key, info);
+            let result = shared.data.lock().unwrap().register_pending_font(id, info);
             shared.bump_version();
             result
         } else {
-            self.data.register_pending_font(key, info)
+            self.data.register_pending_font(id, info)
         };
         #[cfg(not(feature = "std"))]
-        let result = self.data.register_pending_font(key, info);
+        let result = self.data.register_pending_font(id, info);
         result
     }
 
-    fn set_pending_font_status(&mut self, key: u64, status: PendingFontStatus) -> bool {
+    fn set_pending_font_status(&mut self, id: FontId, status: PendingFontStatus) -> bool {
         #[cfg(feature = "std")]
         let changed = if let Some(shared) = &self.shared {
             let changed = shared
                 .data
                 .lock()
                 .unwrap()
-                .set_pending_font_status(key, status);
+                .set_pending_font_status(id, status);
             if changed {
                 shared.bump_version();
             }
             changed
         } else {
-            self.data.set_pending_font_status(key, status)
+            self.data.set_pending_font_status(id, status)
         };
         #[cfg(not(feature = "std"))]
-        let changed = self.data.set_pending_font_status(key, status);
+        let changed = self.data.set_pending_font_status(id, status);
         changed
-    }
-
-    fn unregister_pending_font(&mut self, key: u64) -> bool {
-        #[cfg(feature = "std")]
-        let removed = if let Some(shared) = &self.shared {
-            let removed = shared.data.lock().unwrap().unregister_pending_font(key);
-            shared.bump_version();
-            removed
-        } else {
-            self.data.unregister_pending_font(key)
-        };
-        #[cfg(not(feature = "std"))]
-        let removed = self.data.unregister_pending_font(key);
-        removed
     }
 
     /// Creates a new collection with the given options.
@@ -466,6 +477,11 @@ impl Inner {
             #[cfg(feature = "system")]
             if let Some(system) = &self.system {
                 let family = system.fonts.lock().unwrap().family(id);
+                if let Some(family) = &family {
+                    for font in family.fonts() {
+                        self.data.font_families.insert(font.id(), id);
+                    }
+                }
                 self.data.families.insert(id, family.clone());
                 family
             } else {
@@ -596,7 +612,7 @@ impl Inner {
             self.data.fallbacks.set(key, families)
         }
         #[cfg(not(feature = "std"))]
-        self.data.fallbacks.set(key, families)
+        self.data.fallbacks.set(id, families)
     }
 
     /// Appends the set of family identifiers to the given fallback key.
@@ -616,7 +632,7 @@ impl Inner {
             self.data.fallbacks.append(key, families)
         }
         #[cfg(not(feature = "std"))]
-        self.data.fallbacks.append(key, families)
+        self.data.fallbacks.append(id, families)
     }
 
     /// Loads all fonts that exist in the specified directory(s)
@@ -686,6 +702,36 @@ impl Inner {
         self.data
             .unregister_font(family, width, style, weight)
             .is_some()
+    }
+
+    /// Returns the font with the given identifier.
+    pub fn font(&mut self, id: FontId) -> Option<FontInfo> {
+        self.sync_shared();
+        self.data.font(id).cloned()
+    }
+
+    /// Returns the identifier of the family that holds the font with the given
+    /// identifier.
+    pub fn font_family_id(&mut self, id: FontId) -> Option<FamilyId> {
+        self.sync_shared();
+        self.data.font(id)?;
+        self.data.font_families.get(&id).copied()
+    }
+
+    /// Unregisters the font with the given identifier.
+    ///
+    /// Returns true if a font was removed from its family, false otherwise.
+    pub fn unregister_font_by_id(&mut self, id: FontId) -> bool {
+        #[cfg(feature = "std")]
+        if let Some(shared) = &self.shared {
+            let result = shared.data.lock().unwrap().unregister_font_by_id(id);
+            shared.bump_version();
+            result
+        } else {
+            self.data.unregister_font_by_id(id)
+        }
+        #[cfg(not(feature = "std"))]
+        self.data.unregister_font_by_id(id)
     }
 
     /// Clears this collection. Un-registers all fonts previously registered via
@@ -809,35 +855,39 @@ impl System {
 /// Common data for base and shared collections.
 #[derive(Clone, Default)]
 struct CommonData {
-    /// The family of each pending font, by its key.
-    pending_fonts: HashMap<u64, FamilyId>,
     family_names: FamilyNameMap,
     families: FamilyMap,
+    /// The family that holds each font in `families`.
+    font_families: HashMap<FontId, FamilyId>,
     generic_families: GenericFamilyMap,
     fallbacks: FallbackMap,
 }
 
 impl CommonData {
-    fn register_pending_font(&mut self, key: u64, info: FontInfoOverride<'_>) -> Option<FamilyId> {
+    fn register_pending_font(
+        &mut self,
+        id: FontId,
+        info: FontInfoOverride<'_>,
+    ) -> Option<FamilyId> {
         let family_name = info.family_name.filter(|name| !name.is_empty())?;
-        if self.pending_fonts.contains_key(&key) {
+        if self.font_families.contains_key(&id) {
             return None;
         }
         let name = self.family_names.get_or_insert(family_name);
-        let id = name.id();
+        let family = name.id();
         let mut families = HashMap::default();
-        families.insert(id, (name, alloc::vec![FontInfo::new_pending(key, &info)]));
+        families.insert(
+            family,
+            (name, alloc::vec![FontInfo::new_pending(id, &info)]),
+        );
         self.merge_families(&families);
-        self.pending_fonts.insert(key, id);
-        Some(id)
+        Some(family)
     }
 
-    fn resolve_pending_font(&mut self, key: u64, data: Blob<u8>, index: u32) -> bool {
-        let Some(&id) = self.pending_fonts.get(&key) else {
-            return false;
-        };
+    fn resolve_pending_font(&mut self, id: FontId, data: Blob<u8>, index: u32) -> bool {
         let Some(overrides) = self
-            .pending_source(key)
+            .font(id)
+            .and_then(FontInfo::pending)
             .map(|pending| pending.overrides.clone())
         else {
             return false;
@@ -855,76 +905,50 @@ impl CommonData {
         let Some(mut replacement) = replacement else {
             return false;
         };
+        // The font keeps the identifier it was registered with.
+        replacement.set_id(id);
         replacement.apply_override(&overrides.as_override());
-        let Some(Some(family)) = self.families.get_mut(&id) else {
-            return false;
-        };
-        let name = self.family_names.get_by_id(id).unwrap().clone();
-        let fonts: Vec<_> = family
-            .fonts()
-            .iter()
-            .map(|font| {
-                if font.source().kind().pending_key() == Some(key) {
-                    replacement.clone()
-                } else {
-                    font.clone()
-                }
-            })
-            .collect();
-        *family = FamilyInfo::new(name, fonts);
-        self.pending_fonts.remove(&key);
-        true
+        self.replace_font(id, |_| replacement.clone())
     }
 
-    /// Finds the record of a pending font in its family.
-    fn pending_source(&self, key: u64) -> Option<&crate::source::PendingSource> {
-        let id = self.pending_fonts.get(&key)?;
-        let family = self.families.get(id)?.as_ref()?;
-        family
-            .fonts()
-            .iter()
-            .filter_map(FontInfo::pending)
-            .find(|pending| pending.key() == key)
+    fn pending_font_status(&self, id: FontId) -> Option<PendingFontStatus> {
+        self.font(id)?.pending().map(|pending| pending.status())
     }
 
-    fn pending_font_status(&self, key: u64) -> Option<PendingFontStatus> {
-        self.pending_source(key).map(|pending| pending.status())
-    }
-
-    fn set_pending_font_status(&mut self, key: u64, status: PendingFontStatus) -> bool {
+    fn set_pending_font_status(&mut self, id: FontId, status: PendingFontStatus) -> bool {
         if self
-            .pending_font_status(key)
+            .pending_font_status(id)
             .is_none_or(|current| current == status)
         {
             return false;
         }
-        let id = self.pending_fonts[&key];
-        if let Some(Some(family)) = self.families.get_mut(&id) {
-            let name = self.family_names.get_by_id(id).unwrap().clone();
-            let fonts = family.fonts().iter().cloned().map(|mut font| {
-                if font.source().kind().pending_key() == Some(key) {
-                    font.set_pending_status(status);
-                }
-                font
-            });
-            *family = FamilyInfo::new(name, fonts);
-        }
-        true
+        self.replace_font(id, |font| {
+            let mut font = font.clone();
+            font.set_pending_status(status);
+            font
+        })
     }
 
-    fn unregister_pending_font(&mut self, key: u64) -> bool {
-        let Some(id) = self.pending_fonts.remove(&key) else {
+    /// Rebuilds the family of the font with the given identifier with that font
+    /// replaced, keeping its position.
+    fn replace_font(&mut self, id: FontId, replace: impl Fn(&FontInfo) -> FontInfo) -> bool {
+        let Some(&family_id) = self.font_families.get(&id) else {
             return false;
         };
-        if let Some(Some(family)) = self.families.get_mut(&id) {
-            let name = self.family_names.get_by_id(id).unwrap().clone();
-            let fonts = family
-                .fonts()
-                .iter()
-                .filter(|font| font.source().kind().pending_key() != Some(key))
-                .cloned();
-            *family = FamilyInfo::new(name, fonts);
-        }
+        let Some(name) = self.family_names.get_by_id(family_id) else {
+            return false;
+        };
+        let Some(Some(family)) = self.families.get_mut(&family_id) else {
+            return false;
+        };
+        let fonts = family.fonts().iter().map(|font| {
+            if font.id() == id {
+                replace(font)
+            } else {
+                font.clone()
+            }
+        });
+        *family = FamilyInfo::new(name.clone(), fonts.collect::<Vec<_>>());
         true
     }
 
@@ -1035,6 +1059,9 @@ impl CommonData {
 
     fn merge_families(&mut self, families: &HashMap<FamilyId, (FamilyName, Vec<FontInfo>)>) {
         for (id, (name, fonts)) in families.iter() {
+            for font in fonts {
+                self.font_families.insert(font.id(), *id);
+            }
             if let Some(Some(family)) = self.families.get_mut(id) {
                 let new_fonts = fonts.iter().chain(family.fonts()).cloned();
                 *family = FamilyInfo::new(name.clone(), new_fonts);
@@ -1052,25 +1079,37 @@ impl CommonData {
         style: FontStyleRange,
         weight: FontWeightRange,
     ) -> Option<()> {
+        self.retain_fonts(family, |f| {
+            f.width() != width || f.style() != style || f.weight() != weight
+        })
+    }
+
+    fn unregister_font_by_id(&mut self, id: FontId) -> bool {
+        let Some(&family) = self.font_families.get(&id) else {
+            return false;
+        };
+        self.retain_fonts(family, |f| f.id() != id);
+        self.font_families.remove(&id);
+        true
+    }
+
+    /// Rebuilds the family from the fonts for which `keep` returns true.
+    fn retain_fonts(&mut self, family: FamilyId, keep: impl Fn(&FontInfo) -> bool) -> Option<()> {
         let family_name = self.family_names.get_by_id(family)?;
         let family = self.families.get_mut(&family)?.as_mut()?;
 
-        let new_fonts = family
-            .fonts()
-            .iter()
-            .filter(|f| f.width() != width || f.style() != style || f.weight() != weight)
-            .cloned();
+        for font in family.fonts().iter().filter(|f| !keep(f)) {
+            self.font_families.remove(&font.id());
+        }
+        let new_fonts = family.fonts().iter().filter(|f| keep(f)).cloned();
         *family = FamilyInfo::new(family_name.clone(), new_fonts);
 
-        self.pending_fonts.retain(|key, id| {
-            *id != family.id()
-                || family
-                    .fonts()
-                    .iter()
-                    .any(|font| font.source().kind().pending_key() == Some(*key))
-        });
-
         Some(())
+    }
+
+    fn font(&self, id: FontId) -> Option<&FontInfo> {
+        let family = self.families.get(self.font_families.get(&id)?)?.as_ref()?;
+        family.fonts().iter().find(|font| font.id() == id)
     }
 
     fn clear(&mut self) {

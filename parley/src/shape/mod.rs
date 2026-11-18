@@ -52,7 +52,7 @@ pub(crate) fn shape_text<'a, B: Brush>(
     text: &str,
     layout: &mut Layout<B>,
     style_features: &'a mut Vec<SmallVec<[FontFeature; 8]>>,
-    pending_font_requests: &mut hashbrown::HashSet<u64>,
+    pending_font_requests: &mut hashbrown::HashSet<fontique::FontId>,
 ) {
     let scale = layout.data.scale;
 
@@ -261,7 +261,7 @@ enum LastResortFont {
 }
 
 struct FontSelector<'a, 'b, B: Brush> {
-    pending_font_requests: &'b mut hashbrown::HashSet<u64>,
+    pending_font_requests: &'b mut hashbrown::HashSet<fontique::FontId>,
     query: &'b mut Query<'a>,
     fonts_id: Option<usize>,
     rcx: &'a ResolveContext,
@@ -285,7 +285,7 @@ impl<'a, 'b, B: Brush> FontSelector<'a, 'b, B> {
         query: &'b mut Query<'a>,
         rcx: &'a ResolveContext,
         styles: &'a [ResolvedStyle<B>],
-        pending_font_requests: &'b mut hashbrown::HashSet<u64>,
+        pending_font_requests: &'b mut hashbrown::HashSet<fontique::FontId>,
     ) -> Self {
         let attrs = fontique::Attributes::default();
 
@@ -488,9 +488,9 @@ fn any_font(query: &mut Query<'_>) -> Option<QueryFont> {
 fn record_pending_font(
     candidate: fontique::QueryCandidate<'_>,
     cluster: &CharCluster,
-    requests: &mut hashbrown::HashSet<u64>,
+    requests: &mut hashbrown::HashSet<fontique::FontId>,
 ) -> bool {
-    let fontique::QueryCandidate::Pending { key, unicode_range } = candidate else {
+    let fontique::QueryCandidate::Pending { id, unicode_range } = candidate else {
         return false;
     };
     if cluster
@@ -498,7 +498,7 @@ fn record_pending_font(
         .iter()
         .any(|ch| unicode_range.is_none_or(|range| range.contains(ch.ch)))
     {
-        requests.insert(key);
+        requests.insert(id);
     }
     true
 }

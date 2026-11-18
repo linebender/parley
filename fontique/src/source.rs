@@ -76,18 +76,12 @@ pub enum PendingFontStatus {
 /// [`Collection::register_pending_font`](crate::Collection::register_pending_font).
 #[derive(Clone)]
 pub struct PendingSource {
-    pub(crate) key: u64,
     pub(crate) status: PendingFontStatus,
     /// The descriptors the font was registered with, applied to its data when it arrives.
     pub(crate) overrides: Box<crate::font::PendingOverrides>,
 }
 
 impl PendingSource {
-    /// The key the application registered the font with.
-    pub fn key(&self) -> u64 {
-        self.key
-    }
-
     /// Whether the font's data has been requested, or failed to load.
     pub fn status(&self) -> PendingFontStatus {
         self.status
@@ -108,20 +102,10 @@ pub enum SourceKind {
     Path(Arc<Path>),
 }
 
-impl SourceKind {
-    /// The application key of a descriptor-only font.
-    pub(crate) fn pending_key(&self) -> Option<u64> {
-        match self {
-            Self::Pending(pending) => Some(pending.key),
-            _ => None,
-        }
-    }
-}
-
 impl core::fmt::Debug for SourceKind {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
-            Self::Pending(pending) => write!(f, "Pending({}, {:?})", pending.key, pending.status),
+            Self::Pending(pending) => write!(f, "Pending({:?})", pending.status),
             #[cfg(feature = "std")]
             Self::Path(path) => {
                 write!(f, "Path({path:?})")

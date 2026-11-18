@@ -3,8 +3,9 @@
 
 //! Model for a font.
 
-use crate::{CharmapIndex, UnicodeRangeSet};
+use crate::{AtomicCounter, CharmapIndex, UnicodeRangeSet};
 use alloc::{boxed::Box, vec::Vec};
+use core::sync::atomic::Ordering;
 
 use super::source::{PendingFontStatus, PendingSource, SourceInfo, SourceKind};
 use super::{Blob, source_cache::SourceCache};
@@ -15,9 +16,34 @@ use smallvec::SmallVec;
 
 type AxisVec = SmallVec<[AxisInfo; 1]>;
 
+/// Unique identifier for a font.
+///
+/// Every [`FontInfo`] is given one when it is created, and keeps it when it is
+/// cloned or has overrides applied, so an identifier names the same font in every
+/// copy of a collection.
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
+#[repr(transparent)]
+pub struct FontId(u64);
+
+impl FontId {
+    /// Creates a new unique identifier.
+    #[allow(clippy::new_without_default)]
+    pub fn new() -> Self {
+        static ID_COUNTER: AtomicCounter = AtomicCounter::new(1);
+        #[allow(clippy::useless_conversion, reason = "Not useless on 32-bit platforms")]
+        Self(ID_COUNTER.fetch_add(1, Ordering::Relaxed).into())
+    }
+
+    /// Returns the underlying integer value.
+    pub fn to_u64(self) -> u64 {
+        self.0
+    }
+}
+
 /// Representation of a single font in a family.
 #[derive(Clone, Debug)]
 pub struct FontInfo {
+    id: FontId,
     source: SourceInfo,
     index: u32,
     width: FontWidthRange,
@@ -46,6 +72,11 @@ impl FontInfo {
                 Self::from_font_ref(&font, source.clone(), index)
             }
         }
+    }
+
+    /// Returns the unique identifier for the font.
+    pub fn id(&self) -> FontId {
+        self.id
     }
 
     /// Returns an object describing how to locate the data containing this
@@ -231,12 +262,12 @@ impl FontInfo {
 }
 
 impl FontInfo {
-    pub(crate) fn new_pending(key: u64, info: &FontInfoOverride<'_>) -> Self {
+    pub(crate) fn new_pending(id: FontId, info: &FontInfoOverride<'_>) -> Self {
         let mut font = Self {
+            id,
             source: SourceInfo::new(
                 super::source::SourceId::new(),
                 SourceKind::Pending(PendingSource {
-                    key,
                     status: PendingFontStatus::Unloaded,
                     overrides: Box::new(PendingOverrides {
                         width: info.width,
@@ -260,12 +291,16 @@ impl FontInfo {
         font
     }
 
-    /// The pending source of a descriptor-only font.
-    pub(crate) fn pending(&self) -> Option<&PendingSource> {
+    /// The pending source of a descriptor-only font, and `None` for a font with data.
+    pub fn pending(&self) -> Option<&PendingSource> {
         match &self.source.kind {
             SourceKind::Pending(pending) => Some(pending),
             _ => None,
         }
+    }
+
+    pub(crate) fn set_id(&mut self, id: FontId) {
+        self.id = id;
     }
 
     pub(crate) fn set_pending_status(&mut self, status: PendingFontStatus) {
@@ -322,6 +357,7 @@ impl FontInfo {
             FontWeightRange::new(FontWeight::new(min), FontWeight::new(max))
         });
         Some(Self {
+            id: FontId::new(),
             source,
             index,
             width,

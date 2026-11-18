@@ -27,7 +27,7 @@ fn build_with_font_size(env: &mut TestEnv, text: &str, size: f32) -> Layout<Colo
 #[test]
 fn pending_font_requests_use_unicode_range_and_fallback() {
     use fontique::{
-        Blob, Collection, CollectionOptions, QueryFamily, SourceCache, UnicodeRangeSet,
+        Blob, Collection, CollectionOptions, FontId, QueryFamily, SourceCache, UnicodeRangeSet,
     };
     use parley::style::FontFamily;
     use parley::{FontContext, LayoutContext};
@@ -43,6 +43,7 @@ fn pending_font_requests_use_unicode_range_and_fallback() {
             }),
             source_cache: SourceCache::default(),
         };
+        let (one, two) = (FontId::new(), FontId::new());
         let fallback = Blob::new(Arc::new(ROBOTO.to_vec()));
         fonts.collection.register_fonts(
             fallback.clone(),
@@ -54,7 +55,7 @@ fn pending_font_requests_use_unicode_range_and_fallback() {
         assert!(
             fonts
                 .collection
-                .register_pending_font(1, FontInfoOverride::default())
+                .register_pending_font(one, FontInfoOverride::default())
                 .is_none()
         );
         let range = UnicodeRangeSet::new(std::iter::once(u32::from('a')..=u32::from('z')));
@@ -63,13 +64,13 @@ fn pending_font_requests_use_unicode_range_and_fallback() {
             unicode_range: Some(&range),
             ..Default::default()
         };
-        let family = fonts.collection.register_pending_font(1, info).unwrap();
+        let family = fonts.collection.register_pending_font(one, info).unwrap();
         assert_eq!(fonts.collection.family_id("A"), Some(family));
-        assert!(fonts.collection.register_pending_font(1, info).is_none());
+        assert!(fonts.collection.register_pending_font(one, info).is_none());
         let mut cloned = fonts.collection.clone();
 
         let mut context = LayoutContext::<[u8; 4]>::new();
-        for (text, expected) in [("abc abc", vec![1]), ("123", vec![]), ("", vec![])] {
+        for (text, expected) in [("abc abc", vec![one]), ("123", vec![]), ("", vec![])] {
             let mut builder = context.ranged_builder(&mut fonts, text, 1.0, true);
             builder.push_default(StyleProperty::FontFamily(FontFamily::Source(
                 "A, Fallback".into(),
@@ -98,12 +99,16 @@ fn pending_font_requests_use_unicode_range_and_fallback() {
         assert!(
             fonts
                 .collection
-                .resolve_pending_font(1, fallback.clone(), 0)
+                .resolve_pending_font(one, fallback.clone(), 0)
         );
-        assert!(!fonts.collection.unregister_pending_font(1));
-        if shared {
-            assert!(!cloned.unregister_pending_font(1));
-        }
+        // The resolved font keeps its identifier and is no longer pending.
+        assert!(fonts.collection.font(one).unwrap().pending().is_none());
+        assert_eq!(fonts.collection.font_family_id(one), Some(family));
+        assert_eq!(
+            cloned.font(one).unwrap().pending().is_none(),
+            shared,
+            "clones see the font only when the collection is shared"
+        );
         assert!(
             fonts
                 .collection
@@ -114,22 +119,26 @@ fn pending_font_requests_use_unicode_range_and_fallback() {
                 .all(|font| font.load(None).is_some())
         );
 
-        fonts.collection.register_pending_font(2, info).unwrap();
-        assert!(fonts.collection.unregister_pending_font(2));
+        fonts.collection.register_pending_font(two, info).unwrap();
+        assert!(fonts.collection.unregister_font_by_id(two));
+        assert!(fonts.collection.font(two).is_none());
+        // An identifier can be registered again once its font is removed.
+        assert!(fonts.collection.register_pending_font(two, info).is_some());
     }
 }
 
 #[test]
 fn pending_metrics_and_resolution_preserve_face_priority() {
     use fontique::{
-        Blob, Collection, CollectionOptions, QueryCandidate, QueryStatus, SourceCache,
+        Blob, Collection, CollectionOptions, FontId, QueryCandidate, QueryStatus, SourceCache,
         UnicodeRangeSet,
     };
     use std::sync::Arc;
 
     let bytes = include_bytes!("../../../parley_dev/assets/fonts/roboto_fonts/Roboto-Regular.ttf");
     for shared in [false, true] {
-        for order in [[1, 2], [2, 1]] {
+        for order in [[0, 1], [1, 0]] {
+            let ids = [FontId::new(), FontId::new()];
             let mut collection = Collection::new(CollectionOptions {
                 shared,
                 system_fonts: false,
@@ -140,8 +149,8 @@ fn pending_metrics_and_resolution_preserve_face_priority() {
                 unicode_range: Some(&range),
                 ..FontInfoOverride::default()
             };
-            let family = collection.register_pending_font(1, info).unwrap();
-            collection.register_pending_font(2, info).unwrap();
+            let family = collection.register_pending_font(ids[0], info).unwrap();
+            collection.register_pending_font(ids[1], info).unwrap();
             let mut cache = SourceCache::default();
             {
                 let mut query = collection.query(&mut cache);
@@ -153,29 +162,35 @@ fn pending_metrics_and_resolution_preserve_face_priority() {
                         .first_available_font_with(|key| keys.push(key))
                         .is_none()
                 );
-                assert_eq!(keys, [2, 1]);
+                assert_eq!(keys, [ids[1], ids[0]]);
                 let mut candidates = Vec::new();
                 query.matches_with_pending(|candidate| {
-                    let QueryCandidate::Pending { key, unicode_range } = candidate else {
+                    let QueryCandidate::Pending { id, unicode_range } = candidate else {
                         panic!("unexpected loaded font")
                     };
                     assert!(unicode_range.unwrap().contains(' '));
-                    candidates.push(key);
+                    candidates.push(id);
                     QueryStatus::Continue
                 });
-                assert_eq!(candidates, [2, 1]);
+                assert_eq!(candidates, [ids[1], ids[0]]);
             }
             let font = Blob::new(Arc::new(bytes.to_vec()));
-            assert!(!collection.resolve_pending_font(99, font.clone(), 0));
+            assert!(!collection.resolve_pending_font(FontId::new(), font.clone(), 0));
             // The data holds a single font, so only index 0 names one.
-            assert!(!collection.resolve_pending_font(1, font, 1));
-            assert!(!collection.resolve_pending_font(1, Blob::new(Arc::new(Vec::<u8>::new())), 0));
+            assert!(!collection.resolve_pending_font(ids[0], font, 1));
+            assert!(!collection.resolve_pending_font(
+                ids[0],
+                Blob::new(Arc::new(Vec::<u8>::new())),
+                0
+            ));
             let fonts = [
                 Blob::new(Arc::new(bytes.to_vec())),
                 Blob::new(Arc::new(bytes.to_vec())),
             ];
-            for key in order {
-                assert!(collection.resolve_pending_font(key, fonts[key as usize - 1].clone(), 0));
+            for i in order {
+                assert!(collection.resolve_pending_font(ids[i], fonts[i].clone(), 0));
+                // A font with data cannot be resolved again.
+                assert!(!collection.resolve_pending_font(ids[i], fonts[i].clone(), 0));
             }
             let family_info = collection.family(family).unwrap();
             let loaded: Vec<_> = family_info
@@ -184,6 +199,8 @@ fn pending_metrics_and_resolution_preserve_face_priority() {
                 .map(|font| font.load(None).unwrap().id())
                 .collect();
             assert_eq!(loaded, [fonts[1].id(), fonts[0].id()]);
+            let loaded_ids: Vec<_> = family_info.fonts().iter().map(|font| font.id()).collect();
+            assert_eq!(loaded_ids, [ids[1], ids[0]]);
             let mut query = collection.query(&mut cache);
             query.set_families([family]);
             assert_eq!(
@@ -197,11 +214,11 @@ fn pending_metrics_and_resolution_preserve_face_priority() {
 #[test]
 fn pending_font_status_controls_reporting() {
     use fontique::{
-        Blob, Collection, CollectionOptions, PendingFontStatus, QueryStatus, SourceCache,
+        Blob, Collection, CollectionOptions, FontId, PendingFontStatus, QueryStatus, SourceCache,
     };
     use std::sync::Arc;
 
-    fn reported(collection: &mut Collection, family: fontique::FamilyId) -> Vec<u64> {
+    fn reported(collection: &mut Collection, family: fontique::FamilyId) -> Vec<FontId> {
         let mut cache = SourceCache::default();
         let mut query = collection.query(&mut cache);
         query.set_families([family]);
@@ -213,8 +230,8 @@ fn pending_font_status_controls_reporting() {
         );
         let mut keys = Vec::new();
         query.matches_with_pending(|candidate| {
-            if let fontique::QueryCandidate::Pending { key, .. } = candidate {
-                keys.push(key);
+            if let fontique::QueryCandidate::Pending { id, .. } = candidate {
+                keys.push(id);
             }
             QueryStatus::Continue
         });
@@ -232,38 +249,39 @@ fn pending_font_status_controls_reporting() {
             family_name: Some("Statuses"),
             ..FontInfoOverride::default()
         };
-        let family = collection.register_pending_font(1, info).unwrap();
-        collection.register_pending_font(2, info).unwrap();
+        let (one, two) = (FontId::new(), FontId::new());
+        let family = collection.register_pending_font(one, info).unwrap();
+        collection.register_pending_font(two, info).unwrap();
         let mut clone = collection.clone();
         assert_eq!(
-            collection.pending_font_status(1),
+            collection.pending_font_status(one),
             Some(PendingFontStatus::Unloaded)
         );
-        assert_eq!(reported(&mut collection, family), [2, 1]);
+        assert_eq!(reported(&mut collection, family), [two, one]);
 
         // A face that is loading is reported no more, on this collection.
-        assert!(!collection.set_pending_font_status(99, PendingFontStatus::Loading));
-        assert!(!collection.set_pending_font_status(1, PendingFontStatus::Unloaded));
-        assert!(collection.set_pending_font_status(1, PendingFontStatus::Loading));
-        assert!(!collection.set_pending_font_status(1, PendingFontStatus::Loading));
+        assert!(!collection.set_pending_font_status(FontId::new(), PendingFontStatus::Loading));
+        assert!(!collection.set_pending_font_status(one, PendingFontStatus::Unloaded));
+        assert!(collection.set_pending_font_status(one, PendingFontStatus::Loading));
+        assert!(!collection.set_pending_font_status(one, PendingFontStatus::Loading));
         assert_eq!(
-            collection.pending_font_status(1),
+            collection.pending_font_status(one),
             Some(PendingFontStatus::Loading)
         );
-        assert_eq!(reported(&mut collection, family), [2]);
+        assert_eq!(reported(&mut collection, family), [two]);
         // The status is shared only between clones of a shared collection.
         let clone_status = if shared {
             PendingFontStatus::Loading
         } else {
             PendingFontStatus::Unloaded
         };
-        assert_eq!(clone.pending_font_status(1), Some(clone_status));
+        assert_eq!(clone.pending_font_status(one), Some(clone_status));
 
         // A failed face keeps its slot and is not reported either.
-        assert!(collection.set_pending_font_status(1, PendingFontStatus::Failed));
-        assert!(collection.set_pending_font_status(2, PendingFontStatus::Failed));
+        assert!(collection.set_pending_font_status(one, PendingFontStatus::Failed));
+        assert!(collection.set_pending_font_status(two, PendingFontStatus::Failed));
         assert_eq!(
-            collection.pending_font_status(1),
+            collection.pending_font_status(one),
             Some(PendingFontStatus::Failed)
         );
         assert_eq!(collection.family(family).unwrap().fonts().len(), 2);
@@ -271,12 +289,12 @@ fn pending_font_status_controls_reporting() {
 
         // A face in any status can still be resolved, in its original position, or removed.
         let font = Blob::new(Arc::new(bytes.to_vec()));
-        assert!(collection.resolve_pending_font(1, font.clone(), 0));
-        assert_eq!(collection.pending_font_status(1), None);
+        assert!(collection.resolve_pending_font(one, font.clone(), 0));
+        assert_eq!(collection.pending_font_status(one), None);
         let fonts = collection.family(family).unwrap();
         assert_eq!(fonts.fonts()[1].load(None).unwrap().id(), font.id());
-        assert!(collection.unregister_pending_font(2));
-        assert_eq!(collection.pending_font_status(2), None);
+        assert!(collection.unregister_font_by_id(two));
+        assert_eq!(collection.pending_font_status(two), None);
         assert_eq!(collection.family(family).unwrap().fonts().len(), 1);
     }
 }
