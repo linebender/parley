@@ -32,6 +32,7 @@ pub struct ScannedCollection {
     pub postscript_names: HashMap<String, FamilyId>,
     pub data_paths: SourcePathMap,
     pub families: HashMap<FamilyId, FamilyInfo>,
+    pub file_names: HashMap<String, FamilyId>,
 }
 
 #[cfg(feature = "std")]
@@ -112,8 +113,6 @@ fn scan_collection(
             .map(|name| name.chars());
         if let Some(chars) = postscript_chars {
             postscript_name.extend(chars);
-        } else {
-            return;
         }
         let data = collection.data_paths.get_or_insert(path);
         let Some(font) = FontInfo::from_font_ref(&scanned_font.font, data, scanned_font.index)
@@ -127,9 +126,14 @@ fn scan_collection(
         for other_name in other_names {
             collection.family_names.add_alias(name.id(), other_name);
         }
-        collection
-            .postscript_names
-            .insert(postscript_name.clone(), name.id());
+        if !postscript_name.is_empty() {
+            collection
+                .postscript_names
+                .insert(postscript_name.clone(), name.id());
+        }
+        if let Some(stem) = path.file_stem().and_then(|s| s.to_str()) {
+            collection.file_names.insert(stem.into(), name.id());
+        }
         families
             .entry(name.id())
             .or_insert_with(|| (name.clone(), SmallVec::default()))
