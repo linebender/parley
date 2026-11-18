@@ -1,7 +1,8 @@
 // Copyright 2024 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-use super::spacing::{EffectiveSpacing, push_cluster_gaps};
+use super::justification::Opportunities;
+use super::spacing::push_cluster_gaps;
 use super::{BreakReason, LayoutItemKind};
 use crate::data::LayoutData;
 use crate::style::Brush;
@@ -66,21 +67,28 @@ impl Default for AlignmentOptions {
     }
 }
 
-/// Align the layout. This applies to the full layout at a time, because the alignment implicitly
-///  uses the widest width in the layout if no max advance was provided.
+/// Align the lines of the layout, with the alignment set by [`Layout::set_alignment`].
 ///
-/// TODO: Evaluate whether aligning a line at a time might be faster (better cache locality?).
+/// This is the last step of line breaking. It sets each line's offset, and writes the additional
+/// spacing of the shaped clusters (word and letter spacing, and justification) to
+/// [`LayoutData::cluster_gaps`].
+///
+/// This applies to the full layout at a time, because the alignment implicitly uses the widest
+/// width in the layout if no max advance was provided.
+///
+/// [`Layout::set_alignment`]: crate::Layout::set_alignment
 pub(crate) fn align<B: Brush>(layout: &mut LayoutData<B>) {
     let alignment = layout.alignment_setting;
     let options = layout.alignment_options;
     layout.alignment = Some(alignment);
+    layout.cluster_gaps.clear();
+    // Reused between lines.
+    let mut opportunities = Opportunities::default();
 
     let is_rtl = layout.base_level.is_rtl();
 
     // Apply alignment to line items
     for line in &mut layout.lines {
-        line.justification.amount_per_opportunity = 0.;
-
         let indent = line.metrics.indent;
 
         if is_rtl {
@@ -96,65 +104,68 @@ pub(crate) fn align<B: Brush>(layout: &mut LayoutData<B>) {
         let line_width = line.metrics.inline_max_coord - line.metrics.inline_min_coord;
         let free_space = line_width - indent - line.metrics.advance + line.metrics.hanging_advance;
 
-        if !options.align_when_overflowing && free_space <= 0.0 {
-            if is_rtl {
-                // In RTL text, right-align on overflow.
-                line.metrics.offset += free_space;
+        // The free space to distribute over the line's justification opportunities, if any.
+        let justify = 'justify: {
+            if !options.align_when_overflowing && free_space <= 0.0 {
+                if is_rtl {
+                    // In RTL text, right-align on overflow.
+                    line.metrics.offset += free_space;
+                }
+                break 'justify None;
             }
-            continue;
-        }
 
-        let is_last_line = matches!(line.break_reason, BreakReason::None | BreakReason::Explicit);
-        let line_alignment = if !is_last_line {
-            alignment
-        } else if let Some(last_line_alignment) = options.last_line_alignment {
-            last_line_alignment
-        } else if alignment == Alignment::Justify {
-            Alignment::Start
-        } else {
-            alignment
+            let is_last_line =
+                matches!(line.break_reason, BreakReason::None | BreakReason::Explicit);
+            let line_alignment = if !is_last_line {
+                alignment
+            } else if let Some(last_line_alignment) = options.last_line_alignment {
+                last_line_alignment
+            } else if alignment == Alignment::Justify {
+                Alignment::Start
+            } else {
+                alignment
+            };
+
+            match (line_alignment, is_rtl) {
+                (Alignment::Left, _) | (Alignment::Start, false) | (Alignment::End, true) => None,
+                (Alignment::Right, _) | (Alignment::Start, true) | (Alignment::End, false) => {
+                    line.metrics.offset += free_space;
+                    None
+                }
+                (Alignment::Center, _) => {
+                    line.metrics.offset += free_space * 0.5;
+                    None
+                }
+                (Alignment::Justify, _) => {
+                    // Overflowing lines cannot be justified; start-align them instead.
+                    if free_space <= 0.0 {
+                        if is_rtl {
+                            line.metrics.offset += free_space;
+                        }
+                        None
+                    } else {
+                        Some(free_space)
+                    }
+                }
+            }
         };
 
-        match (line_alignment, is_rtl) {
-            (Alignment::Left, _) | (Alignment::Start, false) | (Alignment::End, true) => {
-                // Do nothing
-            }
-            (Alignment::Right, _) | (Alignment::Start, true) | (Alignment::End, false) => {
-                line.metrics.offset += free_space;
-            }
-            (Alignment::Center, _) => {
-                line.metrics.offset += free_space * 0.5;
-            }
-            (Alignment::Justify, _) => {
-                // Justified alignment doesn't apply if the line overflows or if there are no
-                // whitespace gaps to adjust. In that case, start-align, i.e., left-align for LTR
-                // text and right-align for RTL text.
-                if free_space <= 0.0 || line.num_justification_opportunities == 0 {
-                    if is_rtl {
-                        line.metrics.offset += free_space;
-                    }
-                    continue;
-                }
-
-                line.justification.amount_per_opportunity =
-                    free_space / line.num_justification_opportunities as f32;
-            }
-        }
-    }
-
-    layout.cluster_gaps.clear();
-    for line in &layout.lines {
-        if !line.has_spacing && line.justification.amount_per_opportunity == 0. {
+        if justify.is_none() && !line.has_spacing {
             continue;
         }
-        for item in &mut layout.line_items[line.item_range] {
+        // Write the gaps of the line's shaped clusters: their word and letter spacing, and the
+        // justification.
+        let items = &mut layout.line_items[line.item_range];
+        let line_gaps_start = layout.cluster_gaps.len();
+        for item in items.iter_mut() {
             item.gaps_start = None;
             if item.kind != LayoutItemKind::TextRun {
                 continue;
             }
-            let spacing =
-                EffectiveSpacing::new(layout.runs[item.index].spacing, line.justification);
-            if spacing.is_zero() {
+            let spacing = layout.runs[item.index].spacing;
+            // On a justified line, every text item has gaps, as justification indexes them by
+            // their position in the line.
+            if justify.is_none() && spacing.is_zero() {
                 continue;
             }
             let slice = layout
@@ -163,6 +174,16 @@ pub(crate) fn align<B: Brush>(layout: &mut LayoutData<B>) {
                 .narrow(item.shaped_cluster_range.into());
             item.gaps_start = Some(layout.cluster_gaps.len() as u32);
             push_cluster_gaps(&mut layout.cluster_gaps, slice, spacing, item.is_rtl());
+        }
+        if let Some(free_space) = justify {
+            opportunities.find(&layout.shaped_text, line, items);
+            let justified =
+                opportunities.justify(&mut layout.cluster_gaps[line_gaps_start..], free_space);
+            // Justified alignment doesn't apply if there are no opportunities. In that case,
+            // start-align, i.e., left-align for LTR text and right-align for RTL text.
+            if !justified && is_rtl {
+                line.metrics.offset += free_space;
+            }
         }
     }
 }

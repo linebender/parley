@@ -301,6 +301,10 @@ impl ShapedText {
         &self.features
     }
 
+    /// Appends a shaped run.
+    ///
+    /// `emoji_graphemes` holds the sorted text character indices of the first characters of the
+    /// run's graphemes which are presented as emoji.
     #[expect(clippy::cast_possible_truncation, reason = "Deferred")]
     pub(crate) fn push_run(
         &mut self,
@@ -314,7 +318,20 @@ impl ShapedText {
         font: &FontInstance,
         glyph_buffer: &harfrust::Buffer,
         normalized_coords: &[harfrust::font::NormalizedCoord],
+        emoji_graphemes: &[u32],
     ) {
+        debug_assert_eq!(
+            self.characters.len(),
+            range.char_range.start,
+            "Runs must be pushed contiguously, as we index `self.characters` by text character index"
+        );
+        debug_assert!(
+            emoji_graphemes.is_sorted()
+                && emoji_graphemes
+                    .iter()
+                    .all(|&index| range.char_range.contains(&(index as usize))),
+            "The emoji graphemes must be sorted and within the run"
+        );
         debug_assert_eq!(
             range.char_range.end - range.char_range.start,
             text[range.byte_range].chars().count(),
@@ -385,6 +402,7 @@ impl ShapedText {
                     info.is_word_boundary(),
                     info.is_soft_wrap_opportunity(),
                     info.is_default_ignorable(),
+                    info.is_block_script(),
                 )
                 .with_inline_object(info.is_inline_object()),
                 grapheme_start: info.is_grapheme_start(),
@@ -407,6 +425,7 @@ impl ShapedText {
                 glyph_positions.iter(),
                 &self.characters,
                 characters_start,
+                emoji_graphemes,
                 self.has_safe_to_concat_flags,
             );
         } else {
@@ -418,6 +437,7 @@ impl ShapedText {
                 glyph_positions.iter().rev(),
                 &self.characters,
                 characters_start,
+                emoji_graphemes,
                 self.has_safe_to_concat_flags,
             );
             // Reverse each cluster's glyphs, such that they are in paint order.
@@ -498,6 +518,8 @@ pub struct ShapedRun {
 /// * `characters` must contain the shaped characters whose clusters we're now processing, starting at
 ///   index `characters_start`.
 /// * `characters_start` - See `characters`.
+/// * `emoji_graphemes` - The sorted indices into `characters` of the first characters of the
+///   graphemes which are presented as emoji.
 /// * `produce_safe_to_concat_flags` - Whether `HarfRust` was asked to produce the unsafe-to-concat
 ///   glyph flags.
 fn process_shaped_clusters<'a>(
@@ -508,6 +530,7 @@ fn process_shaped_clusters<'a>(
     glyph_positions: impl Iterator<Item = &'a harfrust::GlyphPosition>,
     characters: &[Character],
     characters_start: usize,
+    emoji_graphemes: &[u32],
     produce_safe_to_concat_flags: bool,
 ) {
     struct Cluster {
@@ -528,6 +551,7 @@ fn process_shaped_clusters<'a>(
         cluster: &Cluster,
         char_end: usize,
         characters: &[Character],
+        emoji_graphemes: &[u32],
         shaped_clusters: &mut Vec<ShapedCluster>,
         glyphs: &mut Vec<Glyph>,
     ) {
@@ -573,6 +597,10 @@ fn process_shaped_clusters<'a>(
                     first_character.flags.is_soft_wrap_opportunity(),
                     first_character.whitespace,
                     first_character.flags.is_default_ignorable(),
+                    first_character.flags.is_block_script()
+                        || emoji_graphemes
+                            .binary_search(&(cluster.characters_start as u32))
+                            .is_ok(),
                 ),
             glyph_offset,
             advance,
@@ -595,7 +623,14 @@ fn process_shaped_clusters<'a>(
     for (glyph_info, glyph_pos) in glyph_infos.zip(glyph_positions) {
         if glyph_info.cluster != cluster.id {
             let char_end = characters_start + glyph_info.cluster as usize;
-            flush(&cluster, char_end, characters, shaped_clusters, glyphs);
+            flush(
+                &cluster,
+                char_end,
+                characters,
+                emoji_graphemes,
+                shaped_clusters,
+                glyphs,
+            );
 
             cluster = Cluster {
                 id: glyph_info.cluster,
@@ -642,6 +677,7 @@ fn process_shaped_clusters<'a>(
         &cluster,
         characters.len(),
         characters,
+        emoji_graphemes,
         shaped_clusters,
         glyphs,
     );

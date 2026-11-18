@@ -5,7 +5,7 @@
 
 use alloc::vec::Vec;
 use core::ops::Range;
-use parley_engine::shape::Whitespace;
+use parley_engine::shape::{ShapedCluster, Whitespace};
 use parley_engine::{Atom, ShapedSlice};
 
 /// Whether the whitespace is a word separator.
@@ -103,8 +103,6 @@ impl Spacing {
     /// - has the given whitespace class, and
     /// - has the given value for its [`CharacterFlags::is_default_ignorable`].
     ///
-    /// This is [`EffectiveSpacing::gaps`] under [`Justification::NONE`].
-    ///
     /// In CSS [letter-spacing][] ignores "invisible zero-width formatting characters", but
     /// doesn't specify an exact list. Blink chooses to ignore clusters which start with a default
     /// ignorable character, so we do the same. Blink does additionally hardcode skipping letter-spacing
@@ -136,81 +134,32 @@ impl Spacing {
 
         gaps
     }
-}
 
-/// Justification to apply to a single line.
-#[derive(Copy, Clone, Debug, PartialEq)]
-pub(crate) struct Justification {
-    /// The amount of additional spacing to apply per justification opportunity.
-    pub(crate) amount_per_opportunity: f32,
-
-    /// One past the line's logically last shaped cluster eligible for justification. Shaped
-    /// clusters at or beyond this index are not justified, as they hang past the line's end, or are
-    /// part of the last atom that doesn't fully hang (e.g., an NBSP doesn't hang, but if it closes
-    /// the line, it shouldn't get justified).
-    pub(crate) justification_end_cluster: u32,
-}
-
-impl Justification {
-    /// No justification.
-    pub(crate) const NONE: Self = Self {
-        amount_per_opportunity: 0.,
-        justification_end_cluster: u32::MAX,
-    };
-}
-
-impl Default for Justification {
-    fn default() -> Self {
-        Self::NONE
-    }
-}
-
-/// Additional spacing to apply, including justification (if any).
-#[derive(Copy, Clone, Debug)]
-pub(crate) struct EffectiveSpacing {
-    spacing: Spacing,
-    justification: Justification,
-}
-
-impl EffectiveSpacing {
-    /// The combined [`Spacing`] and [`Justification`] effective for a run.
-    ///
-    /// To measure text for purposes like line breaking, pass [`Justification::NONE`].
+    /// The gaps around `atom`, see [`Self::gaps`].
     #[inline(always)]
-    pub(crate) const fn new(spacing: Spacing, justification: Justification) -> Self {
-        Self {
-            spacing,
-            justification,
+    pub(crate) fn atom_gaps(self, atom: &Atom<'_>) -> Gaps {
+        if self.is_zero() {
+            return Gaps::ZERO;
         }
-    }
-
-    #[inline(always)]
-    pub(crate) const fn is_zero(self) -> bool {
-        self.spacing.is_zero() && self.justification.amount_per_opportunity == 0.
-    }
-
-    /// The gaps around `atom`.
-    #[inline(always)]
-    pub(crate) fn gaps(self, atom: &Atom<'_>) -> Gaps {
+        // The first shaped cluster caches the relevant properties of the atom's first character.
         let first_cluster = atom.shaped_clusters()[0];
-        let whitespace = first_cluster.whitespace();
-        let mut gaps = self
-            .spacing
-            .gaps(whitespace, first_cluster.is_default_ignorable());
-
-        if is_word_separator(whitespace)
-            && atom.shaped_clusters_range().end <= self.justification.justification_end_cluster
-        {
-            gaps.after += self.justification.amount_per_opportunity;
-        }
-
-        gaps
+        self.gaps(
+            first_cluster.whitespace(),
+            first_cluster.is_default_ignorable(),
+        )
     }
+}
 
-    /// The total advance of `atom`, i.e., the sum of the shaped advance and gaps.
-    #[inline(always)]
-    pub(crate) fn atom_advance(self, atom: &Atom<'_>) -> f32 {
-        atom.advance() + self.gaps(atom).total()
+/// The indices into `clusters` (an atom's shaped clusters) of the visually first and last shaped
+/// cluster.
+///
+/// `clusters` must not be empty.
+#[inline]
+pub(crate) fn visual_edges(clusters: &[ShapedCluster], is_rtl: bool) -> (usize, usize) {
+    if is_rtl {
+        (clusters.len() - 1, 0)
+    } else {
+        (0, clusters.len() - 1)
     }
 }
 
@@ -219,24 +168,22 @@ impl EffectiveSpacing {
 pub(crate) fn push_cluster_gaps(
     cluster_gaps: &mut Vec<Gaps>,
     slice: ShapedSlice<'_>,
-    spacing: EffectiveSpacing,
+    spacing: Spacing,
     is_rtl: bool,
 ) {
     let start = cluster_gaps.len();
     cluster_gaps.resize(start + slice.shaped_clusters().len(), Gaps::ZERO);
+    if spacing.is_zero() {
+        return;
+    }
     let entries = &mut cluster_gaps[start..];
     let base = slice.shaped_clusters_range().start;
     for atom in slice.atoms_start() {
-        let gaps = spacing.gaps(&atom);
+        let gaps = spacing.atom_gaps(&atom);
         if gaps.before == 0. && gaps.after == 0. {
             continue;
         }
-        let clusters = atom.shaped_clusters();
-        let (first, last) = if is_rtl {
-            (clusters.len() - 1, 0)
-        } else {
-            (0, clusters.len() - 1)
-        };
+        let (first, last) = visual_edges(atom.shaped_clusters(), is_rtl);
         let offset = (atom.shaped_clusters_range().start - base) as usize;
         entries[offset + first].before += gaps.before;
         entries[offset + last].after += gaps.after;
