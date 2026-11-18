@@ -75,6 +75,13 @@ pub struct CharmapIndex {
 }
 
 impl CharmapIndex {
+    /// The index of a font whose data is pending. There is no character map at this offset.
+    pub(crate) const PENDING: Self = Self {
+        subtable_offset: 0,
+        is_symbol: false,
+        is_mac_roman: false,
+    };
+
     pub(crate) fn new(font: &FontRef<'_>) -> Option<Self> {
         let cmap = font.cmap().ok()?;
         let cmap_offset = font

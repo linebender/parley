@@ -6,7 +6,7 @@
 use crate::{AtomicCounter, CharmapIndex, UnicodeRangeSet};
 use core::sync::atomic::Ordering;
 
-use super::source::{SourceInfo, SourceKind};
+use super::source::{SourceId, SourceInfo, SourceKind};
 use super::{Blob, source_cache::SourceCache};
 use crate::{FontStyle, FontWeight, FontWidth};
 use parlance::Synthesis;
@@ -66,6 +66,7 @@ impl FontInfo {
                 let font = FontRef::from_index(memory.as_ref(), index).ok()?;
                 Self::from_font_ref(&font, source.clone(), index)
             }
+            SourceKind::Pending => None,
         }
     }
 
@@ -94,6 +95,7 @@ impl FontInfo {
                 SourceKind::Memory(blob) => Some(blob.clone()),
                 #[cfg(feature = "std")]
                 SourceKind::Path(path) => super::source_cache::load_blob(path),
+                SourceKind::Pending => None,
             }
         }
     }
@@ -287,6 +289,47 @@ impl FontInfo {
             charmap_index,
             unicode_range: None,
         })
+    }
+
+    /// Creates a font whose data is not available yet, see
+    /// [`Collection::declare_font`](crate::Collection::declare_font).
+    pub(crate) fn pending(info: &FontInfoOverride<'_>) -> Self {
+        // The axis defaults are kept to be applied once the data is supplied.
+        let axis = |&(tag, default): &(Tag, f32)| AxisInfo {
+            tag,
+            default,
+            ..Default::default()
+        };
+        Self {
+            id: FontId::new(),
+            source: SourceInfo::new(SourceId::new(), SourceKind::Pending),
+            index: 0,
+            width: info.width.unwrap_or_default(),
+            style: info.style.unwrap_or_default(),
+            weight: info.weight.unwrap_or_default(),
+            axes: info.axes.unwrap_or(&[]).iter().map(axis).collect(),
+            attr_axes: 0,
+            charmap_index: CharmapIndex::PENDING,
+            unicode_range: info.unicode_range.cloned(),
+        }
+    }
+
+    /// Returns this pending font with its data, keeping the source identifier and what the font
+    /// was declared with.
+    pub(crate) fn supply(&self, data: Blob<u8>) -> Option<Self> {
+        let font = FontRef::from_index(data.as_ref(), 0).ok()?;
+        let source = SourceInfo::new(self.source.id, SourceKind::Memory(data.clone()));
+        let mut supplied = Self::from_font_ref(&font, source, 0)?;
+        let axes: SmallVec<[_; 1]> = self.axes.iter().map(|a| (a.tag, a.default)).collect();
+        supplied.apply_override(&FontInfoOverride {
+            family_name: None,
+            width: Some(self.width),
+            style: Some(self.style),
+            weight: Some(self.weight),
+            axes: Some(&axes),
+            unicode_range: self.unicode_range.as_ref(),
+        });
+        Some(supplied)
     }
 
     #[allow(unused)]
