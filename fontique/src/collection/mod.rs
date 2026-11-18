@@ -17,7 +17,7 @@ use super::{
     fallback::{FallbackKey, FallbackMap},
     family::{FamilyId, FamilyInfo},
     family_name::{FamilyName, FamilyNameMap},
-    font::FontInfo,
+    font::{FontId, FontInfo},
     generic::GenericFamilyMap,
     source::{SourceId, SourceInfo, SourceKind},
 };
@@ -235,6 +235,28 @@ impl Collection {
         self.inner.unregister_font(family, width, style, weight)
     }
 
+    /// Returns the font with the given identifier.
+    ///
+    /// This finds fonts registered with [`Self::register_fonts`] or
+    /// [`Self::load_fonts_from_paths`], and system fonts whose family has
+    /// been loaded by this collection.
+    pub fn font(&mut self, id: FontId) -> Option<FontInfo> {
+        self.inner.font(id)
+    }
+
+    /// Returns the identifier of the family that holds the font with the given
+    /// identifier. This finds the same fonts as [`Self::font`].
+    pub fn font_family_id(&mut self, id: FontId) -> Option<FamilyId> {
+        self.inner.font_family_id(id)
+    }
+
+    /// Unregisters the font with the given identifier.
+    ///
+    /// Returns true if a font was removed from its family, false otherwise.
+    pub fn unregister_font_by_id(&mut self, id: FontId) -> bool {
+        self.inner.unregister_font_by_id(id)
+    }
+
     /// Clears this collection. Un-registers all fonts previously registered via
     /// [`Self::register_fonts`], and unsets all previously-set generic families
     /// and fallbacks. This will not remove any system fonts.
@@ -353,6 +375,11 @@ impl Inner {
             #[cfg(feature = "system")]
             if let Some(system) = &self.system {
                 let family = system.fonts.lock().unwrap().family(id);
+                if let Some(family) = &family {
+                    for font in family.fonts() {
+                        self.data.font_families.insert(font.id(), id);
+                    }
+                }
                 self.data.families.insert(id, family.clone());
                 family
             } else {
@@ -575,6 +602,36 @@ impl Inner {
             .is_some()
     }
 
+    /// Returns the font with the given identifier.
+    pub fn font(&mut self, id: FontId) -> Option<FontInfo> {
+        self.sync_shared();
+        self.data.font(id).cloned()
+    }
+
+    /// Returns the identifier of the family that holds the font with the given
+    /// identifier.
+    pub fn font_family_id(&mut self, id: FontId) -> Option<FamilyId> {
+        self.sync_shared();
+        self.data.font(id)?;
+        self.data.font_families.get(&id).copied()
+    }
+
+    /// Unregisters the font with the given identifier.
+    ///
+    /// Returns true if a font was removed from its family, false otherwise.
+    pub fn unregister_font_by_id(&mut self, id: FontId) -> bool {
+        #[cfg(feature = "std")]
+        if let Some(shared) = &self.shared {
+            let result = shared.data.lock().unwrap().unregister_font_by_id(id);
+            shared.bump_version();
+            result
+        } else {
+            self.data.unregister_font_by_id(id)
+        }
+        #[cfg(not(feature = "std"))]
+        self.data.unregister_font_by_id(id)
+    }
+
     /// Clears this collection. Un-registers all fonts previously registered via
     /// [`Self::register_fonts`], and unsets all previously-set generic families
     /// and fallbacks. This will not remove any system fonts.
@@ -698,6 +755,8 @@ impl System {
 struct CommonData {
     family_names: FamilyNameMap,
     families: FamilyMap,
+    /// The family that holds each font in `families`.
+    font_families: HashMap<FontId, FamilyId>,
     generic_families: GenericFamilyMap,
     fallbacks: FallbackMap,
 }
@@ -810,6 +869,9 @@ impl CommonData {
 
     fn merge_families(&mut self, families: &HashMap<FamilyId, (FamilyName, Vec<FontInfo>)>) {
         for (id, (name, fonts)) in families.iter() {
+            for font in fonts {
+                self.font_families.insert(font.id(), *id);
+            }
             if let Some(Some(family)) = self.families.get_mut(id) {
                 let new_fonts = fonts.iter().chain(family.fonts()).cloned();
                 *family = FamilyInfo::new(name.clone(), new_fonts);
@@ -827,17 +889,37 @@ impl CommonData {
         style: FontStyleRange,
         weight: FontWeightRange,
     ) -> Option<()> {
+        self.retain_fonts(family, |f| {
+            f.width() != width || f.style() != style || f.weight() != weight
+        })
+    }
+
+    fn unregister_font_by_id(&mut self, id: FontId) -> bool {
+        let Some(&family) = self.font_families.get(&id) else {
+            return false;
+        };
+        self.retain_fonts(family, |f| f.id() != id);
+        self.font_families.remove(&id);
+        true
+    }
+
+    /// Rebuilds the family from the fonts for which `keep` returns true.
+    fn retain_fonts(&mut self, family: FamilyId, keep: impl Fn(&FontInfo) -> bool) -> Option<()> {
         let family_name = self.family_names.get_by_id(family)?;
         let family = self.families.get_mut(&family)?.as_mut()?;
 
-        let new_fonts = family
-            .fonts()
-            .iter()
-            .filter(|f| f.width() != width || f.style() != style || f.weight() != weight)
-            .cloned();
+        for font in family.fonts().iter().filter(|f| !keep(f)) {
+            self.font_families.remove(&font.id());
+        }
+        let new_fonts = family.fonts().iter().filter(|f| keep(f)).cloned();
         *family = FamilyInfo::new(family_name.clone(), new_fonts);
 
         Some(())
+    }
+
+    fn font(&self, id: FontId) -> Option<&FontInfo> {
+        let family = self.families.get(self.font_families.get(&id)?)?.as_ref()?;
+        family.fonts().iter().find(|font| font.id() == id)
     }
 
     fn clear(&mut self) {
