@@ -56,7 +56,7 @@ impl UnicodeRangeSet {
 
     /// Returns `true` if the set contains the given codepoint.
     #[inline]
-    pub(crate) fn contains(&self, codepoint: impl Into<u32>) -> bool {
+    pub fn contains(&self, codepoint: impl Into<u32>) -> bool {
         let c = codepoint.into();
         if c < self.min || c > self.max {
             return false;
@@ -67,7 +67,7 @@ impl UnicodeRangeSet {
 }
 
 /// Metadata for constructing a character map from font data.
-#[derive(Copy, Clone, PartialEq, Eq, Debug)]
+#[derive(Copy, Clone, Default, PartialEq, Eq, Debug)]
 pub struct CharmapIndex {
     subtable_offset: u32,
     is_symbol: bool,

@@ -176,7 +176,7 @@ pub fn build_rich_layout(
     let colr_font_data = std::fs::read(colr_font_path).expect("Failed to load COLR font");
     font_cx
         .collection
-        .register_fonts(Blob::new(Arc::new(colr_font_data)), None);
+        .register_font(Blob::new(Arc::new(colr_font_data)), 0, None);
 
     let (underline_range, strikethrough_range, party_emoji_range) = style_ranges(&config.text);
 

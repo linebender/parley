@@ -4,6 +4,7 @@
 //! Model for font data.
 
 use crate::AtomicCounter;
+use alloc::boxed::Box;
 use core::sync::atomic::Ordering;
 use linebender_resource_handle::Blob;
 #[cfg(feature = "std")]
@@ -58,11 +59,44 @@ impl SourceInfo {
     }
 }
 
+/// Load status of a descriptor-only font registered with
+/// [`Collection::register_pending_font`](crate::Collection::register_pending_font).
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+pub enum PendingFontStatus {
+    /// The font's data is not being loaded. Queries yield the font as
+    /// [`QueryCandidate::Pending`](crate::QueryCandidate::Pending) where it matches, and
+    /// can [request](crate::PendingFont::request) it.
+    Unloaded,
+    /// The font's data is being loaded. Queries yield the font as for
+    /// [`Self::Unloaded`], but requesting it does nothing.
+    Loading,
+    /// Loading the font's data failed. Queries skip the font.
+    Failed,
+}
+
+/// A descriptor-only font registered with
+/// [`Collection::register_pending_font`](crate::Collection::register_pending_font).
+#[derive(Clone)]
+pub struct PendingSource {
+    pub(crate) status: PendingFontStatus,
+    /// The descriptors the font was registered with, applied to its data when it arrives.
+    pub(crate) overrides: Box<crate::font::PendingOverrides>,
+}
+
+impl PendingSource {
+    /// Whether the font's data has been requested, or failed to load.
+    pub fn status(&self) -> PendingFontStatus {
+        self.status
+    }
+}
+
 /// Font data that is either a path to the font file or shared data in memory.
 ///
 /// See [`SourceInfo`].
 #[derive(Clone)]
 pub enum SourceKind {
+    /// Descriptor-only font without data.
+    Pending(PendingSource),
     /// Shared data containing the content of the font file.
     Memory(Blob<u8>),
     #[cfg(feature = "std")]
@@ -73,6 +107,7 @@ pub enum SourceKind {
 impl core::fmt::Debug for SourceKind {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         match self {
+            Self::Pending(pending) => write!(f, "Pending({:?})", pending.status),
             #[cfg(feature = "std")]
             Self::Path(path) => {
                 write!(f, "Path({path:?})")
