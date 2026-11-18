@@ -508,12 +508,11 @@ fn build_into_layout<B: Brush>(
         );
     }
 
-    // After shaping, so that the metrics of fonts used for shaping can be reused.
     crate::layout::style_metrics::resolve_style_metrics(
         &lcx.rcx,
         fcx,
         &lcx.style_table,
-        &layout.data.shaped_text,
+        &mut lcx.scx,
         options.quantize,
         &mut layout.data.style_metrics,
     );

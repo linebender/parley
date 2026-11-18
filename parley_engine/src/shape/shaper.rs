@@ -9,7 +9,7 @@ use linebender_resource_handle::{Blob, FontData};
 use parlance::{FontFeature, FontVariation, Language};
 
 use crate::{
-    Analysis, CharInfo, ShapedText,
+    Analysis, CharInfo, FontMetrics, ShapedText,
     itemize::{Item, Segment, TextRange},
     lru_cache::LruCache,
     shape::{CharCluster, cache},
@@ -120,6 +120,42 @@ impl core::fmt::Debug for Shaper {
 }
 
 impl Shaper {
+    /// Returns the metrics for `font` at `font_size`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `font` is malformed.
+    pub fn font_metrics(
+        &mut self,
+        font: FontInstanceRef<'_>,
+        font_size: f32,
+        variations: &[FontVariation],
+    ) -> FontMetrics {
+        // Make sure to sync with `shape_segment`
+        let base_font = self.shape_data_cache.entry(
+            cache::ShapeDataKey::new(font.data.id(), font.index),
+            || {
+                let (data, _) = font.data.clone().into_raw_parts();
+                harfrust::Font::new(data, font.index).unwrap()
+            },
+        );
+        let instance = self.shape_instance_cache.entry(
+            cache::ShapeInstanceKey::new(
+                font.data.id(),
+                font.index,
+                font.synthesis,
+                Some(variations),
+            ),
+            || {
+                base_font
+                    .instance_builder()
+                    .variations(variations_iter(font.synthesis, variations))
+                    .build()
+            },
+        );
+        FontMetrics::from_harfrust_font(instance, font_size)
+    }
+
     /// Shape text into glyphs, overwriting `shaped_text`.
     ///
     /// The `text` passed in must be the same as used for producing `analysis`.
@@ -393,7 +429,7 @@ fn shape_segment(
             char_style_indices,
             font,
             buffer,
-            instance.normalized_coords(),
+            instance,
         );
     };
 
