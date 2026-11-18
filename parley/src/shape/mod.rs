@@ -16,7 +16,7 @@ use crate::FloatedBox;
 use crate::util::{nearly_eq, nearly_zero};
 use crate::{FontContext, FontData, Spacing};
 
-use fontique::{self, Query, QueryFamily, QueryFont};
+use fontique::{self, Query, QueryCandidate, QueryFamily, QueryFont};
 use parlance::{GenericFamily, Tag};
 
 /// If these font features are passed to the shaper, optional ligatures are not applied.
@@ -315,17 +315,26 @@ impl<'a, 'b, B: Brush> parley_engine::FontSelector for FontSelector<'a, 'b, B> {
         let query = &mut *self.query;
         let query_yields_font = *self.query_yields_font.get_or_insert_with(|| {
             let mut yields_font = false;
-            query.matches_with(|font| {
-                if font.charmap().is_some() {
+            query.matches_with(|candidate| match candidate {
+                QueryCandidate::Font(font) if font.charmap().is_some() => {
                     yields_font = true;
                     fontique::QueryStatus::Stop
-                } else {
-                    fontique::QueryStatus::Continue
                 }
+                _ => fontique::QueryStatus::Continue,
             });
             yields_font
         });
         if !query_yields_font {
+            // The query may still yield pending fonts. Request the first that the cluster is in
+            // range of.
+            query.matches_with(|candidate| match candidate {
+                QueryCandidate::Pending(font) if in_unicode_range(&font, cluster) => {
+                    font.request();
+                    fontique::QueryStatus::Stop
+                }
+                _ => fontique::QueryStatus::Continue,
+            });
+
             if matches!(self.last_resort_font, LastResortFont::Unresolved) {
                 if let Some(font) = any_font(self.query) {
                     self.last_resort_font = LastResortFont::Resolved(FontInstance {
@@ -351,8 +360,22 @@ impl<'a, 'b, B: Brush> parley_engine::FontSelector for FontSelector<'a, 'b, B> {
 
         let mut selected_font = None;
         let mut best_coverage = Coverage::NONE;
+        let mut requested = false;
 
-        self.query.matches_with(|font| {
+        self.query.matches_with(|candidate| {
+            let font = match candidate {
+                QueryCandidate::Font(font) => font,
+                QueryCandidate::Pending(font) => {
+                    // Only the first pending font that the cluster is in range of is requested.
+                    // The later ones are requested once its data is supplied, if it turns out
+                    // not to be the font to use.
+                    if !requested && in_unicode_range(&font, cluster) {
+                        requested = true;
+                        font.request();
+                    }
+                    return fontique::QueryStatus::Continue;
+                }
+            };
             // Only create the charmap if the character is the unicode range, as the the range check
             // is a lot cheaper than creating the charmap. That matters if families are split into
             // many subsets.
@@ -417,11 +440,24 @@ fn any_font(query: &mut Query<'_>) -> Option<QueryFont> {
     ]);
     query.matches_with(
         #[inline]
-        |font: &QueryFont| {
+        |candidate: QueryCandidate<'_, '_>| {
+            let QueryCandidate::Font(font) = candidate else {
+                return fontique::QueryStatus::Continue;
+            };
             found = Some(font.clone());
             fontique::QueryStatus::Stop
         },
     );
 
     found
+}
+
+/// Returns `true` if `font` may be used for part of `cluster` once its data is available.
+fn in_unicode_range(font: &fontique::PendingFont<'_>, cluster: &mut CharCluster) -> bool {
+    let mut in_range = false;
+    cluster.calculate_coverage(|ch| {
+        in_range |= font.in_unicode_range(ch);
+        false
+    });
+    in_range
 }

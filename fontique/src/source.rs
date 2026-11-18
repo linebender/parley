@@ -68,6 +68,9 @@ pub enum SourceKind {
     #[cfg(feature = "std")]
     /// Path to a font file.
     Path(Arc<Path>),
+    /// Data that is not available yet, see
+    /// [`Collection::declare_font`](crate::Collection::declare_font).
+    Pending,
 }
 
 impl core::fmt::Debug for SourceKind {
@@ -79,6 +82,9 @@ impl core::fmt::Debug for SourceKind {
             }
             Self::Memory(_) => {
                 write!(f, "Data([..])")
+            }
+            Self::Pending => {
+                write!(f, "Pending")
             }
         }
     }

@@ -5,7 +5,7 @@
 
 mod query;
 
-pub use query::{Query, QueryFamily, QueryFont, QueryStatus};
+pub use query::{PendingFont, Query, QueryCandidate, QueryFamily, QueryFont, QueryStatus};
 
 use crate::font::FontInfoOverride;
 
@@ -22,8 +22,8 @@ use super::{
     source::{SourceId, SourceInfo, SourceKind},
 };
 use crate::{AtomicCounter, CounterInt};
-use alloc::{string::String, sync::Arc, vec::Vec};
-use hashbrown::HashMap;
+use alloc::{string::String, sync::Arc, vec, vec::Vec};
+use hashbrown::{HashMap, HashSet};
 use read_fonts::types::NameId;
 #[cfg(feature = "std")]
 use std::path::Path;
@@ -66,6 +66,8 @@ impl Default for CollectionOptions {
 pub struct Collection {
     inner: Inner,
     query_state: query::QueryState,
+    /// The pending fonts that queries requested, see [`Self::take_font_requests`].
+    font_requests: HashSet<SourceId>,
 }
 
 impl Collection {
@@ -82,6 +84,7 @@ impl Collection {
         Self {
             inner: Inner::new(options),
             query_state: query::QueryState::default(),
+            font_requests: HashSet::default(),
         }
     }
 
@@ -222,6 +225,40 @@ impl Collection {
         self.inner.register_fonts(data, info_override)
     }
 
+    /// Declares a font in the family named `family_name` whose data is not available yet.
+    ///
+    /// This is like [`Self::register_fonts`] for, e.g., a CSS `@font-face` rule whose font has
+    /// not been fetched. Queries yield the font as [pending](QueryCandidate::Pending), and
+    /// [`Self::take_font_requests`] returns its source once a query requests it. Provide the
+    /// data with [`Self::supply_font`].
+    ///
+    /// The font has the attributes given in `info`, which are normal where not given, also once
+    /// its data is supplied. The family name of `info` is not used.
+    pub fn declare_font(
+        &mut self,
+        family_name: &str,
+        info: FontInfoOverride<'_>,
+    ) -> (FamilyId, SourceId) {
+        self.inner.declare_font(family_name, info)
+    }
+
+    /// Supplies the data of a font declared with [`Self::declare_font`]. The font keeps its
+    /// place in its family.
+    ///
+    /// If `data` is a font collection, its first font is used. Returns `false` if `source` is
+    /// not a pending font or `data` does not contain a font.
+    pub fn supply_font(&mut self, source: SourceId, data: Blob<u8>) -> bool {
+        self.inner.supply_font(source, data)
+    }
+
+    /// Returns the pending fonts that queries [requested](PendingFont::request) since the last
+    /// call, in no particular order.
+    ///
+    /// Later queries request a font again until its data is [supplied](Self::supply_font).
+    pub fn take_font_requests(&mut self) -> impl Iterator<Item = SourceId> + '_ {
+        self.font_requests.drain()
+    }
+
     /// Unregisters the font with the given identifier.
     ///
     /// Returns `true` if the font was removed from its family, `false` otherwise. System fonts
@@ -230,11 +267,22 @@ impl Collection {
         self.inner.unregister_font(id)
     }
 
+    /// Unregisters all fonts of the given source. These are the fonts registered from one blob,
+    /// or a font declared with [`Self::declare_font`], for example because its data could not
+    /// be fetched.
+    ///
+    /// Returns true if a font was removed, false otherwise. This will not remove system fonts.
+    pub fn unregister_source(&mut self, source: SourceId) -> bool {
+        self.font_requests.remove(&source);
+        self.inner.unregister_source(source)
+    }
+
     /// Clears this collection. Un-registers all fonts previously registered via
     /// [`Self::register_fonts`], and unsets all previously-set generic families
     /// and fallbacks. This will not remove any system fonts.
     pub fn clear(&mut self) {
         self.inner.clear();
+        self.font_requests.clear();
     }
 }
 
@@ -540,6 +588,38 @@ impl Inner {
         self.data.register_fonts(data, info_override)
     }
 
+    /// Declares a font whose data is not available yet.
+    pub fn declare_font(
+        &mut self,
+        family_name: &str,
+        info: FontInfoOverride<'_>,
+    ) -> (FamilyId, SourceId) {
+        #[cfg(feature = "std")]
+        if let Some(shared) = &self.shared {
+            let result = shared.data.lock().unwrap().declare_font(family_name, info);
+            shared.bump_version();
+            result
+        } else {
+            self.data.declare_font(family_name, info)
+        }
+        #[cfg(not(feature = "std"))]
+        self.data.declare_font(family_name, info)
+    }
+
+    /// Supplies the data of a font declared with [`Self::declare_font`].
+    pub fn supply_font(&mut self, source: SourceId, data: Blob<u8>) -> bool {
+        #[cfg(feature = "std")]
+        if let Some(shared) = &self.shared {
+            let result = shared.data.lock().unwrap().supply_font(source, data);
+            shared.bump_version();
+            result.is_some()
+        } else {
+            self.data.supply_font(source, data).is_some()
+        }
+        #[cfg(not(feature = "std"))]
+        self.data.supply_font(source, data).is_some()
+    }
+
     /// Unregisters the font with the given identifier.
     ///
     /// Returns `true` if the font was removed from its family, `false` otherwise.
@@ -554,6 +634,20 @@ impl Inner {
         }
         #[cfg(not(feature = "std"))]
         self.data.unregister_font(id)
+    }
+
+    /// Unregisters all fonts of the given source.
+    pub fn unregister_source(&mut self, source: SourceId) -> bool {
+        #[cfg(feature = "std")]
+        if let Some(shared) = &self.shared {
+            let result = shared.data.lock().unwrap().unregister_source(source);
+            shared.bump_version();
+            result
+        } else {
+            self.data.unregister_source(source)
+        }
+        #[cfg(not(feature = "std"))]
+        self.data.unregister_source(source)
     }
 
     /// Clears this collection. Un-registers all fonts previously registered via
@@ -740,6 +834,36 @@ impl CommonData {
             .collect()
     }
 
+    fn declare_font(
+        &mut self,
+        family_name: &str,
+        info: FontInfoOverride<'_>,
+    ) -> (FamilyId, SourceId) {
+        let font = FontInfo::pending(&info);
+        let source = font.source().id();
+        let name = self.family_names.get_or_insert(family_name);
+        let id = name.id();
+        self.merge_families(&HashMap::from_iter([(id, (name, vec![font]))]));
+        (id, source)
+    }
+
+    fn supply_font(&mut self, source: SourceId, data: Blob<u8>) -> Option<()> {
+        let is_pending = |font: &FontInfo| {
+            font.source().id() == source && matches!(font.source().kind(), SourceKind::Pending)
+        };
+        for family in self.families.values_mut().flatten() {
+            let Some(index) = family.fonts().iter().position(is_pending) else {
+                continue;
+            };
+            let mut fonts = family.fonts().to_vec();
+            fonts[index] = fonts[index].supply(data)?;
+            let name = self.family_names.get_by_id(family.id())?;
+            *family = FamilyInfo::new(name.clone(), fonts);
+            return Some(());
+        }
+        None
+    }
+
     fn register_scanned_font(
         &mut self,
         scanned_font: &crate::scan::ScannedFont<'_>,
@@ -818,6 +942,22 @@ impl CommonData {
         *family = FamilyInfo::new(family_name.clone(), new_fonts);
 
         true
+    }
+
+    fn unregister_source(&mut self, source: SourceId) -> bool {
+        let mut removed = false;
+        for family in self.families.values_mut().flatten() {
+            // System families are not in `family_names`.
+            let Some(name) = self.family_names.get_by_id(family.id()) else {
+                continue;
+            };
+            let fonts = family.fonts().iter().filter(|f| f.source().id() != source);
+            if fonts.clone().count() != family.fonts().len() {
+                *family = FamilyInfo::new(name.clone(), fonts.cloned());
+                removed = true;
+            }
+        }
+        removed
     }
 
     fn clear(&mut self) {
