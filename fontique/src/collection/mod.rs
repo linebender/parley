@@ -877,14 +877,7 @@ impl CommonData {
             return None;
         }
         let name = self.family_names.get_or_insert(family_name);
-        let family = name.id();
-        let mut families = HashMap::default();
-        families.insert(
-            family,
-            (name, alloc::vec![FontInfo::new_pending(id, &info)]),
-        );
-        self.merge_families(&families);
-        Some(family)
+        Some(self.add_font(name, FontInfo::new_pending(id, &info)))
     }
 
     fn resolve_pending_font(&mut self, id: FontId, data: Blob<u8>, index: u32) -> bool {
@@ -899,13 +892,9 @@ impl CommonData {
             id: SourceId::new(),
             kind: SourceKind::Memory(data.clone()),
         };
-        let mut replacement = None;
-        crate::scan::scan_memory(data.as_ref(), |scanned| {
-            if scanned.index == index {
-                replacement = FontInfo::from_font_ref(&scanned.font, source.clone(), index);
-            }
-        });
-        let Some(mut replacement) = replacement else {
+        let Some(mut replacement) = crate::scan::memory_font(data.as_ref(), index)
+            .and_then(|scanned| FontInfo::from_font_ref(&scanned.font, source, index))
+        else {
             return false;
         };
         // The font keeps the identifier it was registered with.
