@@ -89,7 +89,6 @@ fn style_font_weight_uses_variable_axis_default() {
         .unwrap();
     // Re-register Roboto Flex with a user declared `weight` override.
     let registered = env.collection().register_font(
-        fontique::FontId::new(),
         roboto_flex,
         0,
         Some(FontInfoOverride {
@@ -235,8 +234,7 @@ fn style_font_unicode_range_decomposition() {
             unicode_range,
             ..Default::default()
         };
-        env.collection()
-            .register_font(fontique::FontId::new(), font, 0, Some(info));
+        env.collection().register_font(font, 0, Some(info));
     }
 
     for (text, from_arimo) in [("x", false), ("\u{e9}", true)] {

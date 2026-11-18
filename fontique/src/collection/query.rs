@@ -430,12 +430,7 @@ mod tests {
                 unicode_range,
                 ..Default::default()
             };
-            collection.register_font(
-                crate::FontId::new(),
-                Blob::new(Arc::new(ROBOTO.to_vec())),
-                0,
-                Some(info),
-            );
+            collection.register_font(Blob::new(Arc::new(ROBOTO.to_vec())), 0, Some(info));
         }
         let mut source_cache = SourceCache::default();
         let mut query = collection.query(&mut source_cache);
@@ -478,20 +473,16 @@ mod tests {
                 let id = crate::FontId::new();
                 let blob = Blob::new(Arc::new(ROBOTO.to_vec()));
                 let (_, font) = collection
-                    .register_font(id, blob.clone(), 0, Some(info))
+                    .register_font_with_id(id, blob.clone(), 0, Some(info))
                     .unwrap();
                 assert_eq!(font.id(), id);
                 // An identifier names one font, and a file holds only the fonts it holds.
                 assert!(
                     collection
-                        .register_font(id, blob.clone(), 0, Some(info))
+                        .register_font_with_id(id, blob.clone(), 0, Some(info))
                         .is_none()
                 );
-                assert!(
-                    collection
-                        .register_font(crate::FontId::new(), blob, 1, Some(info))
-                        .is_none()
-                );
+                assert!(collection.register_font(blob, 1, Some(info)).is_none());
                 ids.push(id);
             }
             let family = collection.family_id("Ids").unwrap();

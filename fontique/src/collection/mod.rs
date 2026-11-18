@@ -201,27 +201,41 @@ impl Collection {
         Query::new(self, source_cache)
     }
 
-    /// Registers the font at `index` in the given data under the given identifier,
-    /// made with [`FontId::new`].
+    /// Registers the font at `index` in the given data, giving it a new identifier.
     ///
     /// `index` is the index of the font within a font collection file, and 0 for a
     /// file that holds a single font. Returns the family the font was added to and
-    /// the font, or `None` if this collection already holds a font with that
-    /// identifier, the data is invalid or does not contain `index`, or the font has
-    /// no family name.
+    /// the font, or `None` if the data is invalid or does not contain `index`, or
+    /// the font has no family name.
     ///
     /// Optionally, you can override various aspects of the font's metadata.
-    ///
-    /// Registering the same identifier in several collections makes it name the
-    /// same font in all of them.
     ///
     /// When a newly registered font joins an existing family, it is placed before
     /// previously-registered fonts. This ordering can be useful, for example, for implementing CSS
     /// `@font-face` behavior, where faces defined later are checked first. See
     /// [CSS Fonts 4 § 4.5.1][css-composite-fonts].
     ///
+    /// To use the same identifier for a font in several collections, such as
+    /// per-thread copies, use [`Self::register_font_with_id`].
+    ///
     /// [css-composite-fonts]: https://www.w3.org/TR/css-fonts-4/#composite-fonlater
     pub fn register_font(
+        &mut self,
+        data: Blob<u8>,
+        index: u32,
+        info_override: Option<FontInfoOverride<'_>>,
+    ) -> Option<(FamilyId, FontInfo)> {
+        self.inner
+            .register_font(FontId::new(), data, index, info_override)
+    }
+
+    /// Registers a font like [`Self::register_font`], under an identifier the
+    /// caller made with [`FontId::new`].
+    ///
+    /// Registering the same identifier in several collections makes it name the
+    /// same font in all of them. Returns `None` if this collection already holds
+    /// a font with that identifier.
+    pub fn register_font_with_id(
         &mut self,
         id: FontId,
         data: Blob<u8>,
@@ -237,8 +251,8 @@ impl Collection {
     /// Returns the family and font of each font registered; read the identifiers
     /// from the fonts. A font with no family name is skipped. To choose the
     /// identifiers, for example to use the same ones in several collections,
-    /// register each font with [`Self::register_font`] instead, which also
-    /// describes overrides and the order of fonts in a family.
+    /// register each font with [`Self::register_font_with_id`] instead. See
+    /// [`Self::register_font`] for overrides and the order of fonts in a family.
     pub fn register_all_fonts(
         &mut self,
         data: Blob<u8>,

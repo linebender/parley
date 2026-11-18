@@ -174,12 +174,9 @@ pub fn build_rich_layout(
     colr_font_path: &Path,
 ) -> (Layout<ColorBrush>, u16, u16) {
     let colr_font_data = std::fs::read(colr_font_path).expect("Failed to load COLR font");
-    font_cx.collection.register_font(
-        parley::fontique::FontId::new(),
-        Blob::new(Arc::new(colr_font_data)),
-        0,
-        None,
-    );
+    font_cx
+        .collection
+        .register_font(Blob::new(Arc::new(colr_font_data)), 0, None);
 
     let (underline_range, strikethrough_range, party_emoji_range) = style_ranges(&config.text);
 
