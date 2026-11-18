@@ -77,6 +77,10 @@ impl FontInfo {
         self.id
     }
 
+    pub(crate) fn set_id(&mut self, id: FontId) {
+        self.id = id;
+    }
+
     /// Returns an object describing how to locate the data containing this
     /// font.
     pub fn source(&self) -> &SourceInfo {

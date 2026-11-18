@@ -87,7 +87,12 @@ pub(crate) fn load_fonts(
                 continue;
             }
             let font_data = std::fs::read(&path)?;
-            collection.register_fonts(Blob::new(Arc::new(font_data)), None);
+            collection.register_font(
+                fontique::FontId::new(),
+                Blob::new(Arc::new(font_data)),
+                0,
+                None,
+            );
         }
     }
     Ok(())

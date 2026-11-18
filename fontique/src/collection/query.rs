@@ -430,7 +430,12 @@ mod tests {
                 unicode_range,
                 ..Default::default()
             };
-            collection.register_fonts(Blob::new(Arc::new(ROBOTO.to_vec())), Some(info));
+            collection.register_font(
+                crate::FontId::new(),
+                Blob::new(Arc::new(ROBOTO.to_vec())),
+                0,
+                Some(info),
+            );
         }
         let mut source_cache = SourceCache::default();
         let mut query = collection.query(&mut source_cache);
@@ -470,9 +475,24 @@ mod tests {
                     family_name: Some("Ids"),
                     ..Default::default()
                 };
-                let registered =
-                    collection.register_fonts(Blob::new(Arc::new(ROBOTO.to_vec())), Some(info));
-                ids.push(registered[0].1[0].id());
+                let id = crate::FontId::new();
+                let blob = Blob::new(Arc::new(ROBOTO.to_vec()));
+                let (_, font) = collection
+                    .register_font(id, blob.clone(), 0, Some(info))
+                    .unwrap();
+                assert_eq!(font.id(), id);
+                // An identifier names one font, and a file holds only the fonts it holds.
+                assert!(
+                    collection
+                        .register_font(id, blob.clone(), 0, Some(info))
+                        .is_none()
+                );
+                assert!(
+                    collection
+                        .register_font(crate::FontId::new(), blob, 1, Some(info))
+                        .is_none()
+                );
+                ids.push(id);
             }
             let family = collection.family_id("Ids").unwrap();
             assert_ne!(ids[0], ids[1]);
@@ -497,8 +517,8 @@ mod tests {
 
             // The two fonts have the same attributes, so only the identifier tells
             // them apart.
-            assert!(collection.unregister_font_by_id(ids[1]));
-            assert!(!collection.unregister_font_by_id(ids[1]));
+            assert!(collection.unregister_font(ids[1]));
+            assert!(!collection.unregister_font(ids[1]));
             assert!(collection.font(ids[1]).is_none());
             assert_eq!(collection.font_family_id(ids[1]), None);
             let fonts = collection.family(family).unwrap();
@@ -507,6 +527,12 @@ mod tests {
 
             collection.clear();
             assert!(collection.font(ids[0]).is_none());
+
+            // Every font in a file, each with a new identifier.
+            let all = collection.register_all_fonts(Blob::new(Arc::new(ROBOTO.to_vec())), None);
+            assert_eq!(all.len(), 1);
+            assert!(!ids.contains(&all[0].1.id()));
+            assert_eq!(collection.font_family_id(all[0].1.id()), Some(all[0].0));
         }
     }
 }
