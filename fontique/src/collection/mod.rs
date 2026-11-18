@@ -612,7 +612,7 @@ impl Inner {
             self.data.fallbacks.set(key, families)
         }
         #[cfg(not(feature = "std"))]
-        self.data.fallbacks.set(id, families)
+        self.data.fallbacks.set(key, families)
     }
 
     /// Appends the set of family identifiers to the given fallback key.
@@ -632,7 +632,7 @@ impl Inner {
             self.data.fallbacks.append(key, families)
         }
         #[cfg(not(feature = "std"))]
-        self.data.fallbacks.append(id, families)
+        self.data.fallbacks.append(key, families)
     }
 
     /// Loads all fonts that exist in the specified directory(s)
