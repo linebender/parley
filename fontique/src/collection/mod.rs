@@ -1037,13 +1037,18 @@ impl CommonData {
         }
 
         let name = self.family_names.get_or_insert(family_name);
+        Some((self.add_font(name, font.clone()), font))
+    }
+
+    /// Adds a font to the named family, in front of the family's other fonts.
+    fn add_font(&mut self, name: FamilyName, font: FontInfo) -> FamilyId {
         let family_id = name.id();
+        self.font_families.insert(font.id(), family_id);
         let existing = self.families.get(&family_id).and_then(Option::as_ref);
         let fonts = core::iter::once(&font).chain(existing.map_or(&[][..], |f| f.fonts()));
         let family = FamilyInfo::new(name, fonts.cloned());
         self.families.insert(family_id, Some(family));
-        self.font_families.insert(id, family_id);
-        Some((family_id, font))
+        family_id
     }
 
     fn unregister_font(&mut self, id: FontId) -> bool {
