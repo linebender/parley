@@ -37,26 +37,26 @@ impl From<&FamilyName> for FamilyId {
 /// Bidirectional map that associates font family names with unique
 /// identifiers.
 #[derive(Clone, Default)]
-pub struct FamilyNameMap {
+pub(crate) struct FamilyNameMap {
     name_map: HashMap<Arc<[u8]>, FamilyName>,
     id_map: HashMap<FamilyId, FamilyName>,
 }
 
 impl FamilyNameMap {
     /// Returns the family name object for the given name.
-    pub fn get(&self, name: &str) -> Option<&FamilyName> {
+    pub(crate) fn get(&self, name: &str) -> Option<&FamilyName> {
         let key = NameKey::from_str(name);
         self.name_map.get(key.as_bytes())
     }
 
     /// Returns the family name object for the given identifier.
-    pub fn get_by_id(&self, id: FamilyId) -> Option<&FamilyName> {
+    pub(crate) fn get_by_id(&self, id: FamilyId) -> Option<&FamilyName> {
         self.id_map.get(&id)
     }
 
     /// Returns the family name object with the given name or creates
     /// a new one if it doesn't exist.
-    pub fn get_or_insert(&mut self, name: &str) -> FamilyName {
+    pub(crate) fn get_or_insert(&mut self, name: &str) -> FamilyName {
         let key = NameKey::from_str(name);
         if let Some(name) = self.name_map.get(key.as_bytes()) {
             name.clone()
@@ -74,7 +74,7 @@ impl FamilyNameMap {
 
     /// Adds `name` as an alias for the given family identifier.
     #[allow(unused)]
-    pub fn add_alias(&mut self, id: FamilyId, name: &str) {
+    pub(crate) fn add_alias(&mut self, id: FamilyId, name: &str) {
         if self.id_map.contains_key(&id) {
             let key = NameKey::from_str(name);
             if self.name_map.contains_key(key.as_bytes()) {
@@ -89,12 +89,12 @@ impl FamilyNameMap {
     }
 
     /// Returns an iterator over all of the font family names, including aliases.
-    pub fn iter(&self) -> impl Iterator<Item = &FamilyName> + Clone {
+    pub(crate) fn iter(&self) -> impl Iterator<Item = &FamilyName> + Clone {
         self.name_map.values()
     }
 
     /// Returns an iterator over all of the font family identifiers.
-    pub fn ids(&self) -> impl Iterator<Item = FamilyId> + Clone + '_ {
+    pub(crate) fn ids(&self) -> impl Iterator<Item = FamilyId> + Clone + '_ {
         self.id_map.keys().copied()
     }
 }
@@ -118,7 +118,7 @@ impl NameKey {
         res
     }
 
-    pub fn as_bytes(&self) -> &[u8] {
+    fn as_bytes(&self) -> &[u8] {
         &self.data
     }
 }

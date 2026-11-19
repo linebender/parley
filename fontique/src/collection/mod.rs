@@ -263,7 +263,7 @@ struct Inner {
 
 impl Inner {
     /// Creates a new collection with the given options.
-    pub fn new(options: CollectionOptions) -> Self {
+    fn new(options: CollectionOptions) -> Self {
         let system = options.system_fonts.then(System::new);
         let shared = options.shared.then(|| Arc::new(Shared::default()));
         Self {
@@ -276,7 +276,7 @@ impl Inner {
     }
 
     #[cfg(feature = "std")]
-    pub fn make_shared(&mut self) {
+    fn make_shared(&mut self) {
         if self.shared.is_none() {
             self.shared = Some(Arc::new(Shared {
                 data: Mutex::new(self.data.clone()),
@@ -286,14 +286,14 @@ impl Inner {
     }
 
     /// Load system fonts. If system fonts are already loaded then they will be reloaded.
-    pub fn load_system_fonts(&mut self) {
+    fn load_system_fonts(&mut self) {
         self.system = Some(System::new());
     }
 
     /// Returns an iterator over all available family names in the collection.
     ///
     /// This includes both system and registered fonts.
-    pub fn family_names(&mut self) -> impl Iterator<Item = &str> + '_ + Clone {
+    fn family_names(&mut self) -> impl Iterator<Item = &str> + '_ + Clone {
         self.sync_shared();
         FamilyNames {
             ours: self.data.family_names.iter(),
@@ -305,7 +305,7 @@ impl Inner {
     /// Returns an iterator over all available family identifiers in the collection.
     ///
     /// This includes both system and registered fonts.
-    pub fn family_ids(&mut self) -> impl Iterator<Item = FamilyId> + '_ + Clone {
+    fn family_ids(&mut self) -> impl Iterator<Item = FamilyId> + '_ + Clone {
         self.sync_shared();
         self.data.family_names.ids().chain(
             self.system
@@ -317,7 +317,7 @@ impl Inner {
     }
 
     /// Returns the family identifier for the given family name.
-    pub fn family_id(&mut self, name: &str) -> Option<FamilyId> {
+    fn family_id(&mut self, name: &str) -> Option<FamilyId> {
         self.sync_shared();
         self.data
             .family_names
@@ -331,7 +331,7 @@ impl Inner {
     }
 
     /// Returns the family name for the given family identifier.
-    pub fn family_name(&mut self, id: FamilyId) -> Option<&str> {
+    fn family_name(&mut self, id: FamilyId) -> Option<&str> {
         self.sync_shared();
         self.data
             .family_names
@@ -345,7 +345,7 @@ impl Inner {
     }
 
     /// Returns the family object for the given family identifier.
-    pub fn family(&mut self, id: FamilyId) -> Option<FamilyInfo> {
+    fn family(&mut self, id: FamilyId) -> Option<FamilyInfo> {
         self.sync_shared();
         if let Some(family) = self.data.families.get(&id) {
             family.as_ref().cloned()
@@ -366,7 +366,7 @@ impl Inner {
     }
 
     /// Returns the family object for the given name.
-    pub fn family_by_name(&mut self, name: &str) -> Option<FamilyInfo> {
+    fn family_by_name(&mut self, name: &str) -> Option<FamilyInfo> {
         if let Some(id) = self.family_id(name) {
             self.family(id)
         } else {
@@ -376,7 +376,7 @@ impl Inner {
 
     /// Returns an iterator over the family identifiers for the given
     /// generic family.
-    pub fn generic_families(
+    fn generic_families(
         &mut self,
         family: GenericFamily,
     ) -> impl Iterator<Item = FamilyId> + '_ + Clone {
@@ -392,7 +392,7 @@ impl Inner {
 
     /// Replaces the set of family identifiers associated with the given generic
     /// family.
-    pub fn set_generic_families(
+    fn set_generic_families(
         &mut self,
         generic: GenericFamily,
         families: impl Iterator<Item = FamilyId>,
@@ -415,7 +415,7 @@ impl Inner {
     }
 
     /// Appends the set of family identifiers to the given generic family.
-    pub fn append_generic_families(
+    fn append_generic_families(
         &mut self,
         generic: GenericFamily,
         families: impl Iterator<Item = FamilyId>,
@@ -439,7 +439,7 @@ impl Inner {
 
     /// Returns an iterator over the fallback families for the given
     /// key.
-    pub fn fallback_families(
+    fn fallback_families(
         &mut self,
         key: impl Into<FallbackKey>,
     ) -> impl Iterator<Item = FamilyId> + '_ + Clone {
@@ -467,7 +467,7 @@ impl Inner {
 
     /// Replaces the set of family identifiers associated with the fallback
     /// key.
-    pub fn set_fallbacks(
+    fn set_fallbacks(
         &mut self,
         key: impl Into<FallbackKey>,
         families: impl Iterator<Item = FamilyId>,
@@ -487,7 +487,7 @@ impl Inner {
     }
 
     /// Appends the set of family identifiers to the given fallback key.
-    pub fn append_fallbacks(
+    fn append_fallbacks(
         &mut self,
         key: impl Into<FallbackKey>,
         families: impl Iterator<Item = FamilyId>,
@@ -508,7 +508,7 @@ impl Inner {
 
     /// Loads all fonts that exist in the specified directory(s)
     #[cfg(feature = "std")]
-    pub fn load_fonts_from_paths(&mut self, paths: impl IntoIterator<Item = impl AsRef<Path>>) {
+    fn load_fonts_from_paths(&mut self, paths: impl IntoIterator<Item = impl AsRef<Path>>) {
         #[cfg(feature = "std")]
         if let Some(shared) = &self.shared {
             shared.data.lock().unwrap().load_fonts_from_paths(paths);
@@ -524,7 +524,7 @@ impl Inner {
     ///
     /// Returns a list of pairs each containing the family identifier and fonts
     /// added to that family.
-    pub fn register_fonts(
+    fn register_fonts(
         &mut self,
         data: Blob<u8>,
         info_override: Option<FontInfoOverride<'_>>,
@@ -548,7 +548,7 @@ impl Inner {
     /// Unregisters the font with the given attributes from the given family.
     ///
     /// Returns true if a font was removed from the family, false otherwise.
-    pub fn unregister_font(
+    fn unregister_font(
         &mut self,
         family: FamilyId,
         width: FontWidth,
@@ -578,7 +578,7 @@ impl Inner {
     /// Clears this collection. Un-registers all fonts previously registered via
     /// [`Self::register_fonts`], and unsets all previously-set generic families
     /// and fallbacks. This will not remove any system fonts.
-    pub fn clear(&mut self) {
+    fn clear(&mut self) {
         #[cfg(feature = "std")]
         if let Some(shared) = &self.shared {
             shared.data.lock().unwrap().clear();
