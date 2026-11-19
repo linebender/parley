@@ -147,26 +147,22 @@ impl<'a> Query<'a> {
                 &mut family.best,
                 self.source_cache,
             );
-            let mut yielded_default = false;
-            for font in bucket {
+            let mut fonts = bucket.iter();
+            let mut default = Some(&mut family.default);
+            while let Some(font) = fonts.next().or_else(|| {
+                load_font(
+                    family_info,
+                    self.attributes,
+                    default.take()?,
+                    self.source_cache,
+                )
+            }) {
                 if font.family.1 == family_info.default_font_index() {
-                    yielded_default = true;
+                    default = None;
                 }
                 if f(font) == QueryStatus::Stop {
                     return;
                 }
-            }
-            if yielded_default {
-                continue;
-            }
-            if let Some(font) = load_font(
-                family_info,
-                self.attributes,
-                &mut family.default,
-                self.source_cache,
-            ) && f(font) == QueryStatus::Stop
-            {
-                return;
             }
         }
     }
@@ -278,6 +274,24 @@ impl QueryFont {
         let unicode_range = self.unicode_range.as_ref();
         unicode_range.is_none_or(|set| set.contains(codepoint))
     }
+
+    /// Loads the font at `index` in `family`.
+    fn load(
+        family: &FamilyInfo,
+        index: usize,
+        attributes: Attributes,
+        source_cache: &mut SourceCache,
+    ) -> Option<Self> {
+        let font_info = family.fonts().get(index)?;
+        Some(Self {
+            family: (family.id(), index),
+            blob: font_info.load(Some(source_cache))?,
+            index: font_info.index(),
+            synthesis: font_info.synthesis(attributes.width, attributes.style, attributes.weight),
+            charmap_index: font_info.charmap_index(),
+            unicode_range: font_info.unicode_range().cloned(),
+        })
+    }
 }
 
 /// Loads every font in `family` matching `attributes` (all coverage variants of the best match).
@@ -299,27 +313,9 @@ fn load_bucket<'a>(
                 attributes.weight,
                 true,
             );
-            let mut fonts: SmallVec<[QueryFont; 1]> = SmallVec::new();
-            for index in indices {
-                let Some(font_info) = family.fonts().get(index) else {
-                    continue;
-                };
-                let Some(blob) = font_info.load(Some(source_cache)) else {
-                    continue;
-                };
-                fonts.push(QueryFont {
-                    family: (family.id(), index),
-                    blob: blob.clone(),
-                    index: font_info.index(),
-                    synthesis: font_info.synthesis(
-                        attributes.width,
-                        attributes.style,
-                        attributes.weight,
-                    ),
-                    charmap_index: font_info.charmap_index(),
-                    unicode_range: font_info.unicode_range().cloned(),
-                });
-            }
+            let fonts: SmallVec<[QueryFont; 1]> = indices
+                .filter_map(|index| QueryFont::load(family, index, attributes, source_cache))
+                .collect();
             if fonts.is_empty() {
                 return &[];
             }
@@ -346,19 +342,12 @@ fn load_font<'a>(
             // the following code.
             *status = Entry::Error;
             let family_index = family.default_font_index();
-            let font_info = family.fonts().get(family_index)?;
-            let blob = font_info.load(Some(source_cache))?;
-            let blob_index = font_info.index();
-            let synthesis =
-                font_info.synthesis(attributes.width, attributes.style, attributes.weight);
-            *status = Entry::Ok(QueryFont {
-                family: (family.id(), family_index),
-                blob,
-                index: blob_index,
-                synthesis,
-                charmap_index: font_info.charmap_index(),
-                unicode_range: font_info.unicode_range().cloned(),
-            });
+            *status = Entry::Ok(QueryFont::load(
+                family,
+                family_index,
+                attributes,
+                source_cache,
+            )?);
             if let Entry::Ok(font) = status {
                 Some(font)
             } else {
