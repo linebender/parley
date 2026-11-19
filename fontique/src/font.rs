@@ -17,17 +17,14 @@ type AxisVec = SmallVec<[AxisInfo; 1]>;
 
 /// Unique identifier for a font.
 ///
-/// Every [`FontInfo`] is given one when it is created, and keeps it when it is
-/// cloned or has overrides applied, so an identifier names the same font in every
-/// copy of a collection.
+/// Every [`FontInfo`] is given one when it is created, and keeps it when it is cloned or has
+/// overrides applied, so an identifier names the same font in every copy of a collection.
 #[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
 #[repr(transparent)]
 pub struct FontId(u64);
 
 impl FontId {
-    /// Creates a new unique identifier.
-    #[allow(clippy::new_without_default)]
-    pub fn new() -> Self {
+    fn new() -> Self {
         static ID_COUNTER: AtomicCounter = AtomicCounter::new(1);
         #[allow(clippy::useless_conversion, reason = "Not useless on 32-bit platforms")]
         Self(ID_COUNTER.fetch_add(1, Ordering::Relaxed).into())
@@ -75,10 +72,6 @@ impl FontInfo {
     /// Returns the unique identifier for the font.
     pub fn id(&self) -> FontId {
         self.id
-    }
-
-    pub(crate) fn set_id(&mut self, id: FontId) {
-        self.id = id;
     }
 
     /// Returns an object describing how to locate the data containing this

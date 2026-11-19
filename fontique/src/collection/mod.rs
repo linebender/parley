@@ -76,7 +76,7 @@ impl Collection {
     /// creating this collection, then it will register the fonts
     /// available on the system.
     ///
-    /// Additional fonts can be registered via [`Collection::register_font`]
+    /// Additional fonts can be registered via [`Collection::register_fonts`]
     /// and providing it with the data for those fonts.
     pub fn new(options: CollectionOptions) -> Self {
         Self {
@@ -201,90 +201,37 @@ impl Collection {
         Query::new(self, source_cache)
     }
 
-    /// Registers the font at `index` in the given data, giving it a new identifier.
+    /// Registers all fonts that exist in the given data.
     ///
-    /// `index` is the index of the font within a font collection file, and 0 for a
-    /// file that holds a single font. Returns the family the font was added to and
-    /// the font, or `None` if the data is invalid or does not contain `index`, or
-    /// the font has no family name.
+    /// Returns a list of pairs each containing the family identifier and fonts
+    /// added to that family.
     ///
     /// Optionally, you can override various aspects of the font's metadata.
     ///
-    /// When a newly registered font joins an existing family, it is placed before
+    /// When newly registered fonts join an existing family, they are placed before
     /// previously-registered fonts. This ordering can be useful, for example, for implementing CSS
     /// `@font-face` behavior, where faces defined later are checked first. See
     /// [CSS Fonts 4 § 4.5.1][css-composite-fonts].
     ///
-    /// To use the same identifier for a font in several collections, such as
-    /// per-thread copies, use [`Self::register_font_with_id`].
-    ///
     /// [css-composite-fonts]: https://www.w3.org/TR/css-fonts-4/#composite-fonlater
-    pub fn register_font(
-        &mut self,
-        data: Blob<u8>,
-        index: u32,
-        info_override: Option<FontInfoOverride<'_>>,
-    ) -> Option<(FamilyId, FontInfo)> {
-        self.inner
-            .register_font(FontId::new(), data, index, info_override)
-    }
-
-    /// Registers a font like [`Self::register_font`], under an identifier the
-    /// caller made with [`FontId::new`].
-    ///
-    /// Registering the same identifier in several collections makes it name the
-    /// same font in all of them. Returns `None` if this collection already holds
-    /// a font with that identifier.
-    pub fn register_font_with_id(
-        &mut self,
-        id: FontId,
-        data: Blob<u8>,
-        index: u32,
-        info_override: Option<FontInfoOverride<'_>>,
-    ) -> Option<(FamilyId, FontInfo)> {
-        self.inner.register_font(id, data, index, info_override)
-    }
-
-    /// Registers every font in the given data, such as each font of a font
-    /// collection file, giving each a new identifier.
-    ///
-    /// Returns the family and font of each font registered; read the identifiers
-    /// from the fonts. A font with no family name is skipped. To choose the
-    /// identifiers, for example to use the same ones in several collections,
-    /// register each font with [`Self::register_font_with_id`] instead. See
-    /// [`Self::register_font`] for overrides and the order of fonts in a family.
-    pub fn register_all_fonts(
+    pub fn register_fonts(
         &mut self,
         data: Blob<u8>,
         info_override: Option<FontInfoOverride<'_>>,
-    ) -> Vec<(FamilyId, FontInfo)> {
-        self.inner.register_all_fonts(data, info_override)
-    }
-
-    /// Returns the font with the given identifier.
-    ///
-    /// This finds fonts registered with [`Self::register_font`] or
-    /// [`Self::load_fonts_from_paths`], and system fonts whose family has
-    /// been loaded by this collection.
-    pub fn font(&mut self, id: FontId) -> Option<FontInfo> {
-        self.inner.font(id)
-    }
-
-    /// Returns the identifier of the family that holds the font with the given
-    /// identifier. This finds the same fonts as [`Self::font`].
-    pub fn font_family_id(&mut self, id: FontId) -> Option<FamilyId> {
-        self.inner.font_family_id(id)
+    ) -> Vec<(FamilyId, Vec<FontInfo>)> {
+        self.inner.register_fonts(data, info_override)
     }
 
     /// Unregisters the font with the given identifier.
     ///
-    /// Returns true if a font was removed from its family, false otherwise.
+    /// Returns `true` if the font was removed from its family, `false` otherwise. System fonts
+    /// can't be removed.
     pub fn unregister_font(&mut self, id: FontId) -> bool {
         self.inner.unregister_font(id)
     }
 
     /// Clears this collection. Un-registers all fonts previously registered via
-    /// [`Self::register_font`], and unsets all previously-set generic families
+    /// [`Self::register_fonts`], and unsets all previously-set generic families
     /// and fallbacks. This will not remove any system fonts.
     pub fn clear(&mut self) {
         self.inner.clear();
@@ -401,11 +348,6 @@ impl Inner {
             #[cfg(feature = "system")]
             if let Some(system) = &self.system {
                 let family = system.fonts.lock().unwrap().family(id);
-                if let Some(family) = &family {
-                    for font in family.fonts() {
-                        self.data.font_families.insert(font.id(), id);
-                    }
-                }
                 self.data.families.insert(id, family.clone());
                 family
             } else {
@@ -570,72 +512,37 @@ impl Inner {
             self.data.load_fonts_from_paths(paths);
         }
         #[cfg(not(feature = "std"))]
-        self.data.load_fonts_from_paths(paths)
+        self.data.register_fonts(paths)
     }
 
-    /// Registers the font at `index` in the given data under the given identifier.
-    pub fn register_font(
+    /// Registers all fonts that exist in the given data.
+    ///
+    /// Returns a list of pairs each containing the family identifier and fonts
+    /// added to that family.
+    pub fn register_fonts(
         &mut self,
-        id: FontId,
         data: Blob<u8>,
-        index: u32,
         info_override: Option<FontInfoOverride<'_>>,
-    ) -> Option<(FamilyId, FontInfo)> {
+    ) -> Vec<(FamilyId, Vec<FontInfo>)> {
         #[cfg(feature = "std")]
         if let Some(shared) = &self.shared {
             let result = shared
                 .data
                 .lock()
                 .unwrap()
-                .register_font(id, data, index, info_override);
+                .register_fonts(data, info_override);
             shared.bump_version();
             result
         } else {
-            self.data.register_font(id, data, index, info_override)
+            self.data.register_fonts(data, info_override)
         }
         #[cfg(not(feature = "std"))]
-        self.data.register_font(id, data, index, info_override)
-    }
-
-    /// Registers every font in the given data, giving each a new identifier.
-    pub fn register_all_fonts(
-        &mut self,
-        data: Blob<u8>,
-        info_override: Option<FontInfoOverride<'_>>,
-    ) -> Vec<(FamilyId, FontInfo)> {
-        #[cfg(feature = "std")]
-        if let Some(shared) = &self.shared {
-            let result = shared
-                .data
-                .lock()
-                .unwrap()
-                .register_all_fonts(data, info_override);
-            shared.bump_version();
-            result
-        } else {
-            self.data.register_all_fonts(data, info_override)
-        }
-        #[cfg(not(feature = "std"))]
-        self.data.register_all_fonts(data, info_override)
-    }
-
-    /// Returns the font with the given identifier.
-    pub fn font(&mut self, id: FontId) -> Option<FontInfo> {
-        self.sync_shared();
-        self.data.font(id).cloned()
-    }
-
-    /// Returns the identifier of the family that holds the font with the given
-    /// identifier.
-    pub fn font_family_id(&mut self, id: FontId) -> Option<FamilyId> {
-        self.sync_shared();
-        self.data.font(id)?;
-        self.data.font_families.get(&id).copied()
+        self.data.register_fonts(data, info_override)
     }
 
     /// Unregisters the font with the given identifier.
     ///
-    /// Returns true if a font was removed from its family, false otherwise.
+    /// Returns `true` if the font was removed from its family, `false` otherwise.
     pub fn unregister_font(&mut self, id: FontId) -> bool {
         #[cfg(feature = "std")]
         if let Some(shared) = &self.shared {
@@ -650,7 +557,7 @@ impl Inner {
     }
 
     /// Clears this collection. Un-registers all fonts previously registered via
-    /// [`Collection::register_font`], and unsets all previously-set generic families
+    /// [`Self::register_fonts`], and unsets all previously-set generic families
     /// and fallbacks. This will not remove any system fonts.
     pub fn clear(&mut self) {
         #[cfg(feature = "std")]
@@ -772,8 +679,6 @@ impl System {
 struct CommonData {
     family_names: FamilyNameMap,
     families: FamilyMap,
-    /// The family that holds each font in `families`.
-    font_families: HashMap<FontId, FamilyId>,
     generic_families: GenericFamilyMap,
     fallbacks: FallbackMap,
 }
@@ -781,126 +686,138 @@ struct CommonData {
 impl CommonData {
     #[cfg(feature = "std")]
     fn load_fonts_from_paths(&mut self, paths: impl IntoIterator<Item = impl AsRef<Path>>) {
-        // `scan_paths` invokes this callback once per face (each face of a
-        // collection is reported separately), so register exactly this font.
+        let mut families: HashMap<FamilyId, (FamilyName, Vec<FontInfo>)> = HashMap::default();
+        let mut scratch_family_name = String::default();
         crate::scan::scan_paths(paths, 16, |scanned_font| {
             let source = SourceInfo {
                 id: SourceId::new(),
                 kind: SourceKind::Path(Arc::from(scanned_font.path.unwrap())),
             };
-            self.register_scanned_font(FontId::new(), scanned_font, source, None);
-        });
-    }
 
-    fn register_font(
-        &mut self,
-        id: FontId,
-        data: Blob<u8>,
-        index: u32,
-        info_override: Option<FontInfoOverride<'_>>,
-    ) -> Option<(FamilyId, FontInfo)> {
-        if self.font_families.contains_key(&id) {
-            return None;
-        }
-        let scanned_font = super::scan::scan_memory_font(data.as_ref(), index)?;
-        let source = SourceInfo {
-            id: SourceId::new(),
-            kind: SourceKind::Memory(data.clone()),
-        };
-        self.register_scanned_font(id, &scanned_font, source, info_override)
-    }
-
-    fn register_all_fonts(
-        &mut self,
-        data: Blob<u8>,
-        info_override: Option<FontInfoOverride<'_>>,
-    ) -> Vec<(FamilyId, FontInfo)> {
-        let source = SourceInfo {
-            id: SourceId::new(),
-            kind: SourceKind::Memory(data.clone()),
-        };
-        let mut registered = Vec::new();
-        super::scan::scan_memory(data.as_ref(), |scanned_font| {
-            registered.extend(self.register_scanned_font(
-                FontId::new(),
+            // `scan_paths` invokes this callback once per face (each face of a
+            // collection is reported separately), so register exactly this font.
+            // Re-scanning the file here would register duplicate faces.
+            families.clear();
+            self.register_scanned_font(
                 scanned_font,
-                source.clone(),
-                info_override,
-            ));
+                &source,
+                None,
+                &mut scratch_family_name,
+                &mut families,
+            );
+            self.merge_families(&families);
         });
-        registered
     }
 
-    /// Adds a scanned font to its family, in front of the family's other fonts.
+    fn register_fonts(
+        &mut self,
+        data: Blob<u8>,
+        info_override: Option<FontInfoOverride<'_>>,
+    ) -> Vec<(FamilyId, Vec<FontInfo>)> {
+        let mut families: HashMap<FamilyId, (FamilyName, Vec<FontInfo>)> = HashMap::default();
+        let mut scratch_family_name = String::default();
+
+        let source = SourceInfo {
+            id: SourceId::new(),
+            kind: SourceKind::Memory(data.clone()),
+        };
+
+        super::scan::scan_memory(data.as_ref(), |scanned_font| {
+            self.register_scanned_font(
+                scanned_font,
+                &source,
+                info_override,
+                &mut scratch_family_name,
+                &mut families,
+            );
+        });
+
+        self.merge_families(&families);
+
+        families
+            .into_iter()
+            .map(|(id, (_, fonts))| (id, fonts))
+            .collect()
+    }
+
     fn register_scanned_font(
         &mut self,
-        id: FontId,
         scanned_font: &crate::scan::ScannedFont<'_>,
-        source: SourceInfo,
+        source: &SourceInfo,
         info_override: Option<FontInfoOverride<'_>>,
-    ) -> Option<(FamilyId, FontInfo)> {
-        let mut scratch_family_name = String::default();
-        let family_name = if let Some(name) = info_override.and_then(|o| o.family_name) {
-            name
-        } else {
-            let family_chars = scanned_font
-                .english_or_first_name(NameId::TYPOGRAPHIC_FAMILY_NAME)
-                .or_else(|| scanned_font.english_or_first_name(NameId::FAMILY_NAME))?
-                .chars();
-            scratch_family_name.extend(family_chars);
-            scratch_family_name.as_str()
-        };
+        scratch_family_name: &mut String,
+        families: &mut HashMap<FamilyId, (FamilyName, Vec<FontInfo>)>,
+    ) {
+        scratch_family_name.clear();
+
+        let family_name =
+            if let Some(override_family_name) = info_override.and_then(|o| o.family_name) {
+                override_family_name
+            } else {
+                let family_chars = scanned_font
+                    .english_or_first_name(NameId::TYPOGRAPHIC_FAMILY_NAME)
+                    .or_else(|| scanned_font.english_or_first_name(NameId::FAMILY_NAME))
+                    .map(|name| name.chars());
+                let Some(family_chars) = family_chars else {
+                    return;
+                };
+                scratch_family_name.extend(family_chars);
+
+                #[allow(clippy::needless_borrow)] // false positive
+                &scratch_family_name
+            };
+
         if family_name.is_empty() {
-            return None;
+            return;
         }
 
-        let mut font = FontInfo::from_font_ref(&scanned_font.font, source, scanned_font.index)?;
-        font.set_id(id);
+        let Some(mut font) =
+            FontInfo::from_font_ref(&scanned_font.font, source.clone(), scanned_font.index)
+        else {
+            return;
+        };
+
         if let Some(info_override) = info_override.as_ref() {
             font.apply_override(info_override);
         }
 
         let name = self.family_names.get_or_insert(family_name);
-        Some((self.add_font(name, font.clone()), font))
+        families
+            .entry(name.id())
+            .or_insert_with(|| (name, Vec::default()))
+            .1
+            .push(font);
     }
 
-    /// Adds a font to the named family, in front of the family's other fonts.
-    fn add_font(&mut self, name: FamilyName, font: FontInfo) -> FamilyId {
-        let family_id = name.id();
-        self.font_families.insert(font.id(), family_id);
-        let existing = self.families.get(&family_id).and_then(Option::as_ref);
-        let fonts = core::iter::once(&font).chain(existing.map_or(&[][..], |f| f.fonts()));
-        let family = FamilyInfo::new(name, fonts.cloned());
-        self.families.insert(family_id, Some(family));
-        family_id
+    fn merge_families(&mut self, families: &HashMap<FamilyId, (FamilyName, Vec<FontInfo>)>) {
+        for (id, (name, fonts)) in families.iter() {
+            if let Some(Some(family)) = self.families.get_mut(id) {
+                let new_fonts = fonts.iter().chain(family.fonts()).cloned();
+                *family = FamilyInfo::new(name.clone(), new_fonts);
+            } else {
+                let family = FamilyInfo::new(name.clone(), fonts.iter().cloned());
+                self.families.insert(*id, Some(family));
+            }
+        }
     }
 
     fn unregister_font(&mut self, id: FontId) -> bool {
-        let Some(&family) = self.font_families.get(&id) else {
+        // If the following search for the font's family ever shows up in profiles, we could create
+        // an index. In practice it should be cheap relative to the other work that's happening.
+        let has_font = |family: &&mut FamilyInfo| family.fonts().iter().any(|f| f.id() == id);
+        let Some(family) = self.families.values_mut().flatten().find(has_font) else {
             return false;
         };
-        self.retain_fonts(family, |f| f.id() != id);
-        self.font_families.remove(&id);
-        true
-    }
 
-    /// Rebuilds the family from the fonts for which `keep` returns true.
-    fn retain_fonts(&mut self, family: FamilyId, keep: impl Fn(&FontInfo) -> bool) -> Option<()> {
-        let family_name = self.family_names.get_by_id(family)?;
-        let family = self.families.get_mut(&family)?.as_mut()?;
+        // Note that families of system fonts are not in `self.family_names`, so they're untouched.
+        let Some(family_name) = self.family_names.get_by_id(family.id()) else {
+            return false;
+        };
 
-        for font in family.fonts().iter().filter(|f| !keep(f)) {
-            self.font_families.remove(&font.id());
-        }
-        let new_fonts = family.fonts().iter().filter(|f| keep(f)).cloned();
+        let new_fonts = family.fonts().iter().filter(|f| f.id() != id).cloned();
         *family = FamilyInfo::new(family_name.clone(), new_fonts);
 
-        Some(())
-    }
-
-    fn font(&self, id: FontId) -> Option<&FontInfo> {
-        let family = self.families.get(self.font_families.get(&id)?)?.as_ref()?;
-        family.fonts().iter().find(|font| font.id() == id)
+        true
     }
 
     fn clear(&mut self) {

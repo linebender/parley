@@ -78,14 +78,6 @@ pub fn scan_memory<'a>(buf: &'a [u8], mut f: impl FnMut(&ScannedFont<'a>)) {
     scan_memory_impl(buf, ScanMemoryPathType::default(), &mut f);
 }
 
-/// Returns the font at `index` in a memory buffer: the index of the font
-/// within a font collection, or 0 for a file that holds a single font.
-pub(crate) fn scan_memory_font(buf: &[u8], index: u32) -> Option<ScannedFont<'_>> {
-    let font = FontRef::from_index(buf, index).ok()?;
-    #[allow(clippy::unit_arg)]
-    scanned_font(font, ScanMemoryPathType::default(), index)
-}
-
 #[cfg(feature = "std")]
 fn scan_collection(
     paths: impl IntoIterator<Item = impl AsRef<Path>>,
@@ -205,31 +197,23 @@ fn scan_memory_impl<'a>(
 
 fn scan_font<'a>(
     font: FontRef<'a>,
-    path: ScanMemoryPathType<'a>,
+    #[allow(unused)] path: ScanMemoryPathType<'a>,
     index: u32,
     f: &mut impl FnMut(&ScannedFont<'a>),
 ) -> Option<()> {
-    f(&scanned_font(font, path, index)?);
-    Some(())
-}
-
-fn scanned_font<'a>(
-    font: FontRef<'a>,
-    #[allow(unused)] path: ScanMemoryPathType<'a>,
-    index: u32,
-) -> Option<ScannedFont<'a>> {
     // We can't currently render hvgl fonts so reject them
     if font.table_data(Tag::new(b"hvgl")).is_some() {
         return None;
     }
     let name_table = font.name().ok()?;
-    Some(ScannedFont {
+    f(&ScannedFont {
         font,
         #[cfg(feature = "std")]
         path,
         index,
         name_table,
-    })
+    });
+    Some(())
 }
 
 fn all_names(
