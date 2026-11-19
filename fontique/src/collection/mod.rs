@@ -227,9 +227,10 @@ impl Collection {
 
     /// Registers a font in the family named `family_name` whose data is not available yet.
     ///
-    /// The font's data can be provided later using [`Self::supply_font`]. Queries yield such fonts
-    /// as [`QueryCandidate::Deferred`]. The font's data can be requested using
-    /// [`DeferredFont::request`], and read later by clients through the collection's
+    /// The font's data can be provided later using [`Self::supply_font`].
+    ///
+    /// Queries yield such fonts as [`QueryCandidate::Deferred`]. The font's data can be requested
+    /// using [`DeferredFont::request`]. Fonts requested like this are yielded by the collection's
     /// [`Self::drain_font_requests`].
     ///
     /// This can be useful, for example, for fonts that are loaded over the network and/or take a
