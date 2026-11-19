@@ -272,6 +272,12 @@ pub struct PendingFont<'a> {
 }
 
 impl PendingFont<'_> {
+    /// Returns the font's identifier.
+    #[inline]
+    pub fn id(&self) -> FontId {
+        self.font.id()
+    }
+
     /// Returns `true` if the font may be used for the given codepoint once its data is
     /// available, see [`QueryFont::in_unicode_range`].
     #[inline]
@@ -559,12 +565,14 @@ mod tests {
             let mut query = collection.query(&mut source_cache);
             query.set_families(["f"]);
             let mut used = None;
+            let mut pending = Vec::new();
             query.matches_with(|font| match font {
                 QueryCandidate::Font(font) if font.in_unicode_range(ch) => {
                     used = Some(font.family.1);
                     QueryStatus::Stop
                 }
                 QueryCandidate::Pending(font) if font.in_unicode_range(ch) => {
+                    pending.push(font.id());
                     font.request();
                     QueryStatus::Continue
                 }
@@ -573,6 +581,8 @@ mod tests {
             drop(query);
             let mut requests = collection.take_font_requests().collect::<Vec<_>>();
             requests.sort();
+            pending.sort();
+            assert_eq!(pending, requests);
             (used, requests)
         };
         // A pending font is yielded in its place, until it is unregistered.
