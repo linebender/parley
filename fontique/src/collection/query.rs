@@ -598,11 +598,11 @@ mod tests {
         assert!(collection.unregister_font(failed) && !collection.unregister_font(failed));
         assert_eq!(select(&mut collection, '1'), (Some(2), vec![any, digits]));
         // A supplied font takes its place, with the attributes and range it was registered with.
-        assert!(!collection.supply_font(any, roboto.clone(), 1));
-        assert!(collection.supply_font(any, roboto.clone(), 0));
-        assert!(!collection.supply_font(any, roboto.clone(), 0));
+        assert!(!collection.supply_deferred_font(any, roboto.clone(), 1));
+        assert!(collection.supply_deferred_font(any, roboto.clone(), 0));
+        assert!(!collection.supply_deferred_font(any, roboto.clone(), 0));
         assert_eq!(select(&mut collection, '1'), (Some(1), vec![digits]));
-        assert!(collection.supply_font(digits, roboto.clone(), 0));
+        assert!(collection.supply_deferred_font(digits, roboto.clone(), 0));
         assert_eq!(select(&mut collection, '1'), (Some(0), vec![]));
         assert_eq!(select(&mut collection, 'a'), (Some(1), vec![]));
         // A supplied font keeps its identifier.
@@ -614,7 +614,7 @@ mod tests {
         query.set_families(["f"]);
         query.first_available_font();
         drop(query);
-        assert!(collection.supply_font(late, roboto, 0));
+        assert!(collection.supply_deferred_font(late, roboto, 0));
         assert_eq!(collection.drain_font_requests().next(), None);
     }
 

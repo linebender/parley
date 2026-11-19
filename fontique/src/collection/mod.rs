@@ -227,7 +227,7 @@ impl Collection {
 
     /// Registers a font in the family named `family_name` whose data is not available yet.
     ///
-    /// The font's data can be provided later using [`Self::supply_font`].
+    /// The font's data can be provided later using [`Self::supply_deferred_font`].
     ///
     /// Queries yield such fonts as [`QueryCandidate::Deferred`]. The font's data can be requested
     /// using [`DeferredFont::request`]. Fonts requested like this are yielded by the collection's
@@ -254,8 +254,8 @@ impl Collection {
     /// `index` selects the font to use if `data` is a font collection, and should be 0 otherwise.
     ///
     /// Returns `false` if `id` is not a deferred font or if `data` has no usable font at `index`.
-    pub fn supply_font(&mut self, id: FontId, data: Blob<u8>, index: u32) -> bool {
-        let supplied = self.inner.supply_font(id, data, index);
+    pub fn supply_deferred_font(&mut self, id: FontId, data: Blob<u8>, index: u32) -> bool {
+        let supplied = self.inner.supply_deferred_font(id, data, index);
         if supplied {
             self.font_requests.remove(&id);
         }
@@ -265,7 +265,8 @@ impl Collection {
     /// Returns the identifiers of the [`DeferredFont`]s queries [requested](DeferredFont::request)
     /// since the last call to this method.
     ///
-    /// Later queries can request the same fonts again, until their data is [supplied](Self::supply_font).
+    /// Later queries can request the same fonts again, until their data is
+    /// [supplied](Self::supply_deferred_font).
     ///
     /// Requests are recorded per [`Collection`] handle, also for
     /// [shared collections](CollectionOptions::shared).
@@ -615,17 +616,21 @@ impl Inner {
         self.data.register_deferred_font(family_name, info)
     }
 
-    fn supply_font(&mut self, id: FontId, data: Blob<u8>, index: u32) -> bool {
+    fn supply_deferred_font(&mut self, id: FontId, data: Blob<u8>, index: u32) -> bool {
         #[cfg(feature = "std")]
         if let Some(shared) = &self.shared {
-            let result = shared.data.lock().unwrap().supply_font(id, data, index);
+            let result = shared
+                .data
+                .lock()
+                .unwrap()
+                .supply_deferred_font(id, data, index);
             shared.bump_version();
             result.is_some()
         } else {
-            self.data.supply_font(id, data, index).is_some()
+            self.data.supply_deferred_font(id, data, index).is_some()
         }
         #[cfg(not(feature = "std"))]
-        self.data.supply_font(id, data, index).is_some()
+        self.data.supply_deferred_font(id, data, index).is_some()
     }
 
     /// Unregisters the font with the given identifier.
@@ -841,7 +846,7 @@ impl CommonData {
         (family, id)
     }
 
-    fn supply_font(&mut self, id: FontId, data: Blob<u8>, index: u32) -> Option<()> {
+    fn supply_deferred_font(&mut self, id: FontId, data: Blob<u8>, index: u32) -> Option<()> {
         let is_deferred = |font: &FontInfo| {
             font.id() == id && matches!(font.source().kind(), SourceKind::Deferred)
         };
