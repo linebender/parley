@@ -146,7 +146,7 @@ pub(crate) struct Justification {
 
     /// One past the line's logically last shaped cluster eligible for justification. Shaped
     /// clusters at or beyond this index are not justified, as they hang past the line's end, or are
-    /// part of the last atom that doesn't fully hang (e.g., an NBSP doesn't hang, but if it closes
+    /// part of the last atom that doesn't hang (e.g., an NBSP doesn't hang, but if it closes
     /// the line, it shouldn't get justified).
     pub(crate) justification_end_cluster: u32,
 }
