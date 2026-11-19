@@ -339,15 +339,14 @@ impl QueryFont {
     }
 }
 
-/// A font of a family as cached by a query.
 #[derive(Clone)]
-enum CachedFont {
+enum CachedQueryCandidate {
     Loaded(QueryFont),
     /// The index of a pending font in the family font list.
     Pending(usize),
 }
 
-impl CachedFont {
+impl CachedQueryCandidate {
     /// Loads the font at `index` in `family`.
     fn load(
         family: &FamilyInfo,
@@ -397,9 +396,9 @@ impl CachedFont {
 fn load_bucket<'a>(
     family: &FamilyInfo,
     attributes: Attributes,
-    bucket: &'a mut Entry<SmallVec<[CachedFont; 1]>>,
+    bucket: &'a mut Entry<SmallVec<[CachedQueryCandidate; 1]>>,
     source_cache: &mut SourceCache,
-) -> &'a [CachedFont] {
+) -> &'a [CachedQueryCandidate] {
     match bucket {
         Entry::Error => &[],
         Entry::Ok(fonts) => fonts,
@@ -412,8 +411,10 @@ fn load_bucket<'a>(
                 attributes.weight,
                 true,
             );
-            let fonts: SmallVec<[CachedFont; 1]> = indices
-                .filter_map(|index| CachedFont::load(family, index, attributes, source_cache))
+            let fonts: SmallVec<[CachedQueryCandidate; 1]> = indices
+                .filter_map(|index| {
+                    CachedQueryCandidate::load(family, index, attributes, source_cache)
+                })
                 .collect();
             if fonts.is_empty() {
                 return &[];
@@ -430,9 +431,9 @@ fn load_bucket<'a>(
 fn load_font<'a>(
     family: &FamilyInfo,
     attributes: Attributes,
-    font: &'a mut Entry<CachedFont>,
+    font: &'a mut Entry<CachedQueryCandidate>,
     source_cache: &mut SourceCache,
-) -> Option<&'a CachedFont> {
+) -> Option<&'a CachedQueryCandidate> {
     match font {
         Entry::Error => None,
         Entry::Ok(font) => Some(font),
@@ -441,7 +442,7 @@ fn load_font<'a>(
             // the following code.
             *status = Entry::Error;
             let family_index = family.default_font_index();
-            *status = Entry::Ok(CachedFont::load(
+            *status = Entry::Ok(CachedQueryCandidate::load(
                 family,
                 family_index,
                 attributes,
@@ -460,8 +461,8 @@ fn load_font<'a>(
 struct CachedFamily {
     id: FamilyId,
     family: Entry<FamilyInfo>,
-    best: Entry<SmallVec<[CachedFont; 1]>>,
-    default: Entry<CachedFont>,
+    best: Entry<SmallVec<[CachedQueryCandidate; 1]>>,
+    default: Entry<CachedQueryCandidate>,
 }
 
 impl CachedFamily {
