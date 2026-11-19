@@ -314,8 +314,8 @@ impl FontInfo {
         }
     }
 
-    /// Returns this pending font with its data, keeping the source identifier and what the font
-    /// was declared with.
+    /// Returns this pending font with its data, keeping its identifiers and what the font was
+    /// declared with.
     pub(crate) fn supply(&self, data: Blob<u8>) -> Option<Self> {
         let font = FontRef::from_index(data.as_ref(), 0).ok()?;
         let source = SourceInfo::new(self.source.id, SourceKind::Memory(data.clone()));
@@ -329,6 +329,7 @@ impl FontInfo {
             axes: Some(&axes),
             unicode_range: self.unicode_range.as_ref(),
         });
+        supplied.id = self.id;
         Some(supplied)
     }
 
