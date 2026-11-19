@@ -66,7 +66,7 @@ impl Default for CollectionOptions {
 pub struct Collection {
     inner: Inner,
     query_state: query::QueryState,
-    /// The pending fonts that queries requested, see [`Self::take_font_requests`].
+    /// The [`PendingFont`]s requested by queries. See also [`Self::take_font_requests`].
     font_requests: HashSet<FontId>,
 }
 
@@ -227,13 +227,16 @@ impl Collection {
 
     /// Declares a font in the family named `family_name` whose data is not available yet.
     ///
-    /// This is like [`Self::register_fonts`] for, e.g., a CSS `@font-face` rule whose font has
-    /// not been fetched. Queries yield the font as [pending](QueryCandidate::Pending), and
-    /// [`Self::take_font_requests`] returns its identifier once a query requests it. Provide the
-    /// data with [`Self::supply_font`].
+    /// The font's data can be provided later using [`Self::supply_font`]. Queries yield such fonts
+    /// as [`QueryCandidate::Pending`]. The font's data can be requested using
+    /// [`PendingFont::request`], and read later by clients through the collection's
+    /// [`Self::take_font_requests`].
     ///
-    /// The font has the attributes given in `info`, which are normal where not given, also once
-    /// its data is supplied. The family name of `info` is not used.
+    /// This can be useful, for example, for fonts that are loaded over the network and/or take a
+    /// large chunk of memory and are not commonly needed, and particularly so in combination with
+    /// [`FontInfoOverride::unicode_range`].
+    ///
+    /// The font has the attributes given in `info`. The family name of `info` is ignored.
     pub fn declare_font(
         &mut self,
         family_name: &str,
@@ -242,11 +245,11 @@ impl Collection {
         self.inner.declare_font(family_name, info)
     }
 
-    /// Supplies the data of a font declared with [`Self::declare_font`]. The font keeps its
-    /// identifier and its place in its family.
+    /// Supplies the data of a font declared with [`Self::declare_font`].
     ///
-    /// `index` selects the font to use if `data` is a font collection, and is 0 otherwise.
-    /// Returns `false` if `id` is not a pending font or `data` does not contain that font.
+    /// `index` selects the font to use if `data` is a font collection, and should be 0 otherwise.
+    ///
+    /// Returns `false` if `id` is not a pending font or if `data` has no usable font at `index`.
     pub fn supply_font(&mut self, id: FontId, data: Blob<u8>, index: u32) -> bool {
         let supplied = self.inner.supply_font(id, data, index);
         if supplied {
@@ -255,12 +258,12 @@ impl Collection {
         supplied
     }
 
-    /// Returns the pending fonts that queries [requested](PendingFont::request) since the last
-    /// call, in no particular order.
+    /// Returns the identifiers of the [`PendingFont`]s queries [requested](PendingFont::request)
+    /// since the last call to this method.
     ///
-    /// Later queries request a font again until its data is [supplied](Self::supply_font).
+    /// Later queries can request the same fonts again, until their data is [supplied](Self::supply_font).
     ///
-    /// Requests are recorded per `Collection` handle, also for
+    /// Requests are recorded per [`Collection`] handle, also for
     /// [shared collections](CollectionOptions::shared).
     pub fn take_font_requests(&mut self) -> impl Iterator<Item = FontId> + '_ {
         self.font_requests.drain()
@@ -587,8 +590,7 @@ impl Inner {
         self.data.register_fonts(data, info_override)
     }
 
-    /// Declares a font whose data is not available yet.
-    pub fn declare_font(
+    fn declare_font(
         &mut self,
         family_name: &str,
         info: FontInfoOverride<'_>,
@@ -605,8 +607,7 @@ impl Inner {
         self.data.declare_font(family_name, info)
     }
 
-    /// Supplies the data of a font declared with [`Self::declare_font`].
-    pub fn supply_font(&mut self, id: FontId, data: Blob<u8>, index: u32) -> bool {
+    fn supply_font(&mut self, id: FontId, data: Blob<u8>, index: u32) -> bool {
         #[cfg(feature = "std")]
         if let Some(shared) = &self.shared {
             let result = shared.data.lock().unwrap().supply_font(id, data, index);
