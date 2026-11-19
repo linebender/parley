@@ -320,8 +320,7 @@ impl<'a, 'b, B: Brush> parley_engine::FontSelector for FontSelector<'a, 'b, B> {
             yields_font
         });
         if !query_yields_font {
-            // The query may still yield pending fonts. Request the first that the cluster is in
-            // range of.
+            // The query may yield pending fonts. Request the first that the cluster is in range of.
             query.matches_with(|candidate| match candidate {
                 QueryCandidate::Pending(font) if in_unicode_range(&font, cluster) => {
                     font.request();
@@ -361,9 +360,11 @@ impl<'a, 'b, B: Brush> parley_engine::FontSelector for FontSelector<'a, 'b, B> {
             let font = match candidate {
                 QueryCandidate::Font(font) => font,
                 QueryCandidate::Pending(font) => {
-                    // Only the first pending font that the cluster is in range of is requested.
-                    // The later ones are requested once its data is supplied, if it turns out
-                    // not to be the font to use.
+                    // Only the first pending font that the cluster is in range of is requested. It
+                    // may turn out not to be usable (e.g., it may not actually have glyphs for our
+                    // characters, or the user may not succeed in loading it and removes it). At
+                    // that point, once we're back here, it's possible subsequent pending fonts get
+                    // yielded.
                     if !requested && in_unicode_range(&font, cluster) {
                         requested = true;
                         font.request();
