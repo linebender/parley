@@ -95,7 +95,7 @@ impl SourceCache {
     pub fn get(&mut self, source: &SourceInfo) -> Option<Blob<u8>> {
         match &source.kind {
             SourceKind::Memory(memory) => Some(memory.clone()),
-            SourceKind::Pending => None,
+            SourceKind::Deferred => None,
             #[cfg(feature = "std")]
             SourceKind::Path(path) => {
                 use hashbrown::hash_map::Entry as HashEntry;

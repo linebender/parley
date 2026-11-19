@@ -83,7 +83,7 @@ pub use script::ScriptExt;
 pub use attributes::Attributes;
 pub use charmap::{Charmap, CharmapIndex, UnicodeRangeSet};
 pub use collection::{
-    Collection, CollectionOptions, PendingFont, Query, QueryCandidate, QueryFamily, QueryFont,
+    Collection, CollectionOptions, DeferredFont, Query, QueryCandidate, QueryFamily, QueryFont,
     QueryStatus,
 };
 pub use fallback::FallbackKey;

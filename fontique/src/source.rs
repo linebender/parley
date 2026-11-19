@@ -69,8 +69,8 @@ pub enum SourceKind {
     /// Path to a font file.
     Path(Arc<Path>),
     /// Data that is not available yet, see
-    /// [`Collection::declare_font`](crate::Collection::declare_font).
-    Pending,
+    /// [`Collection::register_deferred_font`](crate::Collection::register_deferred_font).
+    Deferred,
 }
 
 impl core::fmt::Debug for SourceKind {
@@ -83,8 +83,8 @@ impl core::fmt::Debug for SourceKind {
             Self::Memory(_) => {
                 write!(f, "Data([..])")
             }
-            Self::Pending => {
-                write!(f, "Pending")
+            Self::Deferred => {
+                write!(f, "Deferred")
             }
         }
     }
