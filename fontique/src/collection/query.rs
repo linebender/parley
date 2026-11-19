@@ -267,7 +267,7 @@ pub enum QueryCandidate<'q, 'a> {
 
 /// A font yielded by [`Query`] whose data is not available yet.
 ///
-/// It cannot be used, but its data can be requested through [`Self::requested`].
+/// It cannot be used, but its data can be requested through [`Self::request`].
 #[derive(Debug)]
 pub struct PendingFont<'a> {
     font: &'a FontInfo,
