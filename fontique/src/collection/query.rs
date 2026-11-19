@@ -3,7 +3,7 @@
 
 //! Query support.
 
-use crate::{Charmap, CharmapIndex, FontId, FontInfo, SourceId, SourceKind, UnicodeRangeSet};
+use crate::{Charmap, CharmapIndex, FontId, FontInfo, SourceKind, UnicodeRangeSet};
 
 use super::super::{Collection, SourceCache, matching::match_fonts};
 
@@ -36,7 +36,7 @@ impl QueryState {
 pub struct Query<'a> {
     collection: &'a mut Inner,
     state: &'a mut QueryState,
-    requests: &'a mut HashSet<SourceId>,
+    requests: &'a mut HashSet<FontId>,
     source_cache: &'a mut SourceCache,
     attributes: Attributes,
     fallbacks: Option<FallbackKey>,
@@ -268,7 +268,7 @@ pub enum QueryCandidate<'q, 'a> {
 #[derive(Debug)]
 pub struct PendingFont<'a> {
     font: &'a FontInfo,
-    requests: &'a mut HashSet<SourceId>,
+    requests: &'a mut HashSet<FontId>,
 }
 
 impl PendingFont<'_> {
@@ -280,10 +280,10 @@ impl PendingFont<'_> {
         unicode_range.is_none_or(|set| set.contains(codepoint))
     }
 
-    /// Requests the data of the font. [`Collection::take_font_requests`] returns its source.
+    /// Requests the data of the font. [`Collection::take_font_requests`] returns its identifier.
     #[inline]
     pub fn request(self) {
-        self.requests.insert(self.font.source().id());
+        self.requests.insert(self.font.id());
     }
 }
 
@@ -371,7 +371,7 @@ impl CachedFont {
     fn candidate<'q, 'a>(
         &'q self,
         family: &'a FamilyInfo,
-        requests: &'a mut HashSet<SourceId>,
+        requests: &'a mut HashSet<FontId>,
     ) -> QueryCandidate<'q, 'a> {
         match self {
             Self::Loaded(font) => QueryCandidate::Font(font),
@@ -580,7 +580,7 @@ mod tests {
             select(&mut collection, '1'),
             (Some(3), vec![any, digits, failed])
         );
-        assert!(collection.unregister_source(failed) && !collection.unregister_source(failed));
+        assert!(collection.unregister_font(failed) && !collection.unregister_font(failed));
         assert_eq!(select(&mut collection, '1'), (Some(2), vec![any, digits]));
         // A supplied font is used in its place, with the attributes and range it was declared with.
         assert!(collection.supply_font(any, roboto.clone()));
@@ -589,6 +589,9 @@ mod tests {
         assert!(collection.supply_font(digits, roboto));
         assert_eq!(select(&mut collection, '1'), (Some(0), vec![]));
         assert_eq!(select(&mut collection, 'a'), (Some(1), vec![]));
+        // A supplied font keeps its identifier.
+        assert!(collection.unregister_font(digits));
+        assert_eq!(select(&mut collection, 'a'), (Some(0), vec![]));
     }
 
     #[test]
