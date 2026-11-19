@@ -295,7 +295,7 @@ fn style_font_pending() {
     }
     // The first available font is requested for its metrics.
     assert_eq!(build(&mut env, "Space, Roboto", "x").0, [space]);
-    assert!(env.collection().supply_font(digits.1, arimo.clone()));
+    assert!(env.collection().supply_font(digits.1, arimo.clone(), 0));
     let built = build(&mut env, "Digits, Roboto", "1");
     assert_eq!(built, (vec![], Some(arimo.id())));
 }

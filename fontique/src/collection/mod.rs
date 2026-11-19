@@ -245,10 +245,10 @@ impl Collection {
     /// Supplies the data of a font declared with [`Self::declare_font`]. The font keeps its
     /// identifier and its place in its family.
     ///
-    /// If `data` is a font collection, its first font is used. Returns `false` if `id` is not
-    /// a pending font or `data` does not contain a font.
-    pub fn supply_font(&mut self, id: FontId, data: Blob<u8>) -> bool {
-        self.inner.supply_font(id, data)
+    /// `index` selects the font to use if `data` is a font collection, and is 0 otherwise.
+    /// Returns `false` if `id` is not a pending font or `data` does not contain that font.
+    pub fn supply_font(&mut self, id: FontId, data: Blob<u8>, index: u32) -> bool {
+        self.inner.supply_font(id, data, index)
     }
 
     /// Returns the pending fonts that queries [requested](PendingFont::request) since the last
@@ -599,17 +599,17 @@ impl Inner {
     }
 
     /// Supplies the data of a font declared with [`Self::declare_font`].
-    pub fn supply_font(&mut self, id: FontId, data: Blob<u8>) -> bool {
+    pub fn supply_font(&mut self, id: FontId, data: Blob<u8>, index: u32) -> bool {
         #[cfg(feature = "std")]
         if let Some(shared) = &self.shared {
-            let result = shared.data.lock().unwrap().supply_font(id, data);
+            let result = shared.data.lock().unwrap().supply_font(id, data, index);
             shared.bump_version();
             result.is_some()
         } else {
-            self.data.supply_font(id, data).is_some()
+            self.data.supply_font(id, data, index).is_some()
         }
         #[cfg(not(feature = "std"))]
-        self.data.supply_font(id, data).is_some()
+        self.data.supply_font(id, data, index).is_some()
     }
 
     /// Unregisters the font with the given identifier.
@@ -825,16 +825,16 @@ impl CommonData {
         (family, id)
     }
 
-    fn supply_font(&mut self, id: FontId, data: Blob<u8>) -> Option<()> {
+    fn supply_font(&mut self, id: FontId, data: Blob<u8>, index: u32) -> Option<()> {
         let is_pending = |font: &FontInfo| {
             font.id() == id && matches!(font.source().kind(), SourceKind::Pending)
         };
         for family in self.families.values_mut().flatten() {
-            let Some(index) = family.fonts().iter().position(is_pending) else {
+            let Some(position) = family.fonts().iter().position(is_pending) else {
                 continue;
             };
             let mut fonts = family.fonts().to_vec();
-            fonts[index] = fonts[index].supply(data)?;
+            fonts[position] = fonts[position].supply(data, index)?;
             let name = self.family_names.get_by_id(family.id())?;
             *family = FamilyInfo::new(name.clone(), fonts);
             return Some(());
