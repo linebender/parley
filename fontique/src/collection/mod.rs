@@ -259,6 +259,9 @@ impl Collection {
     /// call, in no particular order.
     ///
     /// Later queries request a font again until its data is [supplied](Self::supply_font).
+    ///
+    /// Requests are recorded per `Collection` handle, also for
+    /// [shared collections](CollectionOptions::shared).
     pub fn take_font_requests(&mut self) -> impl Iterator<Item = FontId> + '_ {
         self.font_requests.drain()
     }
