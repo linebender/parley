@@ -5,7 +5,7 @@
 
 mod query;
 
-pub use query::{PendingFont, Query, QueryCandidate, QueryFamily, QueryFont, QueryStatus};
+pub use query::{DeferredFont, Query, QueryCandidate, QueryFamily, QueryFont, QueryStatus};
 
 use crate::font::FontInfoOverride;
 
@@ -66,7 +66,7 @@ impl Default for CollectionOptions {
 pub struct Collection {
     inner: Inner,
     query_state: query::QueryState,
-    /// The [`PendingFont`]s requested by queries. See also [`Self::drain_font_requests`].
+    /// The [`DeferredFont`]s requested by queries. See also [`Self::drain_font_requests`].
     font_requests: HashSet<FontId>,
 }
 
@@ -225,11 +225,11 @@ impl Collection {
         self.inner.register_fonts(data, info_override)
     }
 
-    /// Declares a font in the family named `family_name` whose data is not available yet.
+    /// Registers a font in the family named `family_name` whose data is not available yet.
     ///
     /// The font's data can be provided later using [`Self::supply_font`]. Queries yield such fonts
-    /// as [`QueryCandidate::Pending`]. The font's data can be requested using
-    /// [`PendingFont::request`], and read later by clients through the collection's
+    /// as [`QueryCandidate::Deferred`]. The font's data can be requested using
+    /// [`DeferredFont::request`], and read later by clients through the collection's
     /// [`Self::drain_font_requests`].
     ///
     /// This can be useful, for example, for fonts that are loaded over the network and/or take a
@@ -237,19 +237,19 @@ impl Collection {
     /// [`FontInfoOverride::unicode_range`].
     ///
     /// The font has the attributes given in `info`. The family name of `info` is ignored.
-    pub fn declare_font(
+    pub fn register_deferred_font(
         &mut self,
         family_name: &str,
         info: FontInfoOverride<'_>,
     ) -> (FamilyId, FontId) {
-        self.inner.declare_font(family_name, info)
+        self.inner.register_deferred_font(family_name, info)
     }
 
-    /// Supplies the data of a font declared with [`Self::declare_font`].
+    /// Supplies the data of a font registered with [`Self::register_deferred_font`].
     ///
     /// `index` selects the font to use if `data` is a font collection, and should be 0 otherwise.
     ///
-    /// Returns `false` if `id` is not a pending font or if `data` has no usable font at `index`.
+    /// Returns `false` if `id` is not a deferred font or if `data` has no usable font at `index`.
     pub fn supply_font(&mut self, id: FontId, data: Blob<u8>, index: u32) -> bool {
         let supplied = self.inner.supply_font(id, data, index);
         if supplied {
@@ -258,7 +258,7 @@ impl Collection {
         supplied
     }
 
-    /// Returns the identifiers of the [`PendingFont`]s queries [requested](PendingFont::request)
+    /// Returns the identifiers of the [`DeferredFont`]s queries [requested](DeferredFont::request)
     /// since the last call to this method.
     ///
     /// Later queries can request the same fonts again, until their data is [supplied](Self::supply_font).
@@ -269,8 +269,8 @@ impl Collection {
         self.font_requests.drain()
     }
 
-    /// Unregisters the font with the given identifier. This can be a font declared with
-    /// [`Self::declare_font`], for example because its data could not be fetched.
+    /// Unregisters the font with the given identifier. This can be a font registered with
+    /// [`Self::register_deferred_font`], for example because its data could not be fetched.
     ///
     /// Returns `true` if the font was removed from its family, `false` otherwise. System fonts
     /// can't be removed.
@@ -590,21 +590,25 @@ impl Inner {
         self.data.register_fonts(data, info_override)
     }
 
-    fn declare_font(
+    fn register_deferred_font(
         &mut self,
         family_name: &str,
         info: FontInfoOverride<'_>,
     ) -> (FamilyId, FontId) {
         #[cfg(feature = "std")]
         if let Some(shared) = &self.shared {
-            let result = shared.data.lock().unwrap().declare_font(family_name, info);
+            let result = shared
+                .data
+                .lock()
+                .unwrap()
+                .register_deferred_font(family_name, info);
             shared.bump_version();
             result
         } else {
-            self.data.declare_font(family_name, info)
+            self.data.register_deferred_font(family_name, info)
         }
         #[cfg(not(feature = "std"))]
-        self.data.declare_font(family_name, info)
+        self.data.register_deferred_font(family_name, info)
     }
 
     fn supply_font(&mut self, id: FontId, data: Blob<u8>, index: u32) -> bool {
@@ -820,12 +824,12 @@ impl CommonData {
             .collect()
     }
 
-    fn declare_font(
+    fn register_deferred_font(
         &mut self,
         family_name: &str,
         info: FontInfoOverride<'_>,
     ) -> (FamilyId, FontId) {
-        let font = FontInfo::pending(&info);
+        let font = FontInfo::deferred(&info);
         let id = font.id();
         let name = self.family_names.get_or_insert(family_name);
         let family = name.id();
@@ -834,11 +838,11 @@ impl CommonData {
     }
 
     fn supply_font(&mut self, id: FontId, data: Blob<u8>, index: u32) -> Option<()> {
-        let is_pending = |font: &FontInfo| {
-            font.id() == id && matches!(font.source().kind(), SourceKind::Pending)
+        let is_deferred = |font: &FontInfo| {
+            font.id() == id && matches!(font.source().kind(), SourceKind::Deferred)
         };
         for family in self.families.values_mut().flatten() {
-            let Some(position) = family.fonts().iter().position(is_pending) else {
+            let Some(position) = family.fonts().iter().position(is_deferred) else {
                 continue;
             };
             let mut fonts = family.fonts().to_vec();

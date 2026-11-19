@@ -178,8 +178,8 @@ impl<'a> Query<'a> {
     ///
     /// As in CSS, fonts whose [unicode range] excludes U+0020 SPACE are skipped.
     ///
-    /// [Pending fonts](QueryCandidate::Pending) are also skipped. The first pending font that
-    /// otherwise would have been returned is [requested](PendingFont::request).
+    /// [Deferred fonts](QueryCandidate::Deferred) are also skipped. The first deferred font that
+    /// otherwise would have been returned is [requested](DeferredFont::request).
     ///
     /// [first available font]: https://drafts.csswg.org/css-fonts-4/#first-available-font
     /// [unicode range]: crate::FontInfoOverride::unicode_range
@@ -191,7 +191,7 @@ impl<'a> Query<'a> {
                 found = Some(font.clone());
                 QueryStatus::Stop
             }
-            QueryCandidate::Pending(font) if !requested && font.in_unicode_range(' ') => {
+            QueryCandidate::Deferred(font) if !requested && font.in_unicode_range(' ') => {
                 requested = true;
                 font.request();
                 QueryStatus::Continue
@@ -256,25 +256,25 @@ impl From<GenericFamily> for QueryFamily<'static> {
 pub enum QueryCandidate<'q, 'a> {
     /// A font that can be used.
     Font(&'q QueryFont),
-    /// A pending font whose data is not available yet.
+    /// A deferred font whose data is not available yet.
     ///
-    /// This is only yielded for fonts declared with [`Collection::declare_font`].
+    /// This is only yielded for fonts registered with [`Collection::register_deferred_font`].
     ///
-    /// Call [`PendingFont::request`] if you otherwise would have used the font, for example if its
-    /// [`PendingFont::in_unicode_range`] covers the character.
-    Pending(PendingFont<'a>),
+    /// Call [`DeferredFont::request`] if you otherwise would have used the font, for example if its
+    /// [`DeferredFont::in_unicode_range`] covers the character.
+    Deferred(DeferredFont<'a>),
 }
 
 /// A font yielded by [`Query`] whose data is not available yet.
 ///
 /// It cannot be used, but its data can be requested through [`Self::request`].
 #[derive(Debug)]
-pub struct PendingFont<'a> {
+pub struct DeferredFont<'a> {
     font: &'a FontInfo,
     requests: &'a mut HashSet<FontId>,
 }
 
-impl PendingFont<'_> {
+impl DeferredFont<'_> {
     /// Returns the font's identifier.
     #[inline]
     pub fn id(&self) -> FontId {
@@ -342,8 +342,8 @@ impl QueryFont {
 #[derive(Clone)]
 enum CachedQueryCandidate {
     Loaded(QueryFont),
-    /// The index of a pending font in the family font list.
-    Pending(usize),
+    /// The index of a deferred font in the family font list.
+    Deferred(usize),
 }
 
 impl CachedQueryCandidate {
@@ -355,8 +355,8 @@ impl CachedQueryCandidate {
         source_cache: &mut SourceCache,
     ) -> Option<Self> {
         let font_info = family.fonts().get(index)?;
-        if matches!(font_info.source().kind(), SourceKind::Pending) {
-            return Some(Self::Pending(index));
+        if matches!(font_info.source().kind(), SourceKind::Deferred) {
+            return Some(Self::Deferred(index));
         }
         Some(Self::Loaded(QueryFont {
             id: font_info.id(),
@@ -372,7 +372,7 @@ impl CachedQueryCandidate {
     fn family_index(&self) -> usize {
         match self {
             Self::Loaded(font) => font.family.1,
-            Self::Pending(index) => *index,
+            Self::Deferred(index) => *index,
         }
     }
 
@@ -384,7 +384,7 @@ impl CachedQueryCandidate {
     ) -> QueryCandidate<'q, 'a> {
         match self {
             Self::Loaded(font) => QueryCandidate::Font(font),
-            Self::Pending(index) => QueryCandidate::Pending(PendingFont {
+            Self::Deferred(index) => QueryCandidate::Deferred(DeferredFont {
                 font: &family.fonts()[*index],
                 requests,
             }),
@@ -540,13 +540,13 @@ mod tests {
     }
 
     #[test]
-    fn pending_fonts() {
+    fn deferred_fonts() {
         use crate::{CollectionOptions, FontInfoOverride, FontWeight, UnicodeRangeSet};
 
         const ROBOTO: &[u8] =
             include_bytes!("../../../parley_dev/assets/fonts/roboto_fonts/Roboto-Regular.ttf");
 
-        // One family, checked in this order: `failed`, `digits`, `any` (all pending), Roboto.
+        // One family, checked in this order: `failed`, `digits`, `any` (all deferred), Roboto.
         let mut collection = Collection::new(CollectionOptions {
             shared: false,
             system_fonts: false,
@@ -558,11 +558,11 @@ mod tests {
             ..Default::default()
         };
         collection.register_fonts(roboto.clone(), Some(info));
-        let (_, any) = collection.declare_font("f", info);
+        let (_, any) = collection.register_deferred_font("f", info);
         let range = UnicodeRangeSet::new([0x30..=0x39, 0x660..=0x669]);
         info.unicode_range = Some(&range);
-        let (_, digits) = collection.declare_font("f", info);
-        let (_, failed) = collection.declare_font("f", info);
+        let (_, digits) = collection.register_deferred_font("f", info);
+        let (_, failed) = collection.register_deferred_font("f", info);
 
         // Returns the index of the font to use for `ch`, and the fonts requested for it.
         let mut source_cache = SourceCache::default();
@@ -570,14 +570,14 @@ mod tests {
             let mut query = collection.query(&mut source_cache);
             query.set_families(["f"]);
             let mut used = None;
-            let mut pending = Vec::new();
+            let mut deferred = Vec::new();
             query.matches_with(|font| match font {
                 QueryCandidate::Font(font) if font.in_unicode_range(ch) => {
                     used = Some(font.family.1);
                     QueryStatus::Stop
                 }
-                QueryCandidate::Pending(font) if font.in_unicode_range(ch) => {
-                    pending.push(font.id());
+                QueryCandidate::Deferred(font) if font.in_unicode_range(ch) => {
+                    deferred.push(font.id());
                     font.request();
                     QueryStatus::Continue
                 }
@@ -586,18 +586,18 @@ mod tests {
             drop(query);
             let mut requests = collection.drain_font_requests().collect::<Vec<_>>();
             requests.sort();
-            pending.sort();
-            assert_eq!(pending, requests);
+            deferred.sort();
+            assert_eq!(deferred, requests);
             (used, requests)
         };
-        // A pending font is yielded in its place, until it is unregistered.
+        // A deferred font is yielded in its place, until it is unregistered.
         assert_eq!(
             select(&mut collection, '1'),
             (Some(3), vec![any, digits, failed])
         );
         assert!(collection.unregister_font(failed) && !collection.unregister_font(failed));
         assert_eq!(select(&mut collection, '1'), (Some(2), vec![any, digits]));
-        // A supplied font is used in its place, with the attributes and range it was declared with.
+        // A supplied font takes its place, with the attributes and range it was registered with.
         assert!(!collection.supply_font(any, roboto.clone(), 1));
         assert!(collection.supply_font(any, roboto.clone(), 0));
         assert!(!collection.supply_font(any, roboto.clone(), 0));
@@ -609,7 +609,7 @@ mod tests {
         assert!(collection.unregister_font(digits));
         assert_eq!(select(&mut collection, 'a'), (Some(0), vec![]));
         // A font that is supplied while its request is queued is no longer requested.
-        let (_, late) = collection.declare_font("f", FontInfoOverride::default());
+        let (_, late) = collection.register_deferred_font("f", FontInfoOverride::default());
         let mut query = collection.query(&mut source_cache);
         query.set_families(["f"]);
         query.first_available_font();

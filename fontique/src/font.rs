@@ -66,7 +66,7 @@ impl FontInfo {
                 let font = FontRef::from_index(memory.as_ref(), index).ok()?;
                 Self::from_font_ref(&font, source.clone(), index)
             }
-            SourceKind::Pending => None,
+            SourceKind::Deferred => None,
         }
     }
 
@@ -95,7 +95,7 @@ impl FontInfo {
                 SourceKind::Memory(blob) => Some(blob.clone()),
                 #[cfg(feature = "std")]
                 SourceKind::Path(path) => super::source_cache::load_blob(path),
-                SourceKind::Pending => None,
+                SourceKind::Deferred => None,
             }
         }
     }
@@ -292,8 +292,8 @@ impl FontInfo {
     }
 
     /// Creates a font whose data is not available yet, see
-    /// [`Collection::declare_font`](crate::Collection::declare_font).
-    pub(crate) fn pending(info: &FontInfoOverride<'_>) -> Self {
+    /// [`Collection::register_deferred_font`](crate::Collection::register_deferred_font).
+    pub(crate) fn deferred(info: &FontInfoOverride<'_>) -> Self {
         // The axis defaults are kept to be applied once the data is supplied.
         let axis = |&(tag, default): &(Tag, f32)| AxisInfo {
             tag,
@@ -302,20 +302,20 @@ impl FontInfo {
         };
         Self {
             id: FontId::new(),
-            source: SourceInfo::new(SourceId::new(), SourceKind::Pending),
+            source: SourceInfo::new(SourceId::new(), SourceKind::Deferred),
             index: 0,
             width: info.width.unwrap_or_default(),
             style: info.style.unwrap_or_default(),
             weight: info.weight.unwrap_or_default(),
             axes: info.axes.unwrap_or(&[]).iter().map(axis).collect(),
             attr_axes: 0,
-            charmap_index: CharmapIndex::PENDING,
+            charmap_index: CharmapIndex::DEFERRED,
             unicode_range: info.unicode_range.cloned(),
         }
     }
 
-    /// Returns this pending font with its data, keeping its identifiers and what the font was
-    /// declared with.
+    /// Returns this deferred font with its data, keeping its identifiers and what the font was
+    /// registered with.
     pub(crate) fn supply(&self, data: Blob<u8>, index: u32) -> Option<Self> {
         let font = FontRef::from_index(data.as_ref(), index).ok()?;
         let source = SourceInfo::new(self.source.id, SourceKind::Memory(data.clone()));

@@ -325,9 +325,9 @@ impl<'a, 'b, B: Brush> parley_engine::FontSelector for FontSelector<'a, 'b, B> {
             yields_font
         });
         if !query_yields_font {
-            // The query may yield pending fonts. Request the first that the cluster is in range of.
+            // The query may yield deferred fonts. Request the first the cluster is in range of.
             query.matches_with(|candidate| match candidate {
-                QueryCandidate::Pending(font) if in_unicode_range(&font, cluster) => {
+                QueryCandidate::Deferred(font) if in_unicode_range(&font, cluster) => {
                     font.request();
                     fontique::QueryStatus::Stop
                 }
@@ -364,11 +364,11 @@ impl<'a, 'b, B: Brush> parley_engine::FontSelector for FontSelector<'a, 'b, B> {
         self.query.matches_with(|candidate| {
             let font = match candidate {
                 QueryCandidate::Font(font) => font,
-                QueryCandidate::Pending(font) => {
-                    // Only the first pending font that the cluster is in range of is requested. It
+                QueryCandidate::Deferred(font) => {
+                    // Only the first deferred font that the cluster is in range of is requested. It
                     // may turn out not to be usable (e.g., it may not actually have glyphs for our
                     // characters, or the user may not succeed in loading it and removes it). At
-                    // that point, once we're back here, it's possible subsequent pending fonts get
+                    // that point, once we're back here, it's possible subsequent deferred fonts get
                     // yielded.
                     if !requested && in_unicode_range(&font, cluster) {
                         requested = true;
@@ -454,7 +454,7 @@ fn any_font(query: &mut Query<'_>) -> Option<QueryFont> {
 }
 
 /// Returns `true` if `font` may be used for part of `cluster` once its data is available.
-fn in_unicode_range(font: &fontique::PendingFont<'_>, cluster: &mut CharCluster) -> bool {
+fn in_unicode_range(font: &fontique::DeferredFont<'_>, cluster: &mut CharCluster) -> bool {
     let mut in_range = false;
     cluster.calculate_coverage(|ch| {
         in_range |= font.in_unicode_range(ch);
