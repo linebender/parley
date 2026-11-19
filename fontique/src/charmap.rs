@@ -75,7 +75,7 @@ pub struct CharmapIndex {
 }
 
 impl CharmapIndex {
-    /// The index of a font whose data is pending. There is no character map at this offset.
+    /// A placeholder index for [`crate::PendingFont`].
     pub(crate) const PENDING: Self = Self {
         subtable_offset: 0,
         is_symbol: false,
