@@ -238,6 +238,9 @@ impl Collection {
     /// [`FontInfoOverride::unicode_range`].
     ///
     /// The font has the attributes given in `info`. The family name of `info` is ignored.
+    ///
+    /// Deferred fonts, like any font, can be removed through [`Self::unregister_font`]. This can be
+    /// useful if the font failed to load, for example.
     pub fn register_deferred_font(
         &mut self,
         family_name: &str,
