@@ -587,12 +587,20 @@ mod tests {
         assert!(collection.supply_font(any, roboto.clone(), 0));
         assert!(!collection.supply_font(any, roboto.clone(), 0));
         assert_eq!(select(&mut collection, '1'), (Some(1), vec![digits]));
-        assert!(collection.supply_font(digits, roboto, 0));
+        assert!(collection.supply_font(digits, roboto.clone(), 0));
         assert_eq!(select(&mut collection, '1'), (Some(0), vec![]));
         assert_eq!(select(&mut collection, 'a'), (Some(1), vec![]));
         // A supplied font keeps its identifier.
         assert!(collection.unregister_font(digits));
         assert_eq!(select(&mut collection, 'a'), (Some(0), vec![]));
+        // A font that is supplied while its request is queued is no longer requested.
+        let (_, late) = collection.declare_font("f", FontInfoOverride::default());
+        let mut query = collection.query(&mut source_cache);
+        query.set_families(["f"]);
+        query.first_available_font();
+        drop(query);
+        assert!(collection.supply_font(late, roboto, 0));
+        assert_eq!(collection.take_font_requests().next(), None);
     }
 
     #[test]
