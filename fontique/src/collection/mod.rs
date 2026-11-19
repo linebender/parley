@@ -248,7 +248,11 @@ impl Collection {
     /// `index` selects the font to use if `data` is a font collection, and is 0 otherwise.
     /// Returns `false` if `id` is not a pending font or `data` does not contain that font.
     pub fn supply_font(&mut self, id: FontId, data: Blob<u8>, index: u32) -> bool {
-        self.inner.supply_font(id, data, index)
+        let supplied = self.inner.supply_font(id, data, index);
+        if supplied {
+            self.font_requests.remove(&id);
+        }
+        supplied
     }
 
     /// Returns the pending fonts that queries [requested](PendingFont::request) since the last
