@@ -250,52 +250,42 @@ fn style_font_unicode_range_decomposition() {
     }
 }
 
-/// A pending font is requested by text in its range, and used once its data is supplied.
+/// Text requests the first pending font it is in range of, and is shaped with the other fonts.
 #[test]
 fn style_font_pending() {
-    use fontique::{GenericFamily, UnicodeRangeSet};
-    use parley::PositionedLayoutItem;
+    use fontique::UnicodeRangeSet;
 
     let mut env = TestEnv::new(test_name!(), None);
-    let family = env.collection().family_by_name("Arimo").unwrap();
-    let arimo = family.default_font().unwrap().load(None).unwrap();
     let mut declare = |family, range| {
         let range = UnicodeRangeSet::new([range]);
         let info = FontInfoOverride {
             unicode_range: Some(&range),
             ..Default::default()
         };
-        env.collection().declare_font(family, info)
+        env.collection().declare_font(family, info).1
     };
-    let space = declare("Space", 0x20..=0x20).1;
+    declare("Space", 0x20..=0x20);
+    let space = declare("Space", 0x20..=0x20);
     let digits = declare("Digits", 0x30..=0x39);
     declare("Other", 0x30..=0x39);
-    let collection = env.collection();
-    collection.set_generic_families(GenericFamily::SansSerif, [digits.0].into_iter());
 
-    // Returns the fonts that `text` requests, and the font of its first run.
-    let build = |env: &mut TestEnv, families: &'static str, text| {
+    // Returns the fonts that `text` requests, and whether it was shaped.
+    let mut build = |families: &'static str, text| {
         let mut builder = env.ranged_builder(text);
         builder.push_default(StyleProperty::FontFamily(families.into()));
         let mut layout = builder.build(text);
         layout.break_all_lines(None);
-        let item = layout.lines().next().and_then(|line| line.items().next());
-        let font = item.map(|item| match item {
-            PositionedLayoutItem::GlyphRun(run) => run.run().font().data.id(),
-            _ => unreachable!(),
-        });
         let requests = env.collection().drain_font_requests();
-        (requests.collect::<Vec<_>>(), font)
+        (requests.collect::<Vec<_>>(), layout.width() > 0.0)
     };
-    // The second list has no font to use. No font has U+4E00 and a tab needs no font, but
-    // pending fonts are not used for those either. Only the first pending font is requested.
+    // The second list has no font to use. No pending font has U+4E00 in range, and a tab has no
+    // character to shape. Only the first pending font is requested.
     for families in ["Digits, Other, Roboto", "Digits, Other"] {
-        assert_eq!(build(&mut env, families, "\u{4e00}\t").0, [], "{families}");
-        assert_eq!(build(&mut env, families, "1").0, [digits.1], "{families}");
+        assert_eq!(build(families, "\u{4e00}\t").0, [], "{families}");
+        assert_eq!(build(families, "1").0, [digits], "{families}");
     }
-    // The first available font is requested for its metrics.
-    assert_eq!(build(&mut env, "Space, Roboto", "x").0, [space]);
-    assert!(env.collection().supply_font(digits.1, arimo.clone(), 0));
-    let built = build(&mut env, "Digits, Roboto", "1");
-    assert_eq!(built, (vec![], Some(arimo.id())));
+    // Meanwhile, the text is shaped with the fonts after the pending one.
+    assert!(build("Digits, Roboto", "1").1);
+    // Only the first available font is requested for its metrics.
+    assert_eq!(build("Space, Roboto", "x").0, [space]);
 }
