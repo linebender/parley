@@ -289,7 +289,7 @@ impl PendingFont<'_> {
         unicode_range.is_none_or(|set| set.contains(codepoint))
     }
 
-    /// Requests the data of the font. [`Collection::take_font_requests`] will then yield its
+    /// Requests the data of the font. [`Collection::drain_font_requests`] will then yield its
     /// [`FontId`].
     #[inline]
     pub fn request(self) {
@@ -583,7 +583,7 @@ mod tests {
                 _ => QueryStatus::Continue,
             });
             drop(query);
-            let mut requests = collection.take_font_requests().collect::<Vec<_>>();
+            let mut requests = collection.drain_font_requests().collect::<Vec<_>>();
             requests.sort();
             pending.sort();
             assert_eq!(pending, requests);
@@ -614,7 +614,7 @@ mod tests {
         query.first_available_font();
         drop(query);
         assert!(collection.supply_font(late, roboto, 0));
-        assert_eq!(collection.take_font_requests().next(), None);
+        assert_eq!(collection.drain_font_requests().next(), None);
     }
 
     #[test]

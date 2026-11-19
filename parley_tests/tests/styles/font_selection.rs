@@ -284,7 +284,7 @@ fn style_font_pending() {
             PositionedLayoutItem::GlyphRun(run) => run.run().font().data.id(),
             _ => unreachable!(),
         });
-        let requests = env.collection().take_font_requests();
+        let requests = env.collection().drain_font_requests();
         (requests.collect::<Vec<_>>(), font)
     };
     // The second list has no font to use. No font has U+4E00 and a tab needs no font, but

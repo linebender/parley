@@ -66,7 +66,7 @@ impl Default for CollectionOptions {
 pub struct Collection {
     inner: Inner,
     query_state: query::QueryState,
-    /// The [`PendingFont`]s requested by queries. See also [`Self::take_font_requests`].
+    /// The [`PendingFont`]s requested by queries. See also [`Self::drain_font_requests`].
     font_requests: HashSet<FontId>,
 }
 
@@ -230,7 +230,7 @@ impl Collection {
     /// The font's data can be provided later using [`Self::supply_font`]. Queries yield such fonts
     /// as [`QueryCandidate::Pending`]. The font's data can be requested using
     /// [`PendingFont::request`], and read later by clients through the collection's
-    /// [`Self::take_font_requests`].
+    /// [`Self::drain_font_requests`].
     ///
     /// This can be useful, for example, for fonts that are loaded over the network and/or take a
     /// large chunk of memory and are not commonly needed, and particularly so in combination with
@@ -265,7 +265,7 @@ impl Collection {
     ///
     /// Requests are recorded per [`Collection`] handle, also for
     /// [shared collections](CollectionOptions::shared).
-    pub fn take_font_requests(&mut self) -> impl Iterator<Item = FontId> + '_ {
+    pub fn drain_font_requests(&mut self) -> impl Iterator<Item = FontId> + '_ {
         self.font_requests.drain()
     }
 
