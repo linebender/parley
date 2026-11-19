@@ -316,10 +316,10 @@ impl FontInfo {
 
     /// Returns this pending font with its data, keeping its identifiers and what the font was
     /// declared with.
-    pub(crate) fn supply(&self, data: Blob<u8>) -> Option<Self> {
-        let font = FontRef::from_index(data.as_ref(), 0).ok()?;
+    pub(crate) fn supply(&self, data: Blob<u8>, index: u32) -> Option<Self> {
+        let font = FontRef::from_index(data.as_ref(), index).ok()?;
         let source = SourceInfo::new(self.source.id, SourceKind::Memory(data.clone()));
-        let mut supplied = Self::from_font_ref(&font, source, 0)?;
+        let mut supplied = Self::from_font_ref(&font, source, index)?;
         let axes: SmallVec<[_; 1]> = self.axes.iter().map(|a| (a.tag, a.default)).collect();
         supplied.apply_override(&FontInfoOverride {
             family_name: None,

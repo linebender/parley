@@ -583,10 +583,11 @@ mod tests {
         assert!(collection.unregister_font(failed) && !collection.unregister_font(failed));
         assert_eq!(select(&mut collection, '1'), (Some(2), vec![any, digits]));
         // A supplied font is used in its place, with the attributes and range it was declared with.
-        assert!(collection.supply_font(any, roboto.clone()));
-        assert!(!collection.supply_font(any, roboto.clone()));
+        assert!(!collection.supply_font(any, roboto.clone(), 1));
+        assert!(collection.supply_font(any, roboto.clone(), 0));
+        assert!(!collection.supply_font(any, roboto.clone(), 0));
         assert_eq!(select(&mut collection, '1'), (Some(1), vec![digits]));
-        assert!(collection.supply_font(digits, roboto));
+        assert!(collection.supply_font(digits, roboto, 0));
         assert_eq!(select(&mut collection, '1'), (Some(0), vec![]));
         assert_eq!(select(&mut collection, 'a'), (Some(1), vec![]));
         // A supplied font keeps its identifier.
