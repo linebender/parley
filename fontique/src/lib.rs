@@ -43,7 +43,6 @@
 #![expect(
     missing_debug_implementations,
     unnameable_types,
-    unreachable_pub,
     clippy::allow_attributes_without_reason,
     clippy::cast_possible_truncation,
     reason = "Deferred"

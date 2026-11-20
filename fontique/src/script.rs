@@ -33,7 +33,7 @@ fn assert_sorted() {
     }
 }
 
-pub const SCRIPT_SAMPLES: &[(Script, &str)] = &[
+const SCRIPT_SAMPLES: &[(Script, &str)] = &[
     (Script::from_bytes(*b"Adlm"), "𞤀𞤁𞤂𞤃𞤄𞤅𞤆𞤇𞤈𞤉𞤊𞤋𞤌𞤍𞤎𞤏"),
     (Script::from_bytes(*b"Aghb"), "𐔰𐔱𐔲𐔳𐔴𐔵𐔶𐔷𐔸𐔹𐔺𐔻𐔼𐔽𐔾𐔿"),
     (Script::from_bytes(*b"Ahom"), "𑜀𑜁𑜂𑜃𑜄𑜅𑜆𑜇𑜈𑜉𑜊𑜋𑜌𑜍𑜎𑜏"),
