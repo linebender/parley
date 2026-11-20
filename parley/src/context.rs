@@ -31,6 +31,7 @@ pub struct LayoutContext<B: Brush = [u8; 4]> {
     pub(crate) style_runs: Vec<StyleRun>,
     pub(crate) inline_boxes: Vec<LayoutInlineBox>,
     pub(crate) floated_boxes: Vec<FloatedBox>,
+    pub(crate) shaping_splits: Vec<usize>,
 
     // Reusable text analysis
     pub(crate) analyzer: Analyzer,
@@ -57,6 +58,7 @@ impl<B: Brush> LayoutContext<B> {
             style_runs: vec![],
             inline_boxes: vec![],
             floated_boxes: vec![],
+            shaping_splits: Vec::new(),
             inline_objects: vec![],
             analyzer: Analyzer::new(),
             analysis: Analysis::new(),
@@ -194,6 +196,7 @@ impl<B: Brush> LayoutContext<B> {
         self.style_runs.clear();
         self.inline_boxes.clear();
         self.floated_boxes.clear();
+        self.shaping_splits.clear();
     }
 }
 

@@ -46,6 +46,7 @@ pub(crate) fn shape_text<'a, B: Brush>(
     fcx: &'a mut FontContext,
     styles: &'a [ResolvedStyle<B>],
     floated_boxes: &[FloatedBox],
+    shaping_splits: &[usize],
     analysis: &Analysis,
     char_style_indices: &[u16],
     scx: &mut Shaper,
@@ -89,11 +90,13 @@ pub(crate) fn shape_text<'a, B: Brush>(
     // Split when shaping-relevant style properties change and at floated boxes.
     let items = {
         // TODO: we currently walk characters here, but we could instead just walk boundaries of
-        // styles and floated boxes.
+        // styles, explicit splits, and floated boxes.
         let char_count = char_style_indices.len();
 
         // The first character of the item currently being built.
         let mut item_start_char = 0_usize;
+
+        let mut shaping_splits = shaping_splits.iter().copied().peekable();
 
         // Positioned at `item_start_char`, i.e., the first character not yet covered by an item.
         let mut chars = text.char_indices().enumerate().peekable();
@@ -131,6 +134,8 @@ pub(crate) fn shape_text<'a, B: Brush>(
                         break;
                     }
                 }
+
+                split |= shaping_splits.next_if_eq(&byte_index).is_some();
 
                 if split {
                     break char_index;
