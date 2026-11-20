@@ -10,7 +10,7 @@ use crate::test_name;
 use crate::util::TestEnv;
 use parley::VerticalAlign;
 use parley::style::FontFamily;
-use parley::{Alignment, AlignmentOptions, InlineBox, InlineBoxKind, StyleProperty, YieldData};
+use parley::{Alignment, AlignmentOptions, InlineBox, StyleProperty, YieldData};
 
 #[test]
 fn break_by_length_basic() {
@@ -101,7 +101,6 @@ fn break_by_length_with_inline_box() {
     let mut builder = env.ranged_builder(text);
     builder.push_inline_box(InlineBox {
         id: 0,
-        kind: InlineBoxKind::InFlow,
         index: 1, // After 'A'
         width: 10.0,
         height: 10.0,
@@ -130,7 +129,6 @@ fn break_by_length_multiple_inline_boxes() {
     for id in 0..3 {
         builder.push_inline_box(InlineBox {
             id,
-            kind: InlineBoxKind::InFlow,
             index: id as usize * '\u{FFFC}'.len_utf8(),
             width: 10.0,
             height: 10.0,

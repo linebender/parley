@@ -1,6 +1,7 @@
 // Copyright 2025 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+use crate::FloatedBox;
 use crate::IndentOptions;
 use crate::InlineBox;
 use crate::layout::data::LayoutData;
@@ -174,21 +175,21 @@ impl<B: Brush> Layout<B> {
     ///
     /// # Panics
     ///
-    /// Panics if `index` is out of bounds, or if `edit` changes [`InlineBox::index`] or whether the
-    /// box is [`crate::InlineBoxKind::InFlow`].
+    /// Panics if `index` is out of bounds, or if `edit` changes [`InlineBox::index`].
     pub fn edit_inline_box(&mut self, index: usize, edit: impl FnOnce(&mut InlineBox)) {
         let layout_box = &mut self.data.inline_boxes[index];
-        let (text_index, is_inline_object) =
-            (layout_box.inline_box.index, layout_box.is_inline_object());
+        let text_index = layout_box.inline_box.index;
         edit(&mut layout_box.inline_box);
         assert!(
-            layout_box.inline_box.index == text_index
-                && layout_box.is_inline_object() == is_inline_object,
-            "an inline box's index and whether it is in-flow is not allowed to change"
+            layout_box.inline_box.index == text_index,
+            "an inline box's index is not allowed to change"
         );
-        if is_inline_object {
-            self.data.place_inline_object(index);
-        }
+        self.data.place_inline_object(index);
+    }
+
+    /// Iterator over floated boxes in text index order.
+    pub fn floated_boxes(&self) -> impl ExactSizeIterator<Item = &FloatedBox> + '_ {
+        self.data.floated_boxes.iter()
     }
 
     /// Returns the line containing `byte_index` and the x-coordinate of the primary caret there.
@@ -212,7 +213,8 @@ impl<B: Brush> Layout<B> {
 
         let cluster_at = |byte_index| {
             line.runs()
-                .find_map(|run| run.cluster_at_text_byte(byte_index))
+                .find(|run| run.text_range().contains(&byte_index))?
+                .cluster_at_text_byte(byte_index)
         };
         let before = byte_index.checked_sub(1).and_then(cluster_at);
         let after = cluster_at(byte_index);

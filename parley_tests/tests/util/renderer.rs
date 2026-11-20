@@ -9,7 +9,7 @@
 
 use std::collections::HashMap;
 
-use parley::{BoundingBox, GlyphRun, InlineBoxKind, Layout, PositionedLayoutItem};
+use parley::{BoundingBox, GlyphRun, Layout, PositionedLayoutItem};
 use peniko::{
     Color,
     kurbo::{self, Affine, BezPath, Rect, Stroke},
@@ -170,27 +170,25 @@ pub(crate) fn draw_layout(
                     render_glyph_run(&glyph_run, &mut renderer, &mut resources, config);
                 }
                 PositionedLayoutItem::InlineBox(inline_box) => {
-                    if inline_box.kind == InlineBoxKind::InFlow {
-                        draw_rect(
+                    draw_rect(
+                        &mut renderer,
+                        inline_box.x as f64,
+                        inline_box.y as f64,
+                        inline_box.width as f64,
+                        inline_box.height as f64,
+                        config.inline_box_color,
+                    );
+                    // Render the (first) baseline of the inline box, if it specifies one.
+                    if let Some(baseline) = inline_box.baseline {
+                        let baseline_y = (inline_box.y + baseline) as f64;
+                        renderer.set_paint(INLINE_BOX_BASELINE_COLOR);
+                        draw_line(
                             &mut renderer,
                             inline_box.x as f64,
-                            inline_box.y as f64,
-                            inline_box.width as f64,
-                            inline_box.height as f64,
-                            config.inline_box_color,
+                            baseline_y,
+                            (inline_box.x + inline_box.width) as f64,
+                            baseline_y,
                         );
-                        // Render the (first) baseline of the inline box, if it specifies one.
-                        if let Some(baseline) = inline_box.baseline {
-                            let baseline_y = (inline_box.y + baseline) as f64;
-                            renderer.set_paint(INLINE_BOX_BASELINE_COLOR);
-                            draw_line(
-                                &mut renderer,
-                                inline_box.x as f64,
-                                baseline_y,
-                                (inline_box.x + inline_box.width) as f64,
-                                baseline_y,
-                            );
-                        }
                     }
                 }
             };

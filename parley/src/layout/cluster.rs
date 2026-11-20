@@ -4,7 +4,7 @@
 use crate::layout::Style;
 use crate::layout::data::BreakReason;
 use crate::layout::layout::Layout;
-use crate::layout::line::{Line, LineItem};
+use crate::layout::line::Line;
 use crate::layout::run::Run;
 use crate::layout::spacing::Gaps;
 use crate::style::Brush;
@@ -86,41 +86,36 @@ impl<'a, B: Brush> Cluster<'a, B> {
             line_index = index;
             let mut offset = line.metrics().offset + line.metrics().inline_min_coord;
             let last_run_index = line.len().saturating_sub(1);
-            for item in line.items_nonpositioned() {
-                match item {
-                    LineItem::Run(run) => {
-                        let is_last_run = run.index as usize == last_run_index;
-                        let run_advance = run.advance();
-                        if x > offset + run_advance && (exact || !is_last_run) {
-                            offset += run_advance;
-                            continue;
-                        }
-                        for cluster in run.visual_clusters() {
-                            let is_last_cluster = is_last_run && cluster.is_line_right_end_of_run();
-                            let cluster_advance = cluster.advance();
-                            let edge = offset;
-                            offset += cluster_advance;
-                            if x > offset && (exact || !is_last_cluster) {
-                                continue;
-                            }
-                            if x < edge && exact {
-                                continue;
-                            }
-                            let side = if x <= edge + cluster_advance * 0.5 {
-                                ClusterSide::Left
-                            } else {
-                                ClusterSide::Right
-                            };
-                            return Some((cluster, side));
-                        }
+            for run in line.runs() {
+                let is_last_run = run.index as usize == last_run_index;
+                let run_advance = run.advance();
+                if x > offset + run_advance && (exact || !is_last_run) {
+                    offset += run_advance;
+                    continue;
+                }
+                for cluster in run.visual_clusters() {
+                    let is_last_cluster = is_last_run && cluster.is_line_right_end_of_run();
+                    let cluster_advance = cluster.advance();
+                    let edge = offset;
+                    offset += cluster_advance;
+                    if x > offset && (exact || !is_last_cluster) {
+                        continue;
                     }
-                    LineItem::OutOfFlowBox(_) => {}
+                    if x < edge && exact {
+                        continue;
+                    }
+                    let side = if x <= edge + cluster_advance * 0.5 {
+                        ClusterSide::Left
+                    } else {
+                        ClusterSide::Right
+                    };
+                    return Some((cluster, side));
                 }
             }
         }
         if y <= 0.0 && !exact {
             // Fall back to the first cluster of the line's first run.
-            let cluster = layout.get(line_index)?.item(0)?.run()?.clusters().next()?;
+            let cluster = layout.get(line_index)?.item(0)?.clusters().next()?;
             Some((cluster, ClusterSide::Left))
         } else {
             None
@@ -358,7 +353,6 @@ impl<'a, B: Brush> Cluster<'a, B> {
                 for run_index in run_index..line.len() {
                     if let Some(cluster) = line
                         .item(run_index)
-                        .and_then(|item| item.run())
                         .and_then(|run| run.visual_clusters().next())
                     {
                         return Some(cluster);
@@ -391,7 +385,6 @@ impl<'a, B: Brush> Cluster<'a, B> {
                 for run_index in (0..first_run).rev() {
                     if let Some(cluster) = line
                         .item(run_index)
-                        .and_then(|item| item.run())
                         .and_then(|run| run.visual_clusters_rev().next())
                     {
                         return Some(cluster);
@@ -459,23 +452,16 @@ impl<'a, B: Brush> Cluster<'a, B> {
         let line = self.line();
         let mut offset = line.metrics().offset + line.metrics().inline_min_coord;
         for run_index in 0..=self.run.index as usize {
-            let item = line.item(run_index)?;
-            match item {
-                LineItem::Run(run) => {
-                    if run_index != self.run.index as usize {
-                        offset += run.advance();
-                    } else {
-                        for cluster in run.visual_clusters() {
-                            if cluster.grapheme.char_range().start
-                                == self.grapheme.char_range().start
-                            {
-                                break;
-                            }
-                            offset += cluster.advance();
-                        }
+            let run = line.item(run_index)?;
+            if run_index != self.run.index as usize {
+                offset += run.advance();
+            } else {
+                for cluster in run.visual_clusters() {
+                    if cluster.grapheme.char_range().start == self.grapheme.char_range().start {
+                        break;
                     }
+                    offset += cluster.advance();
                 }
-                LineItem::OutOfFlowBox(_) => {}
             }
         }
         Some(offset)
@@ -545,7 +531,7 @@ impl ClusterPath {
 
     /// Returns the run for this path and the specified layout.
     pub fn run<'a, B: Brush>(&self, layout: &'a Layout<B>) -> Option<Run<'a, B>> {
-        self.line(layout)?.item(self.run_index())?.run()
+        self.line(layout)?.item(self.run_index())
     }
 
     /// Returns the cluster for this path and the specified layout.

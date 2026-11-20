@@ -12,13 +12,13 @@ type FamilyList = SmallVec<[FamilyId; 1]>;
 
 /// Maps script and language pairs to font families.
 #[derive(Clone, Default, Debug)]
-pub struct FallbackMap {
+pub(crate) struct FallbackMap {
     fallbacks: HashMap<Script, PerScript>,
 }
 
 impl FallbackMap {
     /// Returns the font fallback families for the given key.
-    pub fn get(&self, key: impl Into<FallbackKey>) -> Option<&[FamilyId]> {
+    pub(crate) fn get(&self, key: impl Into<FallbackKey>) -> Option<&[FamilyId]> {
         let key = key.into();
         let entry = self.fallbacks.get(&key.script)?;
         if key.is_default() {
@@ -38,7 +38,7 @@ impl FallbackMap {
     ///
     /// Returns `false` if we don't track that particular pair of script and
     /// language.
-    pub fn set(
+    pub(crate) fn set(
         &mut self,
         key: impl Into<FallbackKey>,
         families: impl Iterator<Item = FamilyId>,
@@ -51,7 +51,7 @@ impl FallbackMap {
     ///
     /// Returns `false` if we don't track that particular pair of script and
     /// language.
-    pub fn append(
+    pub(crate) fn append(
         &mut self,
         key: impl Into<FallbackKey>,
         families: impl Iterator<Item = FamilyId>,

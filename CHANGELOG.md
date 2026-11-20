@@ -14,7 +14,7 @@ Every change to this file must be written by a human.
 
 ## [Unreleased]
 
-This release has an [MSRV] of 1.88.
+This release has an [MSRV] of 1.96.
 
 ## [0.13.0] - 2026-11-06
 

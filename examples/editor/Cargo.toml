@@ -14,7 +14,7 @@ winit = "0.30.13"
 parley = { workspace = true, default-features = true, features = ["bytemuck"] }
 bytemuck = { workspace = true }
 peniko = { workspace = true, default-features = false, features = ["std"] }
-skrifa = { workspace = true }
+skrifa = { workspace = true, features = ["std"] }
 accesskit = "0.25.1"
 accesskit_winit = "0.34.1"
 

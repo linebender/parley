@@ -28,7 +28,7 @@ pub struct ShapedSlice<'a> {
     pub(crate) glyphs: &'a [Glyph],
 
     /// The range of [`Self::shaped_clusters`] this slice covers.
-    pub(crate) clusters: (u32, u32),
+    pub(crate) clusters: core::range::Range<u32>,
 }
 
 impl<'a> ShapedSlice<'a> {
@@ -37,13 +37,13 @@ impl<'a> ShapedSlice<'a> {
     /// This indexes into [`Self::characters`].
     #[inline(always)]
     pub fn char_range(&self) -> Range<u32> {
-        if self.clusters.0 == self.clusters.1 {
+        if self.clusters.start == self.clusters.end {
             0..0
         } else {
-            self.shaped_clusters[self.clusters.0 as usize]
+            self.shaped_clusters[self.clusters.start as usize]
                 .chars_range()
                 .start
-                ..self.shaped_clusters[self.clusters.1 as usize - 1]
+                ..self.shaped_clusters[self.clusters.end as usize - 1]
                     .chars_range()
                     .end
         }
@@ -67,9 +67,6 @@ impl<'a> ShapedSlice<'a> {
     /// This is `false` for an empty slice.
     ///
     /// [`ShapedRun`]: crate::ShapedRun
-    //
-    // TODO: once reshaping lands, perhaps also mention it here (if we indeed allow reshaping
-    // partial graphemes).
     #[inline]
     pub fn grapheme_continues_before(&self) -> bool {
         let char_range = self.char_range();
@@ -108,7 +105,7 @@ impl<'a> ShapedSlice<'a> {
     /// This indexes into [`Self::shaped_clusters`].
     #[inline(always)]
     pub fn shaped_clusters_range(&self) -> Range<u32> {
-        self.clusters.0..self.clusters.1
+        self.clusters.into()
     }
 
     /// The [`ShapedCluster`]s spanned by this shaped slice.
@@ -122,8 +119,8 @@ impl<'a> ShapedSlice<'a> {
     pub fn shaped_clusters_in(&self, clusters_range: Range<u32>) -> &'a [ShapedCluster] {
         debug_assert!(
             clusters_range.is_empty()
-                || (self.clusters.0 <= clusters_range.start
-                    && clusters_range.end <= self.clusters.1),
+                || (self.clusters.start <= clusters_range.start
+                    && clusters_range.end <= self.clusters.end),
             "cluster range out of this slice's range"
         );
         &self.shaped_clusters[clusters_range.start as usize..clusters_range.end as usize]
@@ -171,7 +168,7 @@ impl<'a> ShapedSlice<'a> {
     #[inline]
     pub fn shaped_cluster_glyphs(&self, cluster_idx: u32) -> ShapedClusterGlyphs<'a> {
         debug_assert!(
-            self.clusters.0 <= cluster_idx && cluster_idx < self.clusters.1,
+            self.clusters.start <= cluster_idx && cluster_idx < self.clusters.end,
             "cluster index out of this slice's range"
         );
 
@@ -202,7 +199,7 @@ impl<'a> ShapedSlice<'a> {
     /// Immediately going backwards will return `None`.
     #[inline(always)]
     pub fn atoms_start(&self) -> Atoms<'a> {
-        self.atoms_from(self.clusters.0)
+        self.atoms_from(self.clusters.start)
     }
 
     /// Get a cursor to walk atoms from the logical end of this slice.
@@ -211,7 +208,7 @@ impl<'a> ShapedSlice<'a> {
     /// Immediately going forwards will return `None`.
     #[inline(always)]
     pub fn atoms_end(&self) -> Atoms<'a> {
-        self.atoms_from(self.clusters.1)
+        self.atoms_from(self.clusters.end)
     }
 
     /// Get a cursor to walk atoms of this slice, starting at the atom boundary at `cluster`.
@@ -225,12 +222,12 @@ impl<'a> ShapedSlice<'a> {
     #[inline(always)]
     pub fn atoms_from(&self, cluster: u32) -> Atoms<'a> {
         debug_assert!(
-            self.clusters.0 <= cluster && cluster <= self.clusters.1,
+            self.clusters.start <= cluster && cluster <= self.clusters.end,
             "cluster out of this slice's range"
         );
         debug_assert!(
-            cluster == self.clusters.0
-                || cluster == self.clusters.1
+            cluster == self.clusters.start
+                || cluster == self.clusters.end
                 || self.shaped_clusters[cluster as usize].is_grapheme_start(),
             "cluster is not an atom boundary"
         );
@@ -250,7 +247,7 @@ impl<'a> ShapedSlice<'a> {
     #[expect(clippy::cast_possible_truncation, reason = "deferred")]
     pub fn atom_at_char(&self, char_index: u32) -> Option<Atom<'a>> {
         let shaped_clusters =
-            &self.shaped_clusters[self.clusters.0 as usize..self.clusters.1 as usize];
+            &self.shaped_clusters[self.clusters.start as usize..self.clusters.end as usize];
 
         let idx = shaped_clusters
             .partition_point(|cluster| cluster.chars_range().start <= char_index)
@@ -260,8 +257,8 @@ impl<'a> ShapedSlice<'a> {
         }
 
         let mut idx = idx as u32;
-        idx += self.clusters.0;
-        while idx > self.clusters.0 && !self.shaped_clusters[idx as usize].is_grapheme_start() {
+        idx += self.clusters.start;
+        while idx > self.clusters.start && !self.shaped_clusters[idx as usize].is_grapheme_start() {
             idx -= 1;
         }
 
@@ -278,7 +275,7 @@ impl<'a> ShapedSlice<'a> {
     #[expect(clippy::cast_possible_truncation, reason = "deferred")]
     pub fn atom_at_text_byte(&self, text_byte: u32) -> Option<Atom<'a>> {
         let shaped_clusters =
-            &self.shaped_clusters[self.clusters.0 as usize..self.clusters.1 as usize];
+            &self.shaped_clusters[self.clusters.start as usize..self.clusters.end as usize];
 
         let idx = shaped_clusters
             .partition_point(|cluster| {
@@ -291,8 +288,8 @@ impl<'a> ShapedSlice<'a> {
         }
 
         let mut idx = idx as u32;
-        idx += self.clusters.0;
-        while idx > self.clusters.0 && !self.shaped_clusters[idx as usize].is_grapheme_start() {
+        idx += self.clusters.start;
+        while idx > self.clusters.start && !self.shaped_clusters[idx as usize].is_grapheme_start() {
             idx -= 1;
         }
 
@@ -314,11 +311,11 @@ impl<'a> ShapedSlice<'a> {
             "narrowed cluster range is inverted"
         );
         debug_assert!(
-            self.clusters.0 <= clusters.start && clusters.end <= self.clusters.1,
+            self.clusters.start <= clusters.start && clusters.end <= self.clusters.end,
             "narrowed cluster range out of this slice's range"
         );
         Self {
-            clusters: (clusters.start, clusters.end),
+            clusters: clusters.into(),
             ..*self
         }
     }
@@ -327,7 +324,7 @@ impl<'a> ShapedSlice<'a> {
     #[inline]
     pub fn graphemes_start(&self) -> Graphemes<'a> {
         let char_range = self.char_range();
-        let cluster_idx = self.clusters.0;
+        let cluster_idx = self.clusters.start;
         Graphemes {
             slice: *self,
             char_idx: char_range.start,
@@ -340,7 +337,7 @@ impl<'a> ShapedSlice<'a> {
     #[inline]
     pub fn graphemes_end(&self) -> Graphemes<'a> {
         let char_range = self.char_range();
-        let cluster_idx = self.clusters.1.max(self.clusters.0 + 1) - 1;
+        let cluster_idx = self.clusters.end.max(self.clusters.start + 1) - 1;
         Graphemes {
             slice: *self,
             // char_range,
@@ -352,7 +349,7 @@ impl<'a> ShapedSlice<'a> {
 
     #[inline(always)]
     fn partial_advance_at(&self, cluster_idx: u32) -> f32 {
-        if self.clusters.0 == self.clusters.1 {
+        if self.clusters.start == self.clusters.end {
             return 0.0;
         }
         let cluster = &self.shaped_clusters[cluster_idx as usize];
@@ -431,7 +428,7 @@ impl<'a> Atoms<'a> {
     #[inline]
     pub fn prev(&mut self) -> Option<Atom<'a>> {
         let end = self.cluster_idx;
-        let bound = self.slice.clusters.0;
+        let bound = self.slice.clusters.start;
         if end == bound {
             return None;
         }
@@ -445,13 +442,12 @@ impl<'a> Atoms<'a> {
         self.cluster_idx = idx;
         Some(Atom {
             slice: self.slice,
-            clusters: (idx, end),
-            chars: (
-                self.slice.shaped_clusters[idx as usize].chars_range().start,
-                self.slice.shaped_clusters[end as usize - 1]
+            clusters: (idx..end).into(),
+            chars: (self.slice.shaped_clusters[idx as usize].chars_range().start
+                ..self.slice.shaped_clusters[end as usize - 1]
                     .chars_range()
-                    .end,
-            ),
+                    .end)
+                .into(),
             advance,
         })
     }
@@ -472,7 +468,7 @@ impl<'a> Iterator for Atoms<'a> {
     #[inline]
     fn next(&mut self) -> Option<Atom<'a>> {
         let start = self.cluster_idx;
-        let bound = self.slice.clusters.1;
+        let bound = self.slice.clusters.end;
         if start == bound {
             return None;
         }
@@ -486,15 +482,14 @@ impl<'a> Iterator for Atoms<'a> {
         self.cluster_idx = idx;
         Some(Atom {
             slice: self.slice,
-            clusters: (start, idx),
-            chars: (
-                self.slice.shaped_clusters[start as usize]
+            clusters: (start..idx).into(),
+            chars: (self.slice.shaped_clusters[start as usize]
+                .chars_range()
+                .start
+                ..self.slice.shaped_clusters[idx as usize - 1]
                     .chars_range()
-                    .start,
-                self.slice.shaped_clusters[idx as usize - 1]
-                    .chars_range()
-                    .end,
-            ),
+                    .end)
+                .into(),
             advance,
         })
     }
@@ -512,10 +507,10 @@ pub struct Atom<'a> {
     slice: ShapedSlice<'a>,
 
     /// The clusters this atom spans inside [`ShapedSlice::shaped_clusters`].
-    clusters: (u32, u32),
+    clusters: core::range::Range<u32>,
 
     /// The characters this atom spans inside [`ShapedSlice::characters`].
-    chars: (u32, u32),
+    chars: core::range::Range<u32>,
 
     advance: f32,
 }
@@ -525,7 +520,7 @@ impl<'a> Atom<'a> {
     /// You can use [`ShapedSlice::text_byte_range`] to turn this into a byte range of the source
     /// text.
     pub fn char_range(&self) -> Range<u32> {
-        self.chars.0..self.chars.1
+        self.chars.into()
     }
 
     /// The [`Character`]s from the underlying [`ShapedSlice`] this atom spans.
@@ -537,7 +532,7 @@ impl<'a> Atom<'a> {
     /// The range of [`ShapedCluster`] into the underlying [`ShapedSlice`] this atom spans.
     #[inline(always)]
     pub fn shaped_clusters_range(&self) -> Range<u32> {
-        self.clusters.0..self.clusters.1
+        self.clusters.into()
     }
 
     /// The [`ShapedCluster`]s from the underlying [`ShapedSlice`] this atom spans.
@@ -570,7 +565,7 @@ impl<'a> Atom<'a> {
     /// Whether there is a soft wrap opportunity logically before this atom.
     #[inline(always)]
     pub fn is_soft_wrap_opportunity_before(&self) -> bool {
-        self.slice.characters[self.chars.0 as usize]
+        self.slice.characters[self.chars.start as usize]
             .flags
             .is_soft_wrap_opportunity()
     }
@@ -580,7 +575,7 @@ impl<'a> Atom<'a> {
     /// See also [`ShapedCluster::is_safe_to_break_before`].
     #[inline(always)]
     pub fn is_safe_to_break_before(&self) -> bool {
-        self.slice.shaped_clusters[self.clusters.0 as usize].is_safe_to_break_before()
+        self.slice.shaped_clusters[self.clusters.start as usize].is_safe_to_break_before()
     }
 
     /// Whether this atom is an inline object.
@@ -588,7 +583,7 @@ impl<'a> Atom<'a> {
     /// See [`ShapedCluster::is_inline_object`].
     #[inline(always)]
     pub fn is_inline_object(&self) -> bool {
-        self.slice.shaped_clusters[self.clusters.0 as usize].is_inline_object()
+        self.slice.shaped_clusters[self.clusters.start as usize].is_inline_object()
     }
 
     /// The atom's total advance.
@@ -605,7 +600,7 @@ impl<'a> Atom<'a> {
     /// [`ShapedSlice::grapheme_continues_before`].
     #[inline]
     pub fn grapheme_continues_before(&self) -> bool {
-        !self.slice.characters[self.chars.0 as usize].grapheme_start
+        !self.slice.characters[self.chars.start as usize].grapheme_start
     }
 
     /// Whether this atom's grapheme continues after the atom's last character.
@@ -616,7 +611,7 @@ impl<'a> Atom<'a> {
     pub fn grapheme_continues_after(&self) -> bool {
         self.slice
             .characters
-            .get(self.chars.1 as usize)
+            .get(self.chars.end as usize)
             .is_some_and(|character| !character.grapheme_start)
     }
 
@@ -624,7 +619,7 @@ impl<'a> Atom<'a> {
     pub fn cursor_before(&self) -> Atoms<'a> {
         Atoms {
             slice: self.slice,
-            cluster_idx: self.clusters.0,
+            cluster_idx: self.clusters.start,
         }
     }
 
@@ -632,7 +627,7 @@ impl<'a> Atom<'a> {
     pub fn cursor_after(&self) -> Atoms<'a> {
         Atoms {
             slice: self.slice,
-            cluster_idx: self.clusters.1,
+            cluster_idx: self.clusters.end,
         }
     }
 }
@@ -700,7 +695,7 @@ impl<'a> Graphemes<'a> {
         let first_char = self.slice.characters[idx as usize];
         self.char_idx = idx;
         Some(Grapheme {
-            chars: (idx, grapheme_end),
+            chars: (idx..grapheme_end).into(),
             advance,
             flags: GraphemeFlags::new(
                 first_char.flags.is_soft_wrap_opportunity(),
@@ -768,7 +763,7 @@ impl<'a> Iterator for Graphemes<'a> {
         let first_char = self.slice.characters[grapheme_start as usize];
         self.char_idx = idx;
         Some(Grapheme {
-            chars: (grapheme_start, idx),
+            chars: (grapheme_start..idx).into(),
             advance,
             flags: GraphemeFlags::new(
                 first_char.flags.is_soft_wrap_opportunity(),
@@ -895,7 +890,7 @@ impl GraphemeFlags {
 #[derive(Clone, Copy, Debug, PartialEq)]
 pub struct Grapheme {
     /// The characters this grapheme spans inside [`ShapedSlice::characters`].
-    chars: (u32, u32),
+    chars: core::range::Range<u32>,
 
     advance: f32,
     flags: GraphemeFlags,
@@ -904,7 +899,7 @@ pub struct Grapheme {
 impl Grapheme {
     /// The range of characters into the underlying [`ShapedSlice`] this grapheme spans.
     pub fn char_range(&self) -> Range<u32> {
-        self.chars.0..self.chars.1
+        self.chars.into()
     }
 
     /// The advance of the grapheme.

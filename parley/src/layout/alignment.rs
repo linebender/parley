@@ -1,8 +1,8 @@
 // Copyright 2024 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
+use super::BreakReason;
 use super::spacing::{EffectiveSpacing, push_cluster_gaps};
-use super::{BreakReason, LayoutItemKind};
 use crate::data::LayoutData;
 use crate::style::Brush;
 
@@ -147,11 +147,8 @@ pub(crate) fn align<B: Brush>(layout: &mut LayoutData<B>) {
         if !line.has_spacing && line.justification.amount_per_opportunity == 0. {
             continue;
         }
-        for item in &mut layout.line_items[line.item_range.clone()] {
+        for item in &mut layout.line_items[line.item_range] {
             item.gaps_start = None;
-            if item.kind != LayoutItemKind::TextRun {
-                continue;
-            }
             let spacing =
                 EffectiveSpacing::new(layout.runs[item.index].spacing, line.justification);
             if spacing.is_zero() {
@@ -160,7 +157,7 @@ pub(crate) fn align<B: Brush>(layout: &mut LayoutData<B>) {
             let slice = layout
                 .shaped_text
                 .run_slice(item.index as u32)
-                .narrow(item.shaped_cluster_range.clone());
+                .narrow(item.shaped_cluster_range.into());
             item.gaps_start = Some(layout.cluster_gaps.len() as u32);
             push_cluster_gaps(&mut layout.cluster_gaps, slice, spacing, item.is_rtl());
         }
