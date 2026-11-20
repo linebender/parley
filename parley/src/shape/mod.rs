@@ -386,6 +386,7 @@ impl<'a, 'b, B: Brush> parley_engine::FontSelector for FontSelector<'a, 'b, B> {
                         .is_some_and(|g| g != 0)
             });
             if let Some(None) = charmap {
+                core::hint::cold_path();
                 return fontique::QueryStatus::Continue;
             }
             if coverage > best_coverage {
