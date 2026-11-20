@@ -260,14 +260,14 @@ fn shape_segment(
 ) -> Result<(), ()> {
     select_font.begin_segment(segment, options);
 
-    let text_range = &segment.range.byte_range;
-    let char_range = &segment.range.char_range;
+    let text_range = segment.range.byte_range;
+    let char_range = segment.range.char_range;
 
-    let segment_text = &text[text_range.clone()];
+    let segment_text = &text[text_range];
 
     // Only process current segment
-    let segment_char_info = &char_info[char_range.start..char_range.end];
-    let segment_char_style_indices = &char_style_indices[char_range.start..char_range.end];
+    let segment_char_info = &char_info[char_range];
+    let segment_char_style_indices = &char_style_indices[char_range];
 
     if segment_text.is_empty() {
         return Ok(()); // No clusters
@@ -353,7 +353,7 @@ fn shape_segment(
         });
 
         // Use the entire run text including newlines.
-        let run_text = &text[range.byte_range.clone()];
+        let run_text = &text[range.byte_range];
         buffer.reserve(run_text.len());
         #[expect(clippy::cast_possible_truncation, reason = "Deferred")]
         for (i, ch) in run_text.chars().enumerate() {
@@ -423,8 +423,8 @@ fn shape_segment(
         char_cluster.fill(chars.by_ref().take(grapheme_length), &mut byte_end);
         char_end += grapheme_length;
         let grapheme = TextRange {
-            byte_range: byte_start..byte_end,
-            char_range: char_start..char_end,
+            byte_range: (byte_start..byte_end).into(),
+            char_range: (char_start..char_end).into(),
         };
 
         // An object is shaped as a run of its own, to ensure it becomes its own shaped cluster. It

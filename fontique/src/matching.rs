@@ -28,7 +28,7 @@ pub(crate) fn match_fonts(
     })
 }
 
-pub fn match_font(
+pub(crate) fn match_font(
     set: &[FontInfo],
     width: FontWidth,
     style: FontStyle,

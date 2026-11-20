@@ -38,7 +38,7 @@ Note that Attributed Text requires that an allocator is available (i.e. it uses 
 
 ## Minimum supported Rust Version (MSRV)
 
-This version of Attributed Text has been verified to compile with **Rust 1.88** and later.
+This version of Attributed Text has been verified to compile with **Rust 1.96** and later.
 
 Future versions of Attributed Text might increase the Rust version requirement.
 It will not be treated as a breaking change and as such can even happen with small patch releases.

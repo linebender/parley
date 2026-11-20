@@ -72,7 +72,7 @@ impl<'a, B: Brush> Run<'a, B> {
     pub(crate) fn line_slice(&self) -> ShapedSlice<'a> {
         let slice = self.full_slice();
         match self.line_data {
-            Some(line_data) => slice.narrow(line_data.shaped_cluster_range.clone()),
+            Some(line_data) => slice.narrow(line_data.shaped_cluster_range.into()),
             None => slice,
         }
     }
@@ -116,7 +116,7 @@ impl<'a, B: Brush> Run<'a, B> {
             .data
             .shaped_text
             .normalized_coords()
-            .get(self.shaped.normalized_coords_range.clone())
+            .get(self.shaped.normalized_coords_range)
             .unwrap_or(&[])
     }
 
@@ -131,9 +131,10 @@ impl<'a, B: Brush> Run<'a, B> {
         // TODO: Maybe use a different data type than run in that case?
         let item = self.line_data.unwrap();
         let start = item.gaps_start? as usize;
+        let clusters = item.shaped_cluster_range;
         Some(RunGaps::new(
-            &self.layout.data.cluster_gaps[start..start + item.shaped_cluster_range.len()],
-            item.shaped_cluster_range.start,
+            &self.layout.data.cluster_gaps[start..start + (clusters.end - clusters.start) as usize],
+            clusters.start,
         ))
     }
 
@@ -162,9 +163,8 @@ impl<'a, B: Brush> Run<'a, B> {
     /// Returns the original text range for the run.
     pub fn text_range(&self) -> Range<usize> {
         self.line_data
-            .map(|d| &d.text_range)
-            .unwrap_or(&self.shaped.range.byte_range)
-            .clone()
+            .map_or(self.shaped.range.byte_range, |d| d.text_range)
+            .into()
     }
 
     /// Returns `true` if the run has right-to-left directionality.

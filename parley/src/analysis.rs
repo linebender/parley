@@ -38,13 +38,13 @@ pub(crate) fn analyze_text<B: Brush>(
                 {
                     range.end = style_run.range.end;
                 }
-                _ => lcx.line_break.push((style_run.range.clone(), line_break)),
+                _ => lcx.line_break.push((style_run.range.into(), line_break)),
             }
         }
         if style.white_space_collapse == WhiteSpaceCollapse::BreakSpaces {
             match lcx.break_spaces.last_mut() {
                 Some(last) if last.end == style_run.range.start => last.end = style_run.range.end,
-                _ => lcx.break_spaces.push(style_run.range.clone()),
+                _ => lcx.break_spaces.push(style_run.range.into()),
             }
         }
     }

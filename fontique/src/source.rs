@@ -87,7 +87,7 @@ impl core::fmt::Debug for SourceKind {
 #[cfg(feature = "std")]
 /// Map for deduplicating font data file paths.
 #[derive(Default)]
-pub struct SourcePathMap {
+pub(crate) struct SourcePathMap {
     map: HashMap<Arc<Path>, SourceInfo>,
 }
 
@@ -95,7 +95,7 @@ pub struct SourcePathMap {
 impl SourcePathMap {
     /// Converts a path string into a font data object, creating it if it
     /// doesn't already exist.
-    pub fn get_or_insert(&mut self, path: &Path) -> SourceInfo {
+    pub(crate) fn get_or_insert(&mut self, path: &Path) -> SourceInfo {
         if let Some(source) = self.map.get(path) {
             source.clone()
         } else {

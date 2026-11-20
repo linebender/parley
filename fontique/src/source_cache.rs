@@ -179,7 +179,7 @@ impl Shared {
         }
     }
 
-    pub fn get(&mut self, id: SourceId, path: &Path) -> Option<Blob<u8>> {
+    fn get(&mut self, id: SourceId, path: &Path) -> Option<Blob<u8>> {
         use hashbrown::hash_map::Entry as HashEntry;
         match self.cache.entry(id) {
             HashEntry::Vacant(vacant) => {
