@@ -595,7 +595,7 @@ pub struct MaxHeightBreakData {
 /// Information about a floated box (where control flow has been yielded due to a
 /// [floated box](crate::FloatedBox) being encountered during layout).
 pub struct FloatedBoxData {
-    /// The user-supplied ID for the floated box
+    /// The [`FloatedBox::id`](crate::FloatedBox::id) of the floated box that was encountered.
     pub id: u64,
     /// The index of the floated box within [`Layout::floated_boxes`]
     pub index: usize,

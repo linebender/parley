@@ -235,6 +235,8 @@ pub enum PositionedLayoutItem<'a, B: Brush> {
 /// The computed position of an inline box within a layout
 #[derive(Debug, Clone)]
 pub struct PositionedInlineBox {
+    /// The [`InlineBox::id`](crate::InlineBox::id) of this box.
+    pub id: u64,
     pub x: f32,
     pub y: f32,
     pub width: f32,
@@ -244,7 +246,6 @@ pub struct PositionedInlineBox {
     /// This is `None` if the box does not specify a baseline, in which case its bottom edge is
     /// aligned with the text baseline.
     pub baseline: Option<f32>,
-    pub id: u64,
 }
 
 /// Sequence of fully positioned glyphs with the same style.

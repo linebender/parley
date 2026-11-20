@@ -13,8 +13,8 @@ use crate::VerticalAlign;
 /// [atomic inlines]: https://www.w3.org/TR/css-display-3/#atomic-inline
 #[derive(PartialEq, Debug, Clone)]
 pub struct InlineBox {
-    /// User-specified identifier for the box, which can be used by the user to determine which box in
-    /// parley's output corresponds to which box in its input.
+    /// An identifier of your choosing, which Parley doesn't interpret. It is copied to
+    /// [`PositionedInlineBox::id`](crate::PositionedInlineBox::id).
     pub id: u64,
     /// The byte offset into the underlying text string at which the box is placed.
     ///
@@ -49,8 +49,8 @@ pub struct InlineBox {
 /// use e.g. [`Layout::primary_caret`](crate::Layout::primary_caret).
 #[derive(PartialEq, Debug, Clone)]
 pub struct FloatedBox {
-    /// User-specified identifier for the box, which can be used by the user to determine which box in
-    /// parley's output corresponds to which box in its input.
+    /// An identifier of your choosing, which Parley doesn't interpret. It is copied to
+    /// [`FloatedBoxData::id`](crate::FloatedBoxData::id).
     pub id: u64,
     /// The byte offset into the underlying text string at which the box is placed.
     ///
