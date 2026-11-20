@@ -6,9 +6,10 @@
 use std::borrow::Cow;
 
 use crate::test_name;
-use crate::util::{TestEnv, samples};
+use crate::util::{ColorBrush, TestEnv, samples};
 use parley::setting::Tag;
 use parley::style::{FontFeature, FontFeatures, FontVariation, FontVariations, StyleProperty};
+use peniko::color::palette::css;
 
 // ============================================================================
 // FontVariations Tests
@@ -281,4 +282,31 @@ fn style_locale_mixed_bidi() {
     layout_en.break_all_lines(None);
 
     env.with_name("en").check_layout_snapshot(&layout_en);
+}
+
+// ============================================================================
+// Shaping Split Tests
+// ============================================================================
+
+#[test]
+fn shaping_split() {
+    let mut env = TestEnv::new(test_name!(), None);
+    let text = "office";
+    let middle_f = 2..3;
+
+    for split in [false, true] {
+        let mut builder = env.ranged_builder(text);
+        builder.push(
+            StyleProperty::Brush(ColorBrush::new(css::RED)),
+            middle_f.clone(),
+        );
+        if split {
+            builder.push_shaping_split(middle_f.start);
+            builder.push_shaping_split(middle_f.end);
+        }
+        let mut layout = builder.build(text);
+        layout.break_all_lines(None);
+
+        env.check_layout_snapshot(&layout);
+    }
 }
