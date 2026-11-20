@@ -213,7 +213,8 @@ impl<B: Brush> Layout<B> {
 
         let cluster_at = |byte_index| {
             line.runs()
-                .find_map(|run| run.cluster_at_text_byte(byte_index))
+                .find(|run| run.text_range().contains(&byte_index))?
+                .cluster_at_text_byte(byte_index)
         };
         let before = byte_index.checked_sub(1).and_then(cluster_at);
         let after = cluster_at(byte_index);
