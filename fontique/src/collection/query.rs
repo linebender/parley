@@ -155,15 +155,19 @@ impl<'a> Query<'a> {
             );
             let mut fonts = bucket.iter();
             let mut default = Some(&mut family.default);
-            while let Some(font) = fonts.next().or_else(|| {
-                load_font(
-                    family_info,
-                    self.attributes,
-                    default.take()?,
-                    self.source_cache,
-                )
-            }) {
-                if font.family_index() == family_info.default_font_index() {
+            let default_index = family_info.default_font_index();
+            loop {
+                let font = if let Some(font) = fonts.next() {
+                    font
+                } else {
+                    let Some(font) = default.take().and_then(|default| {
+                        load_font(family_info, self.attributes, default, self.source_cache)
+                    }) else {
+                        break;
+                    };
+                    font
+                };
+                if font.family_index == default_index {
                     default = None;
                 }
                 if f(font.candidate(family_info, self.requests)) == QueryStatus::Stop {
@@ -340,10 +344,11 @@ impl QueryFont {
 }
 
 #[derive(Clone)]
-enum CachedQueryCandidate {
-    Loaded(QueryFont),
-    /// The index of a deferred font in the family font list.
-    Deferred(usize),
+struct CachedQueryCandidate {
+    /// The index of the font in the family font list.
+    family_index: usize,
+    /// `None` if the font is deferred.
+    font: Option<QueryFont>,
 }
 
 impl CachedQueryCandidate {
@@ -356,24 +361,27 @@ impl CachedQueryCandidate {
     ) -> Option<Self> {
         let font_info = family.fonts().get(index)?;
         if matches!(font_info.source().kind(), SourceKind::Deferred) {
-            return Some(Self::Deferred(index));
+            return Some(Self {
+                family_index: index,
+                font: None,
+            });
         }
-        Some(Self::Loaded(QueryFont {
-            id: font_info.id(),
-            family: (family.id(), index),
-            blob: font_info.load(Some(source_cache))?,
-            index: font_info.index(),
-            synthesis: font_info.synthesis(attributes.width, attributes.style, attributes.weight),
-            charmap_index: font_info.charmap_index(),
-            unicode_range: font_info.unicode_range().cloned(),
-        }))
-    }
-
-    fn family_index(&self) -> usize {
-        match self {
-            Self::Loaded(font) => font.family.1,
-            Self::Deferred(index) => *index,
-        }
+        Some(Self {
+            family_index: index,
+            font: Some(QueryFont {
+                id: font_info.id(),
+                family: (family.id(), index),
+                blob: font_info.load(Some(source_cache))?,
+                index: font_info.index(),
+                synthesis: font_info.synthesis(
+                    attributes.width,
+                    attributes.style,
+                    attributes.weight,
+                ),
+                charmap_index: font_info.charmap_index(),
+                unicode_range: font_info.unicode_range().cloned(),
+            }),
+        })
     }
 
     #[inline]
@@ -382,12 +390,15 @@ impl CachedQueryCandidate {
         family: &'a FamilyInfo,
         requests: &'a mut HashSet<FontId>,
     ) -> QueryCandidate<'q, 'a> {
-        match self {
-            Self::Loaded(font) => QueryCandidate::Font(font),
-            Self::Deferred(index) => QueryCandidate::Deferred(DeferredFont {
-                font: &family.fonts()[*index],
-                requests,
-            }),
+        match &self.font {
+            Some(font) => QueryCandidate::Font(font),
+            None => {
+                core::hint::cold_path();
+                QueryCandidate::Deferred(DeferredFont {
+                    font: &family.fonts()[self.family_index],
+                    requests,
+                })
+            }
         }
     }
 }
