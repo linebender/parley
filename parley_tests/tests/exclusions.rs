@@ -54,7 +54,7 @@ mod circle {
                     state.set_line_x(line_x);
                     state.set_line_max_advance(line_width.max(MIN_LINE_WIDTH));
                 }
-                YieldData::InlineBoxBreak(_) => {}
+                YieldData::FloatedBox(_) => {}
                 YieldData::MaxHeightExceeded(data) => {
                     panic!("Unexpected max-height break at {}", data.line_height);
                 }
@@ -139,7 +139,7 @@ mod waterfall {
                     }
                     state.set_line_x(next_offset);
                 }
-                YieldData::InlineBoxBreak(_) | YieldData::MaxHeightExceeded(_) => {}
+                YieldData::FloatedBox(_) | YieldData::MaxHeightExceeded(_) => {}
             }
         }
     }
@@ -200,7 +200,7 @@ mod zigzag {
                         state.set_line_x(0.0);
                     }
                 }
-                YieldData::InlineBoxBreak(_) | YieldData::MaxHeightExceeded(_) => {}
+                YieldData::FloatedBox(_) | YieldData::MaxHeightExceeded(_) => {}
             }
         }
     }
