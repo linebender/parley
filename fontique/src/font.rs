@@ -3,9 +3,10 @@
 
 //! Model for a font.
 
-use crate::{CharmapIndex, UnicodeRangeSet};
+use crate::{AtomicCounter, CharmapIndex, UnicodeRangeSet};
+use core::sync::atomic::Ordering;
 
-use super::source::{SourceInfo, SourceKind};
+use super::source::{SourceId, SourceInfo, SourceKind};
 use super::{Blob, source_cache::SourceCache};
 use crate::{FontStyle, FontWeight, FontWidth};
 use parlance::Synthesis;
@@ -14,9 +15,31 @@ use smallvec::SmallVec;
 
 type AxisVec = SmallVec<[AxisInfo; 1]>;
 
+/// Unique identifier for a font.
+///
+/// Every [`FontInfo`] is given one when it is created, and keeps it when it is cloned or has
+/// overrides applied, so an identifier names the same font in every copy of a collection.
+#[derive(Copy, Clone, PartialEq, Eq, PartialOrd, Ord, Hash, Debug)]
+#[repr(transparent)]
+pub struct FontId(u64);
+
+impl FontId {
+    fn new() -> Self {
+        static ID_COUNTER: AtomicCounter = AtomicCounter::new(1);
+        #[allow(clippy::useless_conversion, reason = "Not useless on 32-bit platforms")]
+        Self(ID_COUNTER.fetch_add(1, Ordering::Relaxed).into())
+    }
+
+    /// Returns the underlying integer value.
+    pub fn to_u64(self) -> u64 {
+        self.0
+    }
+}
+
 /// Representation of a single font in a family.
 #[derive(Clone, Debug)]
 pub struct FontInfo {
+    id: FontId,
     source: SourceInfo,
     index: u32,
     width: FontWidth,
@@ -43,7 +66,13 @@ impl FontInfo {
                 let font = FontRef::from_index(memory.as_ref(), index).ok()?;
                 Self::from_font_ref(&font, source.clone(), index)
             }
+            SourceKind::Deferred => None,
         }
+    }
+
+    /// Returns the unique identifier for the font.
+    pub fn id(&self) -> FontId {
+        self.id
     }
 
     /// Returns an object describing how to locate the data containing this
@@ -66,6 +95,7 @@ impl FontInfo {
                 SourceKind::Memory(blob) => Some(blob.clone()),
                 #[cfg(feature = "std")]
                 SourceKind::Path(path) => super::source_cache::load_blob(path),
+                SourceKind::Deferred => None,
             }
         }
     }
@@ -248,6 +278,7 @@ impl FontInfo {
             (SmallVec::default(), 0)
         };
         Some(Self {
+            id: FontId::new(),
             source,
             index,
             width,
@@ -258,6 +289,48 @@ impl FontInfo {
             charmap_index,
             unicode_range: None,
         })
+    }
+
+    /// Creates a font whose data is not available yet, see
+    /// [`Collection::register_deferred_font`](crate::Collection::register_deferred_font).
+    pub(crate) fn deferred(info: &FontInfoOverride<'_>) -> Self {
+        // The axis defaults are kept to be applied once the data is supplied.
+        let axis = |&(tag, default): &(Tag, f32)| AxisInfo {
+            tag,
+            default,
+            ..Default::default()
+        };
+        Self {
+            id: FontId::new(),
+            source: SourceInfo::new(SourceId::new(), SourceKind::Deferred),
+            index: 0,
+            width: info.width.unwrap_or_default(),
+            style: info.style.unwrap_or_default(),
+            weight: info.weight.unwrap_or_default(),
+            axes: info.axes.unwrap_or(&[]).iter().map(axis).collect(),
+            attr_axes: 0,
+            charmap_index: CharmapIndex::DEFERRED,
+            unicode_range: info.unicode_range.cloned(),
+        }
+    }
+
+    /// Returns this deferred font with its data, keeping its identifiers and what the font was
+    /// registered with.
+    pub(crate) fn supply(&self, data: Blob<u8>, index: u32) -> Option<Self> {
+        let font = FontRef::from_index(data.as_ref(), index).ok()?;
+        let source = SourceInfo::new(self.source.id, SourceKind::Memory(data.clone()));
+        let mut supplied = Self::from_font_ref(&font, source, index)?;
+        let axes: SmallVec<[_; 1]> = self.axes.iter().map(|a| (a.tag, a.default)).collect();
+        supplied.apply_override(&FontInfoOverride {
+            family_name: None,
+            width: Some(self.width),
+            style: Some(self.style),
+            weight: Some(self.weight),
+            axes: Some(&axes),
+            unicode_range: self.unicode_range.as_ref(),
+        });
+        supplied.id = self.id;
+        Some(supplied)
     }
 
     #[allow(unused)]

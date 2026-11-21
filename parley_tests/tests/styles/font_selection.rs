@@ -249,3 +249,43 @@ fn style_font_unicode_range_decomposition() {
         );
     }
 }
+
+/// Text requests the first deferred font it is in range of, and is shaped with the other fonts.
+#[test]
+fn style_font_deferred() {
+    use fontique::UnicodeRangeSet;
+
+    let mut env = TestEnv::new(test_name!(), None);
+    let mut register = |family, range| {
+        let range = UnicodeRangeSet::new([range]);
+        let info = FontInfoOverride {
+            unicode_range: Some(&range),
+            ..Default::default()
+        };
+        env.collection().register_deferred_font(family, info).1
+    };
+    register("Space", 0x20..=0x20);
+    let space = register("Space", 0x20..=0x20);
+    let digits = register("Digits", 0x30..=0x39);
+    register("Other", 0x30..=0x39);
+
+    // Returns the fonts that `text` requests, and whether it was shaped.
+    let mut build = |families: &'static str, text| {
+        let mut builder = env.ranged_builder(text);
+        builder.push_default(StyleProperty::FontFamily(families.into()));
+        let mut layout = builder.build(text);
+        layout.break_all_lines(None);
+        let requests = env.collection().drain_font_requests();
+        (requests.collect::<Vec<_>>(), layout.width() > 0.0)
+    };
+    // The second list has no font to use. No deferred font has U+4E00 in range, and a tab has no
+    // character to shape. Only the first deferred font is requested.
+    for families in ["Digits, Other, Roboto", "Digits, Other"] {
+        assert_eq!(build(families, "\u{4e00}\t").0, [], "{families}");
+        assert_eq!(build(families, "1").0, [digits], "{families}");
+    }
+    // Meanwhile, the text is shaped with the fonts after the deferred one.
+    assert!(build("Digits, Roboto", "1").1);
+    // Only the first available font is requested for its metrics.
+    assert_eq!(build("Space, Roboto", "x").0, [space]);
+}
