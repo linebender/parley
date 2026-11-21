@@ -14,7 +14,12 @@ mod system;
 // OpenHarmony reports `target_os = "linux"` but ships no Fontconfig library.
 #[cfg(all(
     feature = "system",
-    any(target_os = "linux", target_os = "freebsd"),
+    any(
+        target_os = "linux",
+        target_os = "freebsd",
+        target_os = "netbsd",
+        target_os = "dragonfly"
+    ),
     not(target_env = "ohos")
 ))]
 #[path = "fontconfig.rs"]
@@ -47,6 +52,8 @@ pub(crate) use system::SystemFonts;
         target_os = "windows",
         target_os = "linux",
         target_os = "freebsd",
+        target_os = "netbsd",
+        target_os = "dragonfly",
         target_os = "android",
         target_vendor = "apple"
     ))
