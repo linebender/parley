@@ -125,15 +125,17 @@ impl<B: Brush> LayoutContext<B> {
     /// Create a builder for constructing a layout from indexed style runs.
     ///
     /// Unlike [`Self::ranged_builder`], this builder expects callers to provide:
-    /// - a style table of fully specified [`TextStyle`] values (via [`StyleRunBuilder::push_style`])
+    /// - a style table of fully specified [`TextStyle`] values (via [`StyleRunBuilder::push_style`]
+    ///   or [`StyleRunBuilder::push_modified_style`])
     /// - a complete sequence of **contiguous**, **non-overlapping** spans that cover
     ///   `0..text.len()` and reference style indices (via [`StyleRunBuilder::push_style_run`])
     ///
-    /// Parley then skips its internal range-splitting logic.
+    /// The text itself is supplied to [`StyleRunBuilder::build_into`] or
+    /// [`StyleRunBuilder::build`], so styles, runs, inline boxes and floated boxes can be pushed
+    /// while the text is being produced. Parley then skips its internal range-splitting logic.
     pub fn style_run_builder<'a>(
         &'a mut self,
         fcx: &'a mut FontContext,
-        text: &'a str,
         scale: f32,
         quantize: bool,
     ) -> StyleRunBuilder<'a, B> {
@@ -143,7 +145,6 @@ impl<B: Brush> LayoutContext<B> {
 
         StyleRunBuilder {
             options: BuilderOptions::new(scale, quantize),
-            len: text.len(),
             lcx: self,
             fcx,
             cursor: 0,
