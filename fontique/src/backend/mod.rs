@@ -18,6 +18,7 @@ mod system;
         target_os = "linux",
         target_os = "freebsd",
         target_os = "netbsd",
+        target_os = "openbsd",
         target_os = "dragonfly"
     ),
     not(target_env = "ohos")
@@ -53,6 +54,7 @@ pub(crate) use system::SystemFonts;
         target_os = "linux",
         target_os = "freebsd",
         target_os = "netbsd",
+        target_os = "openbsd",
         target_os = "dragonfly",
         target_os = "android",
         target_vendor = "apple"

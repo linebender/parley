@@ -862,6 +862,7 @@ impl Shared {
         target_os = "linux",
         target_os = "freebsd",
         target_os = "netbsd",
+        target_os = "openbsd",
         target_os = "dragonfly",
         target_os = "macos",
         target_os = "windows"
@@ -880,7 +881,7 @@ fn make_shared_matches_local() {
         "/Library/Fonts",
         #[cfg(target_os = "linux")]
         "/usr/share/fonts",
-        #[cfg(any(target_os = "freebsd", target_os = "dragonfly"))]
+        #[cfg(any(target_os = "freebsd", target_os = "openbsd", target_os = "dragonfly"))]
         "/usr/local/share/fonts",
         #[cfg(target_os = "netbsd")]
         "/usr/pkg/share/fonts",
@@ -918,6 +919,7 @@ fn make_shared_matches_local() {
         target_os = "linux",
         target_os = "freebsd",
         target_os = "netbsd",
+        target_os = "openbsd",
         target_os = "dragonfly",
         target_os = "macos",
         target_os = "windows"
@@ -937,7 +939,7 @@ fn load_fonts_from_paths_registers_each_face_once() {
         "/Library/Fonts",
         #[cfg(target_os = "linux")]
         "/usr/share/fonts",
-        #[cfg(any(target_os = "freebsd", target_os = "dragonfly"))]
+        #[cfg(any(target_os = "freebsd", target_os = "openbsd", target_os = "dragonfly"))]
         "/usr/local/share/fonts",
         #[cfg(target_os = "netbsd")]
         "/usr/pkg/share/fonts",
