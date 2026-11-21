@@ -73,9 +73,10 @@ impl<'b, B: Brush> RangedBuilder<'b, B> {
 
     /// Forces a shaping boundary at `byte_index`.
     ///
-    /// Ligatures will not form across the boundary, and kerning will not apply.
-    /// Contextual shaping (such as arabic form selection) will however be maintained
-    /// (`اَلْفُصْ‍|‍حَىٰ` rather than `اَلْفُصْ|حَىٰ` for a boundary in اَلْفُصْ‍حَىٰ).
+    /// Arabic joining forms will be maintained across the boundary (`اَلْفُصْ‍|‍حَىٰ`
+    /// rather than `اَلْفُصْ|حَىٰ` for a boundary in اَلْفُصْ‍حَىٰ).
+    /// However, other shaping features, including but not limited to ligatures
+    /// and kerning, will not reach across the boundary.
     ///
     /// Currently, this also introduces a grapheme boundary.
     /// Splits may be pushed in any order; duplicates are currently ignored.
@@ -216,9 +217,10 @@ impl<'b, B: Brush> StyleRunBuilder<'b, B> {
 
     /// Forces a shaping boundary at `byte_index`.
     ///
-    /// Ligatures will not form across the boundary, and kerning will not apply.
-    /// Contextual shaping (such as arabic form selection) will however be maintained
-    /// (`اَلْفُصْ‍|‍حَىٰ` rather than `اَلْفُصْ|حَىٰ` for a boundary in اَلْفُصْ‍حَىٰ).
+    /// Arabic joining forms will be maintained across the boundary (`اَلْفُصْ‍|‍حَىٰ`
+    /// rather than `اَلْفُصْ|حَىٰ` for a boundary in اَلْفُصْ‍حَىٰ).
+    /// However, other shaping features, including but not limited to ligatures
+    /// and kerning, will not reach across the boundary.
     ///
     /// Currently, this also introduces a grapheme boundary.
     /// Splits may be pushed in any order; duplicates are currently ignored.
@@ -351,9 +353,10 @@ impl<'b, B: Brush> TreeBuilder<'b, B> {
 
     /// Forces a shaping boundary before any subsequent text.
     ///
-    /// Ligatures will not form across the boundary, and kerning will not apply.
-    /// Contextual shaping will however be maintained. That is, arabic form selection
-    /// will lead to `اَلْفُصْ‍|‍حَىٰ` rather than `اَلْفُصْ|حَىٰ` for a boundary in اَلْفُصْ‍حَىٰ).
+    /// Arabic joining forms will be maintained across the boundary (`اَلْفُصْ‍|‍حَىٰ`
+    /// rather than `اَلْفُصْ|حَىٰ` for a boundary in اَلْفُصْ‍حَىٰ).
+    /// However, other shaping features, including but not limited to ligatures
+    /// and kerning, will not reach across the boundary.
     ///
     /// If there is pending collapsible whitespace (see [`Self::has_pending_whitespace`]), the split
     /// is placed between the resulting space and the subsequent text (if any).
