@@ -71,6 +71,23 @@ impl<'b, B: Brush> RangedBuilder<'b, B> {
         self.lcx.ranged_style_builder.push(resolved, range);
     }
 
+    /// Forces a shaping boundary at `byte_index`.
+    ///
+    /// Arabic joining forms will be maintained across the boundary (`اَلْفُصْ‍|‍حَىٰ`
+    /// rather than `اَلْفُصْ|حَىٰ` for a boundary in اَلْفُصْ‍حَىٰ).
+    /// However, other shaping features, including but not limited to ligatures
+    /// and kerning, will not reach across the boundary.
+    ///
+    /// Currently, this also introduces a grapheme boundary.
+    /// Splits may be pushed in any order; duplicates are currently ignored.
+    ///
+    /// # Panics
+    ///
+    /// Building the layout panics if `byte_index` is not a UTF-8 character boundary of the text.
+    pub fn push_shaping_split(&mut self, byte_index: usize) {
+        self.lcx.shaping_splits.push(byte_index);
+    }
+
     /// Adds an inline box.
     ///
     /// The inline box must have a matching U+FFFC OBJECT REPLACEMENT CHARACTER at its
@@ -198,6 +215,23 @@ impl<'b, B: Brush> StyleRunBuilder<'b, B> {
         });
     }
 
+    /// Forces a shaping boundary at `byte_index`.
+    ///
+    /// Arabic joining forms will be maintained across the boundary (`اَلْفُصْ‍|‍حَىٰ`
+    /// rather than `اَلْفُصْ|حَىٰ` for a boundary in اَلْفُصْ‍حَىٰ).
+    /// However, other shaping features, including but not limited to ligatures
+    /// and kerning, will not reach across the boundary.
+    ///
+    /// Currently, this also introduces a grapheme boundary.
+    /// Splits may be pushed in any order; duplicates are currently ignored.
+    ///
+    /// # Panics
+    ///
+    /// Building the layout panics if `byte_index` is not a UTF-8 character boundary of the text.
+    pub fn push_shaping_split(&mut self, byte_index: usize) {
+        self.lcx.shaping_splits.push(byte_index);
+    }
+
     /// Adds an inline box.
     ///
     /// The inline box must have a matching U+FFFC OBJECT REPLACEMENT CHARACTER at its
@@ -312,7 +346,24 @@ impl<'b, B: Brush> TreeBuilder<'b, B> {
     }
 
     pub fn push_text(&mut self, text: &str) {
-        self.lcx.tree_style_builder.push_text(text);
+        self.lcx
+            .tree_style_builder
+            .push_text(text, &mut self.lcx.shaping_splits);
+    }
+
+    /// Forces a shaping boundary before any subsequent text.
+    ///
+    /// Arabic joining forms will be maintained across the boundary (`اَلْفُصْ‍|‍حَىٰ`
+    /// rather than `اَلْفُصْ|حَىٰ` for a boundary in اَلْفُصْ‍حَىٰ).
+    /// However, other shaping features, including but not limited to ligatures
+    /// and kerning, will not reach across the boundary.
+    ///
+    /// If there is pending collapsible whitespace (see [`Self::has_pending_whitespace`]), the split
+    /// is placed between the resulting space and the subsequent text (if any).
+    pub fn push_shaping_split(&mut self) {
+        self.lcx
+            .tree_style_builder
+            .push_shaping_split(&mut self.lcx.shaping_splits);
     }
 
     /// Returns the pushed text so far, after whitespace processing, but excluding any trailing
@@ -345,7 +396,10 @@ impl<'b, B: Brush> TreeBuilder<'b, B> {
     ///
     /// [atomic inline]: https://www.w3.org/TR/css-display-3/#atomic-inline
     pub fn push_inline_box(&mut self, mut inline_box: InlineBox) {
-        inline_box.index = self.lcx.tree_style_builder.push_inline_object();
+        inline_box.index = self
+            .lcx
+            .tree_style_builder
+            .push_inline_object(&mut self.lcx.shaping_splits);
         let parent_style_index = self.lcx.tree_style_builder.resolve_current_style_id();
         self.lcx
             .inline_boxes
@@ -468,6 +522,18 @@ fn build_into_layout<B: Brush>(
         inline_box.parent_style_index = lcx.style_runs[run].style_index;
     }
 
+    // Sort as subsequent code assumes that they are in order.
+    // Same TODO as for inline boxes.
+    lcx.shaping_splits.sort_unstable();
+    lcx.shaping_splits.dedup();
+    lcx.shaping_splits.retain(|&index| {
+        assert!(
+            text.is_char_boundary(index),
+            "shaping split index {index} must be a UTF-8 character boundary within the text"
+        );
+        index != 0 && index != text.len()
+    });
+
     let data_sources = AnalysisDataSources::new(options.dictionary_provider);
 
     crate::analysis::analyze_text(
@@ -507,6 +573,7 @@ fn build_into_layout<B: Brush>(
             fcx,
             &lcx.style_table,
             &lcx.floated_boxes,
+            &lcx.shaping_splits,
             &lcx.analysis,
             &lcx.char_style_indices,
             &mut lcx.scx,
