@@ -7,7 +7,6 @@ use core::range::Range;
 
 use alloc::vec::Vec;
 use parlance::{BidiLevel, FontFeature, Language, NormalizedCoord, Script};
-use skrifa::MetadataProvider;
 
 use crate::{
     CharInfo, FontInstance, Glyph,
@@ -70,64 +69,38 @@ impl FontMetrics {
         }
     }
 
-    /// Compute the metrics of `font` at `font_size`, positioned at the variable font location
-    /// given by the `synthesis` and `variations` axis settings.
-    ///
-    /// Returns `None` if the font data cannot be parsed.
-    pub fn from_font_instance(
-        font: &FontInstance,
-        font_size: f32,
-        variations: &[parlance::FontVariation],
-    ) -> Option<Self> {
-        let font_ref =
-            skrifa::FontRef::from_index(font.font.data.as_ref(), font.font.index).ok()?;
-        let location = font_ref.axes().location(
-            font.synthesis
-                .variation_settings()
-                .map(|(tag, value)| (skrifa::Tag::new(&tag.to_bytes()), value))
-                .chain(
-                    variations
-                        .iter()
-                        .map(|v| (skrifa::Tag::new(&v.tag.to_bytes()), v.value)),
-                ),
-        );
-        Some(Self::from_skrifa_metrics(
-            &skrifa::metrics::Metrics::new(
-                &font_ref,
-                skrifa::prelude::Size::new(font_size),
-                &location,
-            ),
-            font_size,
-        ))
-    }
+    pub(crate) fn from_harfrust_font(font_instance: &harfrust::Font, font_size: f32) -> Self {
+        let metrics = font_instance.metrics().scaled_f32(font_size);
+        let style_metrics = font_instance.style_metrics().scaled_f32(font_size);
 
-    fn from_skrifa_metrics(metrics: &skrifa::metrics::Metrics, font_size: f32) -> Self {
         // Default values from HarfBuzz: https://github.com/harfbuzz/harfbuzz/blob/12ee77ee00514c442bcd28f9aa9d56b708c37382/src/hb-ot-metrics.cc#L355-L372
         let fallback_decoration_size = font_size / 18.0;
 
-        let (underline_offset, underline_size) = if let Some(underline) = metrics.underline {
-            (underline.offset, underline.thickness)
+        let line = metrics.h_line().unwrap_or_default();
+        let ascent = line.ascender;
+        let (underline_offset, underline_size) = if let Some(underline) = style_metrics.underline()
+        {
+            (underline.position, underline.thickness)
         } else {
             (-fallback_decoration_size, fallback_decoration_size)
         };
-        let (strikethrough_offset, strikethrough_size) = if let Some(strikeout) = metrics.strikeout
-        {
-            (strikeout.offset, strikeout.thickness)
-        } else {
-            (metrics.ascent / 2.0, fallback_decoration_size)
-        };
+        let (strikethrough_offset, strikethrough_size) =
+            if let Some(strikethrough) = style_metrics.strike_through() {
+                (strikethrough.position, strikethrough.thickness)
+            } else {
+                (ascent / 2.0, fallback_decoration_size)
+            };
 
         Self {
-            // Normalize ascender and descender to magnitudes, as a hack to deal with fonts with mixed-up signs.
-            ascent: metrics.ascent.abs(),
-            descent: metrics.descent.abs(),
-            leading: metrics.leading,
+            ascent,
+            descent: -line.descender,
+            leading: line.line_gap,
             underline_offset,
             underline_size,
             strikethrough_offset,
             strikethrough_size,
-            x_height: metrics.x_height,
-            cap_height: metrics.cap_height,
+            x_height: metrics.x_height(),
+            cap_height: metrics.cap_height(),
         }
     }
 }
@@ -313,7 +286,7 @@ impl ShapedText {
         char_style_indices: &[u16],
         font: &FontInstance,
         glyph_buffer: &harfrust::Buffer,
-        normalized_coords: &[harfrust::font::NormalizedCoord],
+        font_instance: &harfrust::Font,
     ) {
         debug_assert_eq!(
             range.char_range.end - range.char_range.start,
@@ -326,7 +299,8 @@ impl ShapedText {
         let normalized_coords_range = {
             let start = self.normalized_coords.len();
             self.normalized_coords.extend(
-                normalized_coords
+                font_instance
+                    .normalized_coords()
                     .iter()
                     .map(|c| NormalizedCoord::from_bits(c.to_bits())),
             );
@@ -349,24 +323,13 @@ impl ShapedText {
                 index
             });
 
-        let metrics = {
-            let font = &self.fonts[font_index];
-            let font_ref =
-                skrifa::FontRef::from_index(font.font.data.as_ref(), font.font.index).unwrap();
-            skrifa::metrics::Metrics::new(
-                &font_ref,
-                skrifa::prelude::Size::new(options.font_size),
-                normalized_coords,
-            )
-        };
-        let units_per_em = metrics.units_per_em as f32;
-        let font_metrics = FontMetrics::from_skrifa_metrics(&metrics, options.font_size);
+        let scale_factor = options.font_size / f32::from(font_instance.units_per_em());
+        let font_metrics = FontMetrics::from_harfrust_font(font_instance, options.font_size);
 
         // `HarfRust` returns glyphs in visual order, so we need to process them as such while
         // maintaining logical ordering of clusters.
 
         let glyph_positions = glyph_buffer.glyph_positions();
-        let scale_factor = options.font_size / units_per_em;
         let shaped_clusters_start = self.shaped_clusters.len();
 
         // Push all characters.
@@ -661,22 +624,7 @@ mod tests {
         shape::CharCluster,
     };
 
-    use super::{FontMetrics, ShapedText};
-
-    #[test]
-    fn font_descent_is_a_non_negative_distance() {
-        // Franklin ITC is an example of a font with a positive descender.
-        for (descent, expected) in [(-6.0, 6.0), (0.0, 0.0), (6.0, 6.0)] {
-            let metrics = skrifa::metrics::Metrics {
-                ascent: 18.0,
-                descent,
-                ..Default::default()
-            };
-            let font_metrics = FontMetrics::from_skrifa_metrics(&metrics, 24.0);
-            assert_eq!(font_metrics.ascent, 18.0);
-            assert_eq!(font_metrics.descent, expected);
-        }
-    }
+    use super::ShapedText;
 
     const ROBOTO: &[u8] =
         include_bytes!("../../../parley_dev/assets/fonts/roboto_fonts/Roboto-Regular.ttf");

@@ -16,11 +16,11 @@ all-features = true
 default = ["std"]
 # Get floating point functions from the standard library
 # (likely using your target's libc).
-std = ["harfrust/std", "parlance/std", "parley_data/std", "parley_emoji/std", "skrifa/std"]
+std = ["harfrust/std", "parlance/std", "parley_data/std", "parley_emoji/std"]
 # Use floating point implementations from libm.
 # This is useful for `no_std` environments.
 # However, note that the `libm` crate is not as efficient as the standard library.
-libm = ["harfrust/libm", "skrifa/libm"]
+libm = ["harfrust/libm"]
 # Forwarded to `parlance`, which then implements traits from `bytemuck` on its types.
 bytemuck = ["parlance/bytemuck"]
 # Enable dictionary-based line and word breaking for complex scripts (CJK, Thai, Khmer, Lao, Myanmar).
@@ -41,7 +41,6 @@ icu_properties = { workspace = true, features = ["compiled_data"] }
 icu_provider = { workspace = true }
 icu_segmenter = { workspace = true, features = ["compiled_data"] }
 linebender_resource_handle = { workspace = true }
-skrifa = { workspace = true }
 
 [lints]
 workspace = true
