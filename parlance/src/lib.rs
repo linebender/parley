@@ -67,9 +67,12 @@ mod tag;
 mod text;
 
 pub use bidi::{BidiControl, BidiDirection, BidiLevel, BidiOverride};
-pub use font::{FontStyle, FontWeight, FontWidth};
+pub use font::{
+    FontStyle, FontWeight, FontWidth, ParseFontStyleError, ParseFontWeightError,
+    ParseFontWidthError,
+};
 pub use font_family::{FontFamily, FontFamilyName, ParseFontFamilyError, ParseFontFamilyErrorKind};
-pub use generic_family::GenericFamily;
+pub use generic_family::{GenericFamily, ParseGenericFamilyError};
 pub use language::{Language, ParseLanguageError};
 pub use normalized_coord::NormalizedCoord;
 pub use script::{ParseScriptError, Script};

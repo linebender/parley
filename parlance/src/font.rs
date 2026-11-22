@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 use core::fmt;
+use core::str::FromStr;
 
 /// Visual weight class of a font, typically on a scale from 1.0 to 1000.0.
 ///
@@ -80,6 +81,8 @@ impl FontWeight {
     /// assert_eq!(FontWeight::parse_css("850"), Some(FontWeight::new(850.0)));
     /// assert_eq!(FontWeight::parse_css("invalid"), None);
     /// ```
+    ///
+    /// This is also available through [`FromStr`].
     pub fn parse_css(s: &str) -> Option<Self> {
         let s = s.trim();
         Some(match s {
@@ -118,6 +121,30 @@ impl fmt::Display for FontWeight {
         }
     }
 }
+
+impl FromStr for FontWeight {
+    type Err = ParseFontWeightError;
+
+    /// Parses a CSS `font-weight` value.
+    ///
+    /// See [`FontWeight::parse_css`] for the supported syntax.
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Self::parse_css(s).ok_or(ParseFontWeightError)
+    }
+}
+
+/// An error returned from parsing a [`FontWeight`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct ParseFontWeightError;
+
+impl fmt::Display for ParseFontWeightError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("invalid CSS `font-weight` value")
+    }
+}
+
+impl core::error::Error for ParseFontWeightError {}
 
 /// Visual width of a font — a relative change from the normal aspect ratio, typically in the
 /// range `0.5` to `2.0`.
@@ -230,6 +257,8 @@ impl FontWidth {
     /// );
     /// assert_eq!(FontWidth::parse_css("wideload"), None);
     /// ```
+    ///
+    /// This is also available through [`FromStr`].
     pub fn parse_css(s: &str) -> Option<Self> {
         let s = s.trim();
         Some(match s {
@@ -288,6 +317,30 @@ impl fmt::Display for FontWidth {
         }
     }
 }
+
+impl FromStr for FontWidth {
+    type Err = ParseFontWidthError;
+
+    /// Parses a CSS `font-width` value.
+    ///
+    /// See [`FontWidth::parse_css`] for the supported syntax.
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Self::parse_css(s).ok_or(ParseFontWidthError)
+    }
+}
+
+/// An error returned from parsing a [`FontWidth`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct ParseFontWidthError;
+
+impl fmt::Display for ParseFontWidthError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("invalid CSS `font-width` value")
+    }
+}
+
+impl core::error::Error for ParseFontWidthError {}
 
 /// Visual style or “slope” of a font.
 ///
@@ -348,6 +401,8 @@ impl FontStyle {
     /// );
     /// assert_eq!(FontStyle::parse_css("banana"), None);
     /// ```
+    ///
+    /// This is also available through [`FromStr`].
     pub fn parse_css(mut s: &str) -> Option<Self> {
         s = s.trim();
         Some(match s {
@@ -398,12 +453,80 @@ impl fmt::Display for FontStyle {
     }
 }
 
+impl FromStr for FontStyle {
+    type Err = ParseFontStyleError;
+
+    /// Parses a CSS `font-style` value.
+    ///
+    /// See [`FontStyle::parse_css`] for the supported syntax.
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Self::parse_css(s).ok_or(ParseFontStyleError)
+    }
+}
+
+/// An error returned from parsing a [`FontStyle`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct ParseFontStyleError;
+
+impl fmt::Display for ParseFontStyleError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("invalid CSS `font-style` value")
+    }
+}
+
+impl core::error::Error for ParseFontStyleError {}
+
 #[cfg(test)]
 mod tests {
     extern crate alloc;
 
-    use super::FontWidth;
+    use super::{FontWidth, ParseFontStyleError, ParseFontWeightError, ParseFontWidthError};
     use crate::{FontStyle, FontWeight};
+    use alloc::string::ToString;
+
+    #[test]
+    fn from_str_matches_parse_css() {
+        assert_eq!("bold".parse(), Ok(FontWeight::BOLD));
+        assert_eq!(" 850 ".parse(), Ok(FontWeight::new(850.0)));
+        assert_eq!("heavy".parse::<FontWeight>(), Err(ParseFontWeightError));
+
+        assert_eq!("condensed".parse(), Ok(FontWidth::CONDENSED));
+        assert_eq!("80%".parse(), Ok(FontWidth::from_percentage(80.0)));
+        assert_eq!("80".parse::<FontWidth>(), Err(ParseFontWidthError));
+
+        assert_eq!("italic".parse(), Ok(FontStyle::Italic));
+        assert_eq!("oblique 30deg".parse(), Ok(FontStyle::Oblique(Some(30.0))));
+        assert_eq!("banana".parse::<FontStyle>(), Err(ParseFontStyleError));
+    }
+
+    #[test]
+    fn display_round_trips_through_from_str() {
+        for weight in [
+            FontWeight::THIN,
+            FontWeight::NORMAL,
+            FontWeight::BOLD,
+            FontWeight::new(450.5),
+        ] {
+            assert_eq!(weight.to_string().parse(), Ok(weight));
+        }
+        for width in [
+            FontWidth::ULTRA_CONDENSED,
+            FontWidth::NORMAL,
+            FontWidth::EXTRA_EXPANDED,
+            FontWidth::from_percentage(80.0),
+        ] {
+            assert_eq!(width.to_string().parse(), Ok(width));
+        }
+        for style in [
+            FontStyle::Normal,
+            FontStyle::Italic,
+            FontStyle::Oblique(Some(14.0)),
+            FontStyle::Oblique(Some(30.0)),
+        ] {
+            assert_eq!(style.to_string().parse(), Ok(style));
+        }
+    }
 
     #[test]
     fn fontwidth_parse_includes_expanded() {

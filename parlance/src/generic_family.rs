@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 use core::fmt;
+use core::str::FromStr;
 
 /// Generic font families, named after CSS.
 #[derive(Clone, Copy, Debug, PartialEq, Eq, Hash)]
@@ -62,6 +63,8 @@ impl GenericFamily {
     /// assert_eq!(GenericFamily::parse("SERIF"), Some(GenericFamily::Serif));
     /// assert_eq!(GenericFamily::parse("Arial"), None);
     /// ```
+    ///
+    /// This is also available through [`FromStr`], so `"serif".parse::<GenericFamily>()` works too.
     pub fn parse(s: &str) -> Option<Self> {
         let s = s.trim();
         // The longest generic family name is `ui-sans-serif` (13 bytes). Any
@@ -137,9 +140,53 @@ impl fmt::Display for GenericFamily {
     }
 }
 
+impl FromStr for GenericFamily {
+    type Err = ParseGenericFamilyError;
+
+    /// Parses a generic family from a CSS generic family name.
+    ///
+    /// See [`GenericFamily::parse`] for details.
+    fn from_str(s: &str) -> Result<Self, Self::Err> {
+        Self::parse(s).ok_or(ParseGenericFamilyError)
+    }
+}
+
+/// An error returned from parsing a [`GenericFamily`].
+#[derive(Clone, Copy, Debug, PartialEq, Eq)]
+#[non_exhaustive]
+pub struct ParseGenericFamilyError;
+
+impl fmt::Display for ParseGenericFamilyError {
+    fn fmt(&self, f: &mut fmt::Formatter<'_>) -> fmt::Result {
+        f.write_str("unrecognized generic font family name")
+    }
+}
+
+impl core::error::Error for ParseGenericFamilyError {}
+
 #[cfg(test)]
 mod tests {
-    use super::GenericFamily;
+    extern crate alloc;
+
+    use super::{GenericFamily, ParseGenericFamilyError};
+    use alloc::string::ToString;
+
+    #[test]
+    fn from_str_matches_parse() {
+        assert_eq!("serif".parse(), Ok(GenericFamily::Serif));
+        assert_eq!(" UI-Sans-Serif ".parse(), Ok(GenericFamily::UiSansSerif));
+        assert_eq!(
+            "Arial".parse::<GenericFamily>(),
+            Err(ParseGenericFamilyError)
+        );
+    }
+
+    #[test]
+    fn display_round_trips_through_from_str() {
+        for &family in GenericFamily::all() {
+            assert_eq!(family.to_string().parse(), Ok(family));
+        }
+    }
 
     #[test]
     fn parse_is_ascii_case_insensitive() {
