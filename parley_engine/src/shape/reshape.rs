@@ -330,11 +330,15 @@ struct FragmentCache {
     /// Slots 0 and 1 hold fragments starting lines, slots 2 and 3 fragments ending lines, including
     /// whole lines.
     ///
-    /// These are stored as separate collections to have a relatively good chance of a cache hit
-    /// under common patterns of line breakers. Note in particular that a line breaker, after
-    /// measuring the line's new start, may need to measure multiple candidates for the line's end.
-    /// We can't simply us a single [`ReshapedText`] as a a cache, because there'd be no way to
-    /// evict older entries.
+    /// Eviction of these pairs' cache entries is done separately to have a relatively good chance
+    /// of a cache hit under common patterns of line breakers. Note in particular that a line
+    /// breaker, after measuring the line's new start, may need to measure multiple candidates for
+    /// the line's end. We can't simply us a single [`ReshapedText`] as a cache, because there'd be
+    /// no way to evict older entries.
+    ///
+    /// This is a single array holding both pairs so that slots are just an index (otherwise we'd
+    /// need to carry something like a tuple or a `&mut CachedFragment`), and this shape also allows
+    /// us to find fragments with a scan over just this one array.
     slots: [CachedFragment; 4],
     /// For each of those pairs, which of its two slots was used last.
     recent: [usize; 2],
