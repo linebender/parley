@@ -3,11 +3,10 @@
 
 //! Data structures to store the result of shaping.
 
-use core::ops::Range;
+use core::range::Range;
 
 use alloc::vec::Vec;
 use parlance::{BidiLevel, FontFeature, Language, NormalizedCoord, Script};
-use skrifa::MetadataProvider;
 
 use crate::{
     CharInfo, FontInstance, Glyph,
@@ -70,65 +69,38 @@ impl FontMetrics {
         }
     }
 
-    /// Compute the metrics of `font` at `font_size`, positioned at the variable font location
-    /// given by the `synthesis` and `variations` axis settings.
-    ///
-    /// Returns `None` if the font data cannot be parsed.
-    pub fn from_font_instance(
-        font: &FontInstance,
-        font_size: f32,
-        variations: &[parlance::FontVariation],
-    ) -> Option<Self> {
-        let font_ref =
-            skrifa::FontRef::from_index(font.font.data.as_ref(), font.font.index).ok()?;
-        let location = font_ref.axes().location(
-            font.synthesis
-                .variation_settings()
-                .iter()
-                .map(|(tag, value)| (skrifa::Tag::new(&tag.to_be_bytes()), *value))
-                .chain(
-                    variations
-                        .iter()
-                        .map(|v| (skrifa::Tag::new(&v.tag.to_bytes()), v.value)),
-                ),
-        );
-        Some(Self::from_skrifa_metrics(
-            &skrifa::metrics::Metrics::new(
-                &font_ref,
-                skrifa::prelude::Size::new(font_size),
-                &location,
-            ),
-            font_size,
-        ))
-    }
+    pub(crate) fn from_harfrust_font(font_instance: &harfrust::Font, font_size: f32) -> Self {
+        let metrics = font_instance.metrics().scaled_f32(font_size);
+        let style_metrics = font_instance.style_metrics().scaled_f32(font_size);
 
-    fn from_skrifa_metrics(metrics: &skrifa::metrics::Metrics, font_size: f32) -> Self {
         // Default values from HarfBuzz: https://github.com/harfbuzz/harfbuzz/blob/12ee77ee00514c442bcd28f9aa9d56b708c37382/src/hb-ot-metrics.cc#L355-L372
         let fallback_decoration_size = font_size / 18.0;
 
-        let (underline_offset, underline_size) = if let Some(underline) = metrics.underline {
-            (underline.offset, underline.thickness)
+        let line = metrics.h_line().unwrap_or_default();
+        let ascent = line.ascender;
+        let (underline_offset, underline_size) = if let Some(underline) = style_metrics.underline()
+        {
+            (underline.position, underline.thickness)
         } else {
             (-fallback_decoration_size, fallback_decoration_size)
         };
-        let (strikethrough_offset, strikethrough_size) = if let Some(strikeout) = metrics.strikeout
-        {
-            (strikeout.offset, strikeout.thickness)
-        } else {
-            (metrics.ascent / 2.0, fallback_decoration_size)
-        };
+        let (strikethrough_offset, strikethrough_size) =
+            if let Some(strikethrough) = style_metrics.strike_through() {
+                (strikethrough.position, strikethrough.thickness)
+            } else {
+                (ascent / 2.0, fallback_decoration_size)
+            };
 
         Self {
-            // Normalize ascender and descender to magnitudes, as a hack to deal with fonts with mixed-up signs.
-            ascent: metrics.ascent.abs(),
-            descent: metrics.descent.abs(),
-            leading: metrics.leading,
+            ascent,
+            descent: -line.descender,
+            leading: line.line_gap,
             underline_offset,
             underline_size,
             strikethrough_offset,
             strikethrough_size,
-            x_height: metrics.x_height,
-            cap_height: metrics.cap_height,
+            x_height: metrics.x_height(),
+            cap_height: metrics.cap_height(),
         }
     }
 }
@@ -206,10 +178,7 @@ impl ShapedText {
             shaped_clusters: &self.shaped_clusters,
             glyphs: &self.glyphs,
 
-            clusters: (
-                run.shaped_clusters_range.start,
-                run.shaped_clusters_range.end,
-            ),
+            clusters: run.shaped_clusters_range,
         }
     }
 
@@ -317,28 +286,29 @@ impl ShapedText {
         char_style_indices: &[u16],
         font: &FontInstance,
         glyph_buffer: &harfrust::Buffer,
-        normalized_coords: &[harfrust::font::NormalizedCoord],
+        font_instance: &harfrust::Font,
     ) {
         debug_assert_eq!(
-            range.char_range.len(),
-            text[range.byte_range.clone()].chars().count(),
+            range.char_range.end - range.char_range.start,
+            text[range.byte_range].chars().count(),
             "The claimed character range and the text's covered byte range should agree"
         );
 
         let normalized_coords_range = {
             let start = self.normalized_coords.len();
             self.normalized_coords.extend(
-                normalized_coords
+                font_instance
+                    .normalized_coords()
                     .iter()
                     .map(|c| NormalizedCoord::from_bits(c.to_bits())),
             );
-            start..self.normalized_coords.len()
+            Range::from(start..self.normalized_coords.len())
         };
 
         let features_range = {
             let start = self.features.len();
             self.features.extend_from_slice(options.features);
-            start..self.features.len()
+            Range::from(start..self.features.len())
         };
 
         let font_index = self
@@ -351,25 +321,15 @@ impl ShapedText {
                 index
             });
 
-        let metrics = {
-            let font = &self.fonts[font_index];
-            let font_ref =
-                skrifa::FontRef::from_index(font.font.data.as_ref(), font.font.index).unwrap();
-            skrifa::metrics::Metrics::new(
-                &font_ref,
-                skrifa::prelude::Size::new(options.font_size),
-                normalized_coords,
-            )
-        };
-        let units_per_em = metrics.units_per_em as f32;
-        let font_metrics = FontMetrics::from_skrifa_metrics(&metrics, options.font_size);
+        let scale_factor = options.font_size / f32::from(font_instance.units_per_em());
+        let font_metrics = FontMetrics::from_harfrust_font(font_instance, options.font_size);
 
         // Push all characters.
         let characters_start = self.characters.len();
-        for (((byte_offset, ch), info), style_index) in text[range.byte_range.clone()]
+        for (((byte_offset, ch), info), style_index) in text[range.byte_range]
             .char_indices()
-            .zip(&char_info[range.char_range.clone()])
-            .zip(&char_style_indices[range.char_range.clone()])
+            .zip(&char_info[range.char_range])
+            .zip(&char_style_indices[range.char_range])
         {
             self.characters.push(Character {
                 text_byte_start: (range.byte_range.start + byte_offset) as u32,
@@ -396,10 +356,10 @@ impl ShapedText {
             &mut self.shaped_clusters,
             &mut self.glyphs,
             glyph_buffer,
-            options.font_size / units_per_em,
+            scale_factor,
             segment.bidi_level.is_rtl(),
             &self.characters,
-            characters_start..self.characters.len(),
+            Range::from(characters_start..self.characters.len()),
             self.has_safe_to_concat_flags,
         );
 
@@ -407,7 +367,7 @@ impl ShapedText {
             range,
             font_size: options.font_size,
             font_index,
-            characters_range: characters_start as u32..self.characters.len() as u32,
+            characters_range: Range::from(characters_start as u32..self.characters.len() as u32),
             shaped_clusters_range,
             glyphs_range,
             normalized_coords_range,
@@ -421,7 +381,7 @@ impl ShapedText {
 }
 
 /// One shaped run, belonging to a [`ShapedText`].
-#[derive(Clone, Debug, PartialEq)]
+#[derive(Clone, Copy, Debug, PartialEq)]
 #[non_exhaustive]
 pub struct ShapedRun {
     /// The range of text this run corresponds to.
@@ -429,9 +389,6 @@ pub struct ShapedRun {
     /// Font size.
     pub font_size: f32,
     /// This run's font, as an index into [`ShapedText::fonts`].
-    //
-    // Note: We carry the font index instead of having `ShapedRun` carry `Arc<FontInstance>`,
-    // meaning `ShapedRun` could become `Copy` once we have access to `core::range::Range`.
     pub font_index: usize,
     /// This run's characters, as a range into [`ShapedText::characters`].
     pub characters_range: Range<u32>,
@@ -506,8 +463,8 @@ pub(crate) fn push_glyph_buffer(
     }
 
     (
-        shaped_clusters_start as u32..shaped_clusters.len() as u32,
-        glyphs_start..glyphs.len(),
+        Range::from(shaped_clusters_start as u32..shaped_clusters.len() as u32),
+        Range::from(glyphs_start..glyphs.len()),
     )
 }
 
@@ -556,10 +513,11 @@ fn process_shaped_clusters<'a>(
     #[expect(clippy::cast_possible_truncation, reason = "Deferred")]
     #[inline(always)]
     fn flush(
-        cluster: &mut Cluster,
+        cluster: &Cluster,
         char_end: usize,
         characters: &[Character],
         shaped_clusters: &mut Vec<ShapedCluster>,
+        glyphs: &mut Vec<Glyph>,
     ) {
         let first_character = &characters[cluster.characters_start];
         let is_newline = first_character.whitespace == Whitespace::Newline;
@@ -572,19 +530,26 @@ fn process_shaped_clusters<'a>(
             // Elide glyphs and advances of newlines and inline objects. Note that inline objects'
             // advances can be set later by the user.
             (cluster.glyphs_start as u32, 0, false, 0.)
-        } else if let Some(inline_glyph) = cluster.inline_glyph.take() {
+        } else if let Some(inline_glyph) = cluster.inline_glyph {
             (inline_glyph.id, 1, true, cluster.advance)
         } else {
-            (
-                cluster.glyphs_start as u32,
-                cluster.glyphs as u8,
-                false,
-                cluster.advance,
-            )
+            let mut advance = cluster.advance;
+            let glyph_len = u8::try_from(cluster.glyphs).unwrap_or_else(|_| {
+                // If more than 255 glyphs were produced, we keep only the first 255, drop the rest,
+                // and recompute the advance. This should only happen with artificial input, like
+                // 255+ invisible characters inside a ligature, or a hostile font.
+                glyphs.truncate(cluster.glyphs_start + usize::from(u8::MAX));
+                advance = glyphs[cluster.glyphs_start..]
+                    .iter()
+                    .map(|g| g.advance)
+                    .sum();
+                u8::MAX
+            });
+            (cluster.glyphs_start as u32, glyph_len, false, advance)
         };
 
         shaped_clusters.push(ShapedCluster {
-            chars_range: (cluster.characters_start as u32, char_end as u32),
+            chars_range: Range::from(cluster.characters_start as u32..char_end as u32),
             style_index: first_character.style_index,
             flags: ShapedClusterFlags::new(glyph_len)
                 .with_grapheme_start(first_character.grapheme_start)
@@ -618,7 +583,7 @@ fn process_shaped_clusters<'a>(
     for (glyph_info, glyph_pos) in glyph_infos.zip(glyph_positions) {
         if glyph_info.cluster != cluster.id {
             let char_end = characters_range.start + glyph_info.cluster as usize;
-            flush(&mut cluster, char_end, characters, shaped_clusters);
+            flush(&cluster, char_end, characters, shaped_clusters, glyphs);
 
             cluster = Cluster {
                 id: glyph_info.cluster,
@@ -662,10 +627,11 @@ fn process_shaped_clusters<'a>(
 
     // Flush the final cluster.
     flush(
-        &mut cluster,
+        &cluster,
         characters_range.end,
         characters,
         shaped_clusters,
+        glyphs,
     );
 }
 
@@ -673,8 +639,8 @@ fn process_shaped_clusters<'a>(
 pub(crate) mod tests {
     use alloc::{sync::Arc, vec, vec::Vec};
 
-    use fontique::Synthesis;
     use linebender_resource_handle::{Blob, FontData};
+    use parlance::Synthesis;
 
     use crate::{
         Analysis, AnalysisOptions, Analyzer, FontInstance, FontInstanceRef, FontSelector,
@@ -683,22 +649,7 @@ pub(crate) mod tests {
         shape::CharCluster,
     };
 
-    use super::{FontMetrics, ShapedText};
-
-    #[test]
-    fn font_descent_is_a_non_negative_distance() {
-        // Franklin ITC is an example of a font with a positive descender.
-        for (descent, expected) in [(-6.0, 6.0), (0.0, 0.0), (6.0, 6.0)] {
-            let metrics = skrifa::metrics::Metrics {
-                ascent: 18.0,
-                descent,
-                ..Default::default()
-            };
-            let font_metrics = FontMetrics::from_skrifa_metrics(&metrics, 24.0);
-            assert_eq!(font_metrics.ascent, 18.0);
-            assert_eq!(font_metrics.descent, expected);
-        }
-    }
+    use super::ShapedText;
 
     pub(crate) const ROBOTO: &[u8] =
         include_bytes!("../../../parley_dev/assets/fonts/roboto_fonts/Roboto-Regular.ttf");
@@ -831,9 +782,9 @@ pub(crate) mod tests {
         let [a, soft_hyphen, b] = shaped.runs() else {
             panic!("expected three runs, got {}", shaped.runs().len());
         };
-        assert_eq!(a.characters_range, 0..1);
-        assert_eq!(soft_hyphen.characters_range, 1..2);
-        assert_eq!(b.characters_range, 2..3);
+        assert_eq!(a.characters_range, (0..1).into());
+        assert_eq!(soft_hyphen.characters_range, (1..2).into());
+        assert_eq!(b.characters_range, (2..3).into());
 
         assert!(soft_hyphen.glyphs_range.is_empty());
 

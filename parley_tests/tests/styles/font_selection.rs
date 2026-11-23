@@ -204,3 +204,48 @@ fn style_font_family_named() {
 
     env.with_name("roboto").check_layout_snapshot(&layout);
 }
+
+// ============================================================================
+// unicode-range Tests
+// ============================================================================
+
+/// A font whose `unicode-range` excludes "é" but includes its decomposition can serve it.
+#[test]
+fn style_font_unicode_range_decomposition() {
+    use fontique::UnicodeRangeSet;
+    use parley::PositionedLayoutItem;
+    use parley::style::FontFamily;
+
+    let mut env = TestEnv::new(test_name!(), None);
+    let mut load = |name| {
+        let family = env.collection().family_by_name(name).unwrap();
+        family.default_font().unwrap().load(None).unwrap()
+    };
+    let (roboto, arimo) = (load("Roboto"), load("Arimo"));
+    // "e" and U+0301 COMBINING ACUTE ACCENT. Arimo is registered last, so it is tried first.
+    let range = UnicodeRangeSet::new([0x65..=0x65, 0x301..=0x301]);
+    for (font, unicode_range) in [(roboto, None), (arimo.clone(), Some(&range))] {
+        let info = FontInfoOverride {
+            family_name: Some("Composite"),
+            unicode_range,
+            ..Default::default()
+        };
+        env.collection().register_fonts(font, Some(info));
+    }
+
+    for (text, from_arimo) in [("x", false), ("\u{e9}", true)] {
+        let mut builder = env.ranged_builder(text);
+        builder.push_default(StyleProperty::FontFamily(FontFamily::named("Composite")));
+        let mut layout = builder.build(text);
+        layout.break_all_lines(None);
+        let item = layout.lines().next().unwrap().items().next().unwrap();
+        let PositionedLayoutItem::GlyphRun(run) = item else {
+            unreachable!()
+        };
+        assert_eq!(
+            run.run().font().data.id() == arimo.id(),
+            from_arimo,
+            "{text}"
+        );
+    }
+}

@@ -41,7 +41,7 @@ pub(crate) struct ShapeInstanceId {
     font_blob_id: u64,
     /// The font's index in the font collection.
     font_index: u32,
-    synthesis: fontique::Synthesis,
+    synthesis: parlance::Synthesis,
     variations: Option<Box<[FontVariation]>>,
 }
 
@@ -50,7 +50,7 @@ pub(crate) struct ShapeInstanceKey<'a> {
     font_blob_id: u64,
     /// The font's index in the font collection.
     font_index: u32,
-    synthesis: &'a fontique::Synthesis,
+    synthesis: &'a parlance::Synthesis,
     variations: Option<&'a [FontVariation]>,
 }
 
@@ -58,7 +58,7 @@ impl<'a> ShapeInstanceKey<'a> {
     pub(crate) const fn new(
         font_blob_id: u64,
         font_index: u32,
-        synthesis: &'a fontique::Synthesis,
+        synthesis: &'a parlance::Synthesis,
         variations: Option<&'a [FontVariation]>,
     ) -> Self {
         Self {

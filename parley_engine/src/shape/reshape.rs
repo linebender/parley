@@ -126,10 +126,7 @@ impl ReshapedText {
             characters: source.characters(),
             shaped_clusters: &self.shaped_clusters,
             glyphs: &self.glyphs,
-            clusters: (
-                run.shaped_clusters_range.start,
-                run.shaped_clusters_range.end,
-            ),
+            clusters: run.shaped_clusters_range,
         }
     }
 
@@ -143,10 +140,10 @@ impl ReshapedText {
         self.runs.extend(other.runs.iter().map(|reshaped_run| {
             let mut reshaped_run = reshaped_run.clone();
             let run = &mut reshaped_run.run;
-            run.shaped_clusters_range = run.shaped_clusters_range.start + clusters_start
-                ..run.shaped_clusters_range.end + clusters_start;
-            run.glyphs_range =
-                run.glyphs_range.start + glyphs_start..run.glyphs_range.end + glyphs_start;
+            run.shaped_clusters_range.start += clusters_start;
+            run.shaped_clusters_range.end += clusters_start;
+            run.glyphs_range.start += glyphs_start;
+            run.glyphs_range.end += glyphs_start;
             reshaped_run
         }));
         self.shaped_clusters
@@ -1122,20 +1119,20 @@ impl Reshaper {
             font_unit_scale,
             run.bidi_level.is_rtl(),
             characters,
-            chars.start as usize..chars.end as usize,
+            (chars.start as usize..chars.end as usize).into(),
             shaped.has_safe_to_concat_flags,
         );
 
         reshaped.runs.push(ReshapedRun {
             run: ShapedRun {
                 range: TextRange {
-                    byte_range: bytes,
-                    char_range: chars.start as usize..chars.end as usize,
+                    byte_range: bytes.into(),
+                    char_range: (chars.start as usize..chars.end as usize).into(),
                 },
-                characters_range: chars,
+                characters_range: chars.into(),
                 shaped_clusters_range,
                 glyphs_range,
-                ..run.clone()
+                ..*run
             },
             source_run: run_index,
         });
@@ -1163,7 +1160,7 @@ impl Reshaper {
         let instance = base_font
             .instance_builder()
             .normalized_coords(
-                shaped.normalized_coords()[run.normalized_coords_range.clone()]
+                shaped.normalized_coords()[run.normalized_coords_range]
                     .iter()
                     .map(|coord| harfrust::font::NormalizedCoord::from_bits(coord.to_bits())),
             )
@@ -1176,10 +1173,7 @@ impl Reshaper {
         };
         let hb_script = script_to_harfrust(run.script);
         let language = language_to_harfrust(run.language.as_ref());
-        features_to_harfrust(
-            &shaped.features()[run.features_range.clone()],
-            &mut self.features,
-        );
+        features_to_harfrust(&shaped.features()[run.features_range], &mut self.features);
         let shaper_plan = self.shape_plan_cache.entry(
             cache::ShapePlanKey::new(
                 font.font.data.id(),
@@ -1305,7 +1299,7 @@ mod tests {
     fn line_clusters(shaped: &ShapedText, out: &ReshapedText, line: ReshapedLine) -> Vec<Cluster> {
         let range = line.source_shaped_clusters_range();
         let source = ShapedSlice {
-            clusters: (range.start, range.end),
+            clusters: range.into(),
             ..shaped.run_slice(0)
         };
         let [start, end] =

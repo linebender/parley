@@ -350,18 +350,18 @@ impl CharCluster {
     /// [`Coverage::total`] may be different from the count of [`Self::chars`], and may also differ
     /// between subsequent calls due to returning the best coverage of either the original
     /// characters or one of the normalized forms.
-    pub fn calculate_coverage(&mut self, covers: impl Fn(char) -> bool) -> Coverage {
+    pub fn calculate_coverage(&mut self, mut covers: impl FnMut(char) -> bool) -> Coverage {
         let len = self.len();
         let mut best_coverage = Mapper {
             chars: &self.chars[..len],
             map_len: self.map_len,
         }
-        .coverage(&covers);
+        .coverage(&mut covers);
         if best_coverage.is_complete() {
             return best_coverage;
         }
         if self.force_normalize && self.composed().is_some() {
-            let coverage = self.comp.coverage(&covers);
+            let coverage = self.comp.coverage(&mut covers);
             if coverage > best_coverage {
                 best_coverage = coverage;
                 if coverage.is_complete() {
@@ -370,7 +370,7 @@ impl CharCluster {
             }
         }
         if self.decomposed().is_some() {
-            let coverage = self.decomp.coverage(&covers);
+            let coverage = self.decomp.coverage(&mut covers);
             if coverage > best_coverage {
                 best_coverage = coverage;
                 if coverage.is_complete() {
@@ -378,7 +378,7 @@ impl CharCluster {
                 }
             }
             if !self.force_normalize && self.composed().is_some() {
-                let coverage = self.comp.coverage(&covers);
+                let coverage = self.comp.coverage(&mut covers);
                 if coverage > best_coverage {
                     best_coverage = coverage;
                     if coverage.is_complete() {
@@ -526,7 +526,7 @@ impl Form {
     }
 
     #[inline(always)]
-    fn coverage(&self, covers: &impl Fn(char) -> bool) -> Coverage {
+    fn coverage(&self, covers: &mut impl FnMut(char) -> bool) -> Coverage {
         Mapper {
             chars: &self.chars[..self.len as usize],
             map_len: self.map_len,
@@ -542,7 +542,7 @@ struct Mapper<'a> {
 
 impl<'a> Mapper<'a> {
     /// Returns the coverage of characters contributing to shaping.
-    fn coverage(&self, covers: &impl Fn(char) -> bool) -> Coverage {
+    fn coverage(&self, covers: &mut impl FnMut(char) -> bool) -> Coverage {
         let mut mapped: u8 = 0;
         for c in self.chars.iter() {
             if c.contributes_to_shaping && covers(c.ch) {

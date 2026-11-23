@@ -9,7 +9,7 @@ use linebender_resource_handle::{Blob, FontData};
 use parlance::{FontFeature, FontVariation, Language};
 
 use crate::{
-    Analysis, CharInfo, ShapedText,
+    Analysis, CharInfo, FontMetrics, ShapedText,
     itemize::{Item, Segment, TextRange},
     lru_cache::LruCache,
     shape::{CharCluster, cache},
@@ -48,9 +48,9 @@ pub struct FontInstance {
     /// The font.
     pub font: FontData,
     /// Font synthesis suggestions.
-    // TODO: Synthesis carries more than we need, and ties us to `fontique`. We can likely change
-    // this to opaque user data.
-    pub synthesis: fontique::Synthesis,
+    // TODO: Synthesis carries more than we need: shaping only uses its variation settings. We can
+    // likely change this to opaque user data.
+    pub synthesis: parlance::Synthesis,
 }
 
 impl FontInstance {
@@ -73,7 +73,7 @@ pub struct FontInstanceRef<'a> {
     /// Index of the font in a collection, or 0 for a single font.
     pub index: u32,
     /// Font synthesis suggestions.
-    pub synthesis: &'a fontique::Synthesis,
+    pub synthesis: &'a parlance::Synthesis,
 }
 
 impl From<FontInstanceRef<'_>> for FontInstance {
@@ -120,6 +120,42 @@ impl core::fmt::Debug for Shaper {
 }
 
 impl Shaper {
+    /// Returns the metrics for `font` at `font_size`.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `font` is malformed.
+    pub fn font_metrics(
+        &mut self,
+        font: FontInstanceRef<'_>,
+        font_size: f32,
+        variations: &[FontVariation],
+    ) -> FontMetrics {
+        // Make sure to sync with `shape_segment`
+        let base_font = self.shape_data_cache.entry(
+            cache::ShapeDataKey::new(font.data.id(), font.index),
+            || {
+                let (data, _) = font.data.clone().into_raw_parts();
+                harfrust::Font::new(data, font.index).unwrap()
+            },
+        );
+        let instance = self.shape_instance_cache.entry(
+            cache::ShapeInstanceKey::new(
+                font.data.id(),
+                font.index,
+                font.synthesis,
+                Some(variations),
+            ),
+            || {
+                base_font
+                    .instance_builder()
+                    .variations(variations_iter(font.synthesis, variations))
+                    .build()
+            },
+        );
+        FontMetrics::from_harfrust_font(instance, font_size)
+    }
+
     /// Shape text into glyphs, overwriting `shaped_text`.
     ///
     /// The `text` passed in must be the same as used for producing `analysis`.
@@ -260,14 +296,14 @@ fn shape_segment(
 ) -> Result<(), ()> {
     select_font.begin_segment(segment, options);
 
-    let text_range = &segment.range.byte_range;
-    let char_range = &segment.range.char_range;
+    let text_range = segment.range.byte_range;
+    let char_range = segment.range.char_range;
 
-    let segment_text = &text[text_range.clone()];
+    let segment_text = &text[text_range];
 
     // Only process current segment
-    let segment_char_info = &char_info[char_range.start..char_range.end];
-    let segment_char_style_indices = &char_style_indices[char_range.start..char_range.end];
+    let segment_char_info = &char_info[char_range];
+    let segment_char_style_indices = &char_style_indices[char_range];
 
     if segment_text.is_empty() {
         return Ok(()); // No clusters
@@ -343,7 +379,7 @@ fn shape_segment(
         });
 
         // Use the entire run text including newlines.
-        let run_text = &text[range.byte_range.clone()];
+        let run_text = &text[range.byte_range];
         buffer.reserve(run_text.len());
         #[expect(clippy::cast_possible_truncation, reason = "Deferred")]
         for (i, ch) in run_text.chars().enumerate() {
@@ -383,7 +419,7 @@ fn shape_segment(
             char_style_indices,
             font,
             buffer,
-            instance.normalized_coords(),
+            instance,
         );
     };
 
@@ -413,8 +449,8 @@ fn shape_segment(
         char_cluster.fill(chars.by_ref().take(grapheme_length), &mut byte_end);
         char_end += grapheme_length;
         let grapheme = TextRange {
-            byte_range: byte_start..byte_end,
-            char_range: char_start..char_end,
+            byte_range: (byte_start..byte_end).into(),
+            char_range: (char_start..char_end).into(),
         };
 
         // An object is shaped as a run of its own, to ensure it becomes its own shaped cluster. It
@@ -455,15 +491,14 @@ fn shape_segment(
 
 #[inline]
 fn variations_iter<'a>(
-    synthesis: &'a fontique::Synthesis,
+    synthesis: &'a parlance::Synthesis,
     item: &'a [FontVariation],
 ) -> impl Iterator<Item = harfrust::font::Variation> + 'a {
     synthesis
         .variation_settings()
-        .iter()
         .map(|(tag, value)| harfrust::font::Variation {
-            tag: *tag,
-            value: *value,
+            tag: harfrust::Tag::new(&tag.to_bytes()),
+            value,
         })
         .chain(item.iter().map(|variation| harfrust::font::Variation {
             tag: harfrust::Tag::new(&variation.tag.to_bytes()),
@@ -486,7 +521,7 @@ pub(crate) fn features_to_harfrust(features: &[FontFeature], out: &mut Vec<harfr
     }));
 }
 
-pub(crate) fn script_to_harfrust(script: fontique::Script) -> harfrust::Script {
+pub(crate) fn script_to_harfrust(script: parlance::Script) -> harfrust::Script {
     harfrust::Script::from_iso15924_tag(harfrust::Tag::new(&script.to_bytes()))
         .unwrap_or(harfrust::Script::UNKNOWN)
 }
