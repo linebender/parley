@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 use alloc::boxed::Box;
-use hashbrown::Equivalent;
 use parlance::FontVariation;
 
 #[derive(PartialEq, Eq, Copy, Clone)]
@@ -56,9 +55,9 @@ impl<'a> ShapeInstanceKey<'a> {
     }
 }
 
-impl<'a> Equivalent<ShapeInstanceId> for ShapeInstanceKey<'a> {
+impl PartialEq<ShapeInstanceId> for ShapeInstanceKey<'_> {
     #[inline(always)]
-    fn equivalent(&self, key: &ShapeInstanceId) -> bool {
+    fn eq(&self, key: &ShapeInstanceId) -> bool {
         self.font_blob_id == key.font_blob_id
             && self.font_index == key.font_index
             && *self.synthesis == key.synthesis

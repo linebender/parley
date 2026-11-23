@@ -2,7 +2,6 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 use alloc::vec::Vec;
-use hashbrown::Equivalent;
 
 /// A least-recently-used cache. This cache uses a linear scan of its entries
 /// to find a given entry - it is optimised for a low number of entries. Preferably
@@ -19,14 +18,14 @@ impl<Id, T> LruCache<Id, T> {
     }
 
     /// Returns a reference to the entry with the given ID. If the entry is not
-    /// found, it is created and returned using `make_data`.
+    /// found, it is created and returned using `make`.
     pub(crate) fn entry<K>(&mut self, key: K, make: impl FnOnce() -> T) -> &T
     where
-        K: Equivalent<Id> + Into<Id>,
+        K: PartialEq<Id> + Into<Id>,
     {
         let (_, value) = self
             .store
-            .entry(|(id, _)| key.equivalent(id))
+            .entry(|(id, _)| key.eq(id))
             .or_insert_with(|| (key.into(), make()));
         value
     }
@@ -115,8 +114,8 @@ mod tests {
     struct TestId(String);
     struct TestLookupKey<'a>(&'a str);
 
-    impl<'a> Equivalent<TestId> for TestLookupKey<'a> {
-        fn equivalent(&self, key: &TestId) -> bool {
+    impl PartialEq<TestId> for TestLookupKey<'_> {
+        fn eq(&self, key: &TestId) -> bool {
             self.0 == key.0.as_str()
         }
     }
@@ -124,12 +123,6 @@ mod tests {
     impl<'a> From<TestLookupKey<'a>> for TestId {
         fn from(key: TestLookupKey<'a>) -> Self {
             Self(key.0.to_string())
-        }
-    }
-
-    impl Equivalent<Self> for TestId {
-        fn equivalent(&self, key: &Self) -> bool {
-            self.0 == key.0
         }
     }
 
