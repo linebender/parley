@@ -30,7 +30,7 @@ use parley_engine::shape::Whitespace;
 use parley_engine::{Atom, ShapedSlice};
 
 use crate::layout::Style;
-use crate::layout::spacing::EffectiveSpacing;
+use crate::layout::spacing::Gaps;
 use crate::style::Brush;
 use crate::{TextWrapMode, WhiteSpaceCollapse};
 
@@ -78,16 +78,18 @@ pub(crate) fn whitespace_hangs<B: Brush>(whitespace: Whitespace, style: &Style<B
 /// An atom can hang partially: e.g., a prepend character followed by a space is a single atom (as
 /// it's a grapheme), but may consist of multiple shaped clusters, of which the spaces can hang.
 /// The atom's spacing at its logical end hangs along with the clusters, and if the atom hangs in
-/// its entirety does its spacing at its logical start hang as well.
+/// its entirety does its spacing at its logical start hang as well. `gaps` is the atom's spacing.
+///
+/// This decides both whether an atom at the end of a line fits when line breaking, and how much
+/// of the line hangs when committing it, so the two always agree.
 #[inline(always)]
 pub(crate) fn atom_hanging_advance<B: Brush>(
     slice: ShapedSlice<'_>,
     atom: &Atom<'_>,
     styles: &[Style<B>],
-    spacing: EffectiveSpacing,
+    gaps: Gaps,
     is_rtl: bool,
 ) -> (f32, bool) {
-    let gaps = spacing.gaps(atom);
     let (gap_start, gap_end) = if is_rtl {
         (gaps.after, gaps.before)
     } else {

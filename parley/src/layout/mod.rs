@@ -5,6 +5,7 @@
 
 mod alignment;
 mod cluster;
+mod justification;
 mod line;
 mod line_break;
 mod run;

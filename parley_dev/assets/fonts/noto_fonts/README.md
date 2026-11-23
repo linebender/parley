@@ -13,12 +13,12 @@ The full unsubsetted font was obtained from <https://github.com/notofonts/noto-c
 [Language Specific OTFs Simplified Chinese (简体中文)](https://github.com/notofonts/noto-cjk/releases/download/Sans2.004/08_NotoSansCJKsc.zip)).
 The original font file (`NotoSansCJKsc-Regular.otf`), had sha256 hash `2c76254f6fc379fddfce0a7e84fb5385bb135d3e399294f6eeb6680d0365b74b`.
 
-Currently, this subset is only a single glyph, produced using [fonttools](https://github.com/fonttools/fonttools):
+Currently, this subset is 骨, 漢, 字, 典, 、, 。 and U+3000 IDEOGRAPHIC SPACE, produced using [fonttools](https://github.com/fonttools/fonttools):
 
 ```sh
 fonttools subset NotoSansCJKsc-Regular.otf \
   --output-file=NotoSansCJKsc-Regular-subset.otf \
-  --unicodes=U+9AA8 \
+  --unicodes=U+9AA8,U+6F22,U+5B57,U+5178,U+3000-3002 \
   --layout-features='*' \
   --glyph-names \
   --symbol-cmap \

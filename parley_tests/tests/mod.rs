@@ -32,6 +32,7 @@ mod exclusions;
 mod floats;
 mod inline_objects;
 mod issues;
+mod justification;
 mod line_break;
 mod linebreaking_matches_chrome;
 mod lines;

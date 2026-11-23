@@ -104,6 +104,15 @@ pub fn line_breaking() -> Vec<Benchmark> {
     ];
 
     fn break_lines(layout: &mut Layout<ColorBrush>, max_advance: Option<f32>) {
+        break_lines_aligned(layout, max_advance, Alignment::Start);
+    }
+
+    fn break_lines_aligned(
+        layout: &mut Layout<ColorBrush>,
+        max_advance: Option<f32>,
+        alignment: Alignment,
+    ) {
+        layout.set_alignment(alignment, AlignmentOptions::default());
         layout.break_all_lines(max_advance);
         black_box((layout.len(), layout.width(), layout.height()));
     }
@@ -144,6 +153,28 @@ pub fn line_breaking() -> Vec<Benchmark> {
                 b.iter(move || break_lines(&mut layout, Some(MAX_ADVANCE)))
             },
         ));
+    }
+
+    // Justified, with and without word and letter spacing.
+    for sample in samples() {
+        for (label, spaced) in [("justified", false), ("spacing + justified", true)] {
+            benchmarks.push(benchmark_fn(
+                format!(
+                    "Line Breaking - {} {}, wrapped + {label}",
+                    sample.name, sample.modification
+                ),
+                move |b| {
+                    let mut layout = if spaced {
+                        build_layout(&sample.text, spacing_styles(0..sample.text.len()))
+                    } else {
+                        build_layout(&sample.text, [])
+                    };
+                    b.iter(move || {
+                        break_lines_aligned(&mut layout, Some(MAX_ADVANCE), Alignment::Justify);
+                    })
+                },
+            ));
+        }
     }
 
     benchmarks
