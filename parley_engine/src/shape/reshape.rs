@@ -548,15 +548,17 @@ impl Reshaper {
 
     /// Make `line` identical to reshaping the whole line.
     ///
+    /// See the note about [exactness](Self#exactness).
+    ///
+    /// The result is guaranteed to be identical to reshaping the whole line, but for some fonts,
+    /// like those that kern many characters, this process may be relatively slow. In case the line
+    /// created by [`Self::line`] turned out to not already be exact, the line's
+    /// [advance](PendingLine::advance_delta) may change.
+    ///
     /// This splices the line's reshaped fragments to the source glyphs at the nearest cluster that
     /// is marked [`ShapedCluster::is_safe_to_concat_before`] in both the source and the reshaped
     /// fragment, extending the fragments until such a boundary is found, or reshaping the whole line
     /// if they would overlap. Note this repeatedly reshapes the fragments.
-    ///
-    /// The result will always be identical to reshaping the whole line, but for some fonts, like
-    /// those that kern many characters, fragments may be much longer than necessary and this
-    /// process may be relatively slow. Call this once, for the line you keep, rather than for every
-    /// candidate line. The line's [advance](PendingLine::advance_delta) may change.
     ///
     /// # Panics
     ///
