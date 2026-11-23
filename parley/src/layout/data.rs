@@ -171,6 +171,29 @@ impl LineItemData {
     pub(crate) fn is_rtl(&self) -> bool {
         self.bidi_level.is_rtl()
     }
+
+    /// The advance of `shaped_clusters`, which must be a subrange of
+    /// [`Self::shaped_cluster_range`]. This includes their [`Gaps`].
+    pub(crate) fn advance_in<B: Brush>(
+        &self,
+        layout: &LayoutData<B>,
+        shaped_clusters: Range<u32>,
+    ) -> f32 {
+        let clusters = &layout.shaped_text.shaped_clusters()
+            [shaped_clusters.start as usize..shaped_clusters.end as usize];
+        match self.gaps_start {
+            Some(gaps_start) => {
+                let start =
+                    (gaps_start + shaped_clusters.start - self.shaped_cluster_range.start) as usize;
+                layout.cluster_gaps[start..start + clusters.len()]
+                    .iter()
+                    .zip(clusters)
+                    .map(|(gaps, cluster)| cluster.advance + gaps.total())
+                    .sum()
+            }
+            None => clusters.iter().map(|cluster| cluster.advance).sum(),
+        }
+    }
 }
 
 #[derive(Clone, Debug, PartialEq)]

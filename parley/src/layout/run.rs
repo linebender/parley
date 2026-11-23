@@ -144,20 +144,10 @@ impl<'a, B: Brush> Run<'a, B> {
     /// layout has been [aligned](Layout::set_alignment) with [`Justify`](crate::Alignment::Justify), the
     /// justification.
     pub fn advance(&self) -> f32 {
-        let slice = self.line_slice();
-        match self.gaps() {
-            Some(gaps) => gaps
-                .for_cluster_range(slice.shaped_clusters_range())
-                .iter()
-                .zip(slice.shaped_clusters())
-                .map(|(entry, cluster)| cluster.advance + entry.total())
-                .sum(),
-            None => slice
-                .shaped_clusters()
-                .iter()
-                .map(|cluster| cluster.advance)
-                .sum(),
-        }
+        // As in `Self::gaps`, a Run with no line_data only happens during line breaking, which
+        // doesn't call this method.
+        let item = self.line_data.unwrap();
+        item.advance_in(&self.layout.data, item.shaped_cluster_range)
     }
 
     /// Returns the original text range for the run.

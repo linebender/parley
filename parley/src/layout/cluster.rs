@@ -449,18 +449,35 @@ impl<'a, B: Brush> Cluster<'a, B> {
     /// This cost of this function is roughly linear in the number of clusters
     /// on the containing line.
     pub fn visual_offset(&self) -> Option<f32> {
-        let line = self.line();
-        let mut offset = line.metrics().offset + line.metrics().inline_min_coord;
-        for run_index in 0..=self.run.index as usize {
-            let run = line.item(run_index)?;
-            if run_index != self.run.index as usize {
-                offset += run.advance();
+        let layout = &self.run.layout.data;
+        let line = layout.lines.get(self.run.line_index as usize)?;
+        let mut offset = line.metrics.offset + line.metrics.inline_min_coord;
+        // The runs visually before this cluster's run.
+        let (before, rest) =
+            layout.line_items[line.item_range].split_at_checked(self.run.index as usize)?;
+        for item in before {
+            offset += item.advance_in(layout, item.shaped_cluster_range);
+        }
+        // The atoms visually before this cluster's atom.
+        let item = rest.first()?;
+        let run_clusters = item.shaped_cluster_range;
+        let atom_clusters = self.atom.shaped_clusters_range();
+        offset += item.advance_in(
+            layout,
+            if self.is_rtl() {
+                (atom_clusters.end..run_clusters.end).into()
             } else {
-                for cluster in run.visual_clusters() {
-                    if cluster.grapheme.char_range().start == self.grapheme.char_range().start {
-                        break;
-                    }
-                    offset += cluster.advance();
+                (run_clusters.start..atom_clusters.start).into()
+            },
+        );
+        // The clusters visually before this one within its atom. Only a ligature has any.
+        if !(self.grapheme.is_atom_start() && self.grapheme.is_atom_end()) {
+            let start = self.grapheme.char_range().start;
+            for grapheme in self.atom.graphemes_start() {
+                if grapheme.char_range().start != start
+                    && (grapheme.char_range().start > start) == self.is_rtl()
+                {
+                    offset += Self { grapheme, ..*self }.advance();
                 }
             }
         }
