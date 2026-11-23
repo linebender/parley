@@ -56,7 +56,6 @@ impl ShapedClusterFlags {
     const SAFE_TO_CONCAT_BEFORE: u32 = 1 << 16;
     /// Whether the cluster's first character is default ignorable.
     const DEFAULT_IGNORABLE: u32 = 1 << 17;
-    /// Whether the cluster is justify expandable.
     const JUSTIFY_EXPANDABLE: u32 = 1 << 18;
 
     #[inline(always)]
@@ -301,12 +300,11 @@ impl ShapedCluster {
         self.flags.is_default_ignorable()
     }
 
-    /// Whether this cluster provides a justification opportunity at its boundary with any other
-    /// cluster, i.e., without there being a word separator.
+    /// Whether this cluster allows a justification opportunity at boundaries with adjacent
+    /// clusters, without needing a word separator.
     ///
-    /// That is the case if this cluster's first character is a [block script] character (see
-    /// [`CharacterFlags::is_block_script`]), or this cluster starts a grapheme which is presented
-    /// as an emoji (as emoji are laid out like the characters of the block scripts).
+    /// True when the cluster's first character belongs to a [block script]
+    /// ([`CharacterFlags::is_block_script`]) or starts a grapheme with emoji presentation.
     ///
     /// [block script]: https://www.w3.org/TR/css-text-3/#block-scripts
     #[inline(always)]
@@ -366,7 +364,7 @@ impl CharacterFlags {
     const INLINE_OBJECT: u8 = 1 << 5;
     /// Whether the character has the `Default_Ignorable_Code_Point` unicode property.
     const DEFAULT_IGNORABLE: u8 = 1 << 6;
-    /// Whether the character belongs to a block script for the purposes of justification.
+    /// Whether the character belongs to a block script for justification.
     const BLOCK_SCRIPT: u8 = 1 << 7;
 
     #[inline(always)]
@@ -378,8 +376,8 @@ impl CharacterFlags {
         is_block_script: bool,
     ) -> Self {
         // TODO: Defer to ICU4X properties (see: https://docs.rs/icu/latest/icu/properties/props/struct.Emoji.html).
-        // Ideally, this would be whether the character's grapheme is presented as an emoji, which
-        // the shaper already determines to compute `ShapedCluster::is_justify_expandable`.
+        // Ideally this would reflect emoji presentation at the grapheme level, which the shaper
+        // already computes for `ShapedCluster::is_justify_expandable`.
         let is_emoji = matches!(source_char as u32, 0x1F600..=0x1F64F | 0x1F300..=0x1F5FF | 0x1F680..=0x1F6FF | 0x2600..=0x26FF | 0x2700..=0x27BF);
         #[expect(
             clippy::cast_possible_truncation,
@@ -445,7 +443,7 @@ impl CharacterFlags {
         self.0 & Self::DEFAULT_IGNORABLE != 0
     }
 
-    /// Whether this character belongs to a block script for the purposes of justification (see
+    /// Whether this character belongs to a block script for justification (see
     /// [`CharInfo::is_block_script`](crate::CharInfo::is_block_script)).
     #[inline(always)]
     pub fn is_block_script(self) -> bool {

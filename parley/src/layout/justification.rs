@@ -1,23 +1,22 @@
 // Copyright 2026 the Parley Authors
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
-//! Justification opportunities, and their distribution over a line's atoms.
+//! Justification opportunities and their distribution across a line's atoms.
 //!
-//! Following the [minimum requirements for `text-justify: auto`][css] in CSS Text Level 3, a
-//! line's justification opportunities are:
+//! Following the [minimum requirements for `text-justify: auto`][css] in CSS Text Level 3,
+//! justification opportunities occur:
 //!
 //! - after each [word separator](is_word_separator), and
-//! - at each visual boundary between two atoms where at least one of them is "justify expandable"
-//!   (a character of a block script, i.e., mostly CJK ideographs, kana and fullwidth symbols, or
-//!   an emoji, see [`ShapedCluster::is_justify_expandable`]) and neither is a word separator.
+//! - at each visual boundary between two atoms where at least one is justify-expandable (a block
+//!   script character or emoji; see [`ShapedCluster::is_justify_expandable`]) and neither is a
+//!   word separator.
 //!
-//! The clustered scripts (e.g., Thai) don't provide justification opportunities yet.
+//! Clustered scripts (e.g., Thai) do not yet provide justification opportunities.
 //!
-//! A word separator owns the whole opportunity after itself. An opportunity between two expandable
-//! atoms is shared equally between the two, and one between an expandable and some other atom is
-//! owned in whole by the expandable atom. Opportunities at the line's edges (including next to
-//! the atoms excluded from justification, like hanging whitespace) are dropped. Zero-width
-//! default ignorable atoms are transparent, i.e., the boundary goes through them.
+//! A word separator owns the full opportunity after itself. Between two expandable atoms, the
+//! opportunity is split equally; between an expandable and a non-expandable atom, the expandable
+//! atom owns the full opportunity. Atoms excluded from justification (such as hanging whitespace)
+//! act as line edges, and zero-width default-ignorable atoms are transparent to adjacency.
 //!
 //! [css]: https://www.w3.org/TR/css-text-3/#justify-algos
 //! [`ShapedCluster::is_justify_expandable`]: parley_engine::shape::ShapedCluster::is_justify_expandable
@@ -47,7 +46,6 @@ impl Class {
     ///
     /// Atoms starting at or beyond shaped cluster `end_cluster` are excluded from justification.
     fn of(atom: &Atom<'_>, end_cluster: u32) -> Option<Self> {
-        // The first shaped cluster caches the relevant properties of the atom's first character.
         let first = atom.shaped_clusters()[0];
         Some(if atom.shaped_clusters_range().start >= end_cluster {
             Self::Edge
@@ -58,7 +56,6 @@ impl Class {
         } else if first.is_justify_expandable() {
             Self::Expandable
         } else if first.is_default_ignorable() && atom.advance() == 0. {
-            // A zero-width ignorable does not interrupt visual adjacency.
             return None;
         } else {
             Self::Opaque
@@ -66,25 +63,22 @@ impl Class {
     }
 }
 
-/// The shares of the justification opportunities owned by a shaped cluster, visually before and
-/// after it, in units of half an opportunity.
+/// Justification opportunity shares owned visually before and after a shaped cluster, packed as
+/// two 2-bit counts of half-opportunities (each 0, 1, or 2).
 ///
-/// An atom's share before itself is owned by its visually first shaped cluster, and its share after
-/// itself by its visually last shaped cluster (see [`visual_edges`]), so that's where the spacing is
-/// applied.
+/// An atom assigns its before-share to its visually first shaped cluster and its after-share to
+/// its visually last (see [`visual_edges`]).
 #[derive(Clone, Copy, Debug, Default, PartialEq, Eq)]
 struct ClusterShares(u8);
 
 impl ClusterShares {
     const AFTER_SHIFT: u8 = 2;
 
-    /// The half opportunities visually before the cluster.
     #[inline(always)]
     fn before(self) -> u8 {
         self.0 & ((1 << Self::AFTER_SHIFT) - 1)
     }
 
-    /// The half opportunities visually after the cluster.
     #[inline(always)]
     fn after(self) -> u8 {
         self.0 >> Self::AFTER_SHIFT
@@ -94,17 +88,14 @@ impl ClusterShares {
 /// The justification opportunities of a line.
 #[derive(Clone, Debug, Default)]
 pub(crate) struct Opportunities {
-    /// The shares of the line's opportunities owned by its shaped clusters.
-    ///
-    /// These are the shaped clusters of the line's text items, one item after the other, in the
-    /// order of the line's items (i.e., visual order).
+    /// Per-cluster shares for the line's text items, concatenated in visual (item) order.
     shares: Vec<ClusterShares>,
-    /// The line's total number of half opportunities.
+    /// Total half-opportunities on the line.
     halves: u32,
 }
 
 impl Opportunities {
-    /// Find the justification opportunities of `line`, whose items are `items`.
+    /// Finds the justification opportunities on `line` (`items` must be in visual order).
     pub(crate) fn find(
         &mut self,
         shaped_text: &ShapedText,
@@ -114,12 +105,10 @@ impl Opportunities {
         self.shares.clear();
         self.halves = 0;
 
-        // The class of the visually previous (non-transparent) atom, and the index of its
-        // visually last shaped cluster.
+        // Visually previous non-transparent atom: its class and the `shares` index of its visually
+        // last cluster.
         let mut previous = (Class::Edge, 0);
-        // The index in `Self::shares` of the item's first shaped cluster.
         let mut item_start = 0;
-        // The line's items are in visual order.
         for item in items {
             let clusters = item.shaped_cluster_range;
             let cluster_len = (clusters.end - clusters.start) as usize;
@@ -129,7 +118,6 @@ impl Opportunities {
             let slice = shaped_text
                 .run_slice(item.index as u32)
                 .narrow(clusters.into());
-            // Visit the item's atoms in visual order.
             let mut atoms = if is_rtl {
                 slice.atoms_end()
             } else {
@@ -142,14 +130,14 @@ impl Opportunities {
                 let atom_start =
                     item_start + (atom.shaped_clusters_range().start - clusters.start) as usize;
                 let (first, last) = visual_edges(atom.shaped_clusters(), is_rtl);
-                // The opportunity at the boundary with the previous atom.
                 let (after_previous, before) = match (previous.0, class) {
                     (Class::Expandable, Class::Expandable) => (1, 1),
                     (Class::Expandable, Class::Opaque) => (2, 0),
                     (Class::Opaque, Class::Expandable) => (0, 2),
                     _ => (0, 0),
                 };
-                // A word separator owns the opportunity after itself, regardless of what follows.
+                // Word separators always own the opportunity after themselves (trailing ones are
+                // already `Edge`).
                 let after = if class == Class::Space { 2 } else { 0 };
                 if after_previous != 0 {
                     self.shares[previous.1].0 |= after_previous << ClusterShares::AFTER_SHIFT;
@@ -167,10 +155,10 @@ impl Opportunities {
         }
     }
 
-    /// Distribute `free_space` over the opportunities, adding it to `gaps`, the gaps of the shaped
-    /// clusters of the line's text items (in the order of the line's items).
+    /// Distributes `free_space` across the found opportunities, adding it to `gaps`.
     ///
-    /// Returns `false` if there are no opportunities, in which case nothing is changed.
+    /// `gaps` must align with the shaped clusters passed to [`Self::find`]. Returns `false`
+    /// without modifying `gaps` if there are no opportunities.
     pub(crate) fn justify(&self, gaps: &mut [Gaps], free_space: f32) -> bool {
         if self.halves == 0 {
             return false;

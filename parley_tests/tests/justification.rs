@@ -51,7 +51,6 @@ fn glyphs(layout: &Layout<ColorBrush>) -> Vec<parley::Glyph> {
 #[test]
 fn justification_cj() {
     let mut env = TestEnv::new(test_name!(), None);
-    // Each fixture is one line at twice its natural advance, so expansion is unmistakable.
     for (name, text, expands) in [
         ("pair", "漢字", true),
         ("space", "漢 字", true),
@@ -70,8 +69,8 @@ fn justification_cj() {
         ("ligature", "fi漢", true),
         ("bidi", "漢مرحبا字", true),
         ("rtl_no_opportunity", "مرحبا", false),
-        // A grapheme presented as an emoji is expandable, whether that's the default (👀) or
-        // requested (U+FE0F), but a pictograph presented as text is not (if it isn't wide).
+        // Emoji-presented graphemes are expandable (by default like 👀, or via U+FE0F).
+        // Text-presented pictographs are only expandable if Wide (👀 is Wide; ✌ is not).
         ("emoji", "a👀b", true),
         ("emoji_text_selector", "a👀\u{fe0e}b", true),
         ("emoji_selector", "a✌\u{fe0f}b", true),
@@ -111,7 +110,7 @@ fn justification_cj_halfway_geometry() {
     close(natural_glyphs[0].advance, 16.);
     close(natural_glyphs[1].advance, 16.);
 
-    // Hand-derived: one opportunity, 20 units free, each facing owner gets 10.
+    // One opportunity between two 16px glyphs in 52px leaves 20px free, split 10px to each side.
     layout.set_alignment(Alignment::Justify, JUSTIFY_LAST);
     layout.break_all_lines(Some(52.));
     let positioned = glyphs(&layout);
@@ -151,12 +150,12 @@ fn justification_cj_halfway_geometry() {
         .collect();
     assert_eq!(runs.len(), 2);
     assert!(runs[0].style().underline.is_some());
-    // The renderer uses this advance for the first character's underline extent.
+    // First run's advance determines its underline extent.
     close(runs[0].offset() + runs[0].advance(), 26.);
     close(runs[1].offset(), 26.);
     env.render_and_check_snapshot(&layout, Some(caret.geometry(&layout, 1.)), &selection);
 
-    // Re-breaking with another alignment, and then justified again gives the same result.
+    // Switching alignment and re-justifying produces the same positions.
     layout.set_alignment(Alignment::Start, AlignmentOptions::default());
     layout.break_all_lines(Some(52.));
     assert_ne!(glyphs(&layout), positioned);

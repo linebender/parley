@@ -141,7 +141,6 @@ impl Spacing {
         if self.is_zero() {
             return Gaps::ZERO;
         }
-        // The first shaped cluster caches the relevant properties of the atom's first character.
         let first_cluster = atom.shaped_clusters()[0];
         self.gaps(
             first_cluster.whitespace(),
@@ -150,8 +149,7 @@ impl Spacing {
     }
 }
 
-/// The indices into `clusters` (an atom's shaped clusters) of the visually first and last shaped
-/// cluster.
+/// Returns the indices of the visually first and last elements of `clusters`.
 ///
 /// `clusters` must not be empty.
 #[inline]

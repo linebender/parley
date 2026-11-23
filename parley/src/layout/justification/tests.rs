@@ -16,7 +16,6 @@ const JUSTIFY_LAST: AlignmentOptions = AlignmentOptions {
 
 const FONT_FAMILIES: &str = "Roboto, 'Noto Sans CJK SC', 'Noto Kufi Arabic'";
 
-/// Build `text`, and justify it (including the last line) at twice its natural width.
 fn layout(text: &str) -> Layout<()> {
     let mut fonts = create_font_context();
     let mut context = LayoutContext::new();
@@ -45,7 +44,6 @@ fn close(actual: f32, expected: f32) {
     );
 }
 
-/// How much of an opportunity a shaped cluster owns on one visual side.
 #[derive(Clone, Copy, Debug, PartialEq, Eq)]
 enum Share {
     None,
@@ -53,7 +51,6 @@ enum Share {
     Whole,
 }
 
-/// The justification opportunities of line `index` of `layout`.
 fn opportunities(layout: &Layout<()>, index: usize) -> Opportunities {
     let data = &layout.data;
     let line = &data.lines[index];
@@ -62,11 +59,9 @@ fn opportunities(layout: &Layout<()>, index: usize) -> Opportunities {
     opportunities
 }
 
-/// The owners of the line's opportunities, as the byte index of the owning shaped cluster's first
-/// character, and its shares before and after it.
+/// Returns `(byte_index, before, after)` for each cluster that owns a non-zero opportunity share.
 fn owners(layout: &Layout<()>, index: usize) -> Vec<(usize, Share, Share)> {
     let data = &layout.data;
-    // The line's shaped clusters, in the order `Opportunities::shares` indexes them.
     let clusters: Vec<u32> = data.line_items[data.lines[index].item_range]
         .iter()
         .flat_map(|item| item.shaped_cluster_range)
@@ -97,7 +92,7 @@ fn owners(layout: &Layout<()>, index: usize) -> Vec<(usize, Share, Share)> {
     owners
 }
 
-/// Justified lines with opportunities must fill the line, and others must not be stretched.
+/// Asserts that justified lines with opportunities fill their width and others are unchanged.
 fn assert_fills_width(layout: &Layout<()>) {
     for index in 0..layout.len() {
         let line = layout.get(index).unwrap();
@@ -130,7 +125,6 @@ fn assert_fills_width(layout: &Layout<()>) {
 #[test]
 fn cj_boundary_ownership() {
     use Share::{Half as H, None as N, Whole as W};
-    // Expected byte-indexed owners, derived from visual boundaries.
     type ExpectedOwner = (usize, Share, Share);
     let cases: &[(&str, &[ExpectedOwner])] = &[
         ("one two", &[(3, N, W)]),
@@ -179,7 +173,7 @@ fn cj_mixed_direction_fills_width() {
         let layout = layout(text);
         assert_fills_width(&layout);
         if opportunities(&layout, 0).halves == 0 {
-            // Zero-opportunity RTL lines remain start aligned (visually right aligned).
+            // Without opportunities, RTL lines fall back to start (right) alignment.
             let metrics = &layout.data.lines[0].metrics;
             close(metrics.offset, metrics.inline_max_coord - metrics.advance);
         }
@@ -208,8 +202,6 @@ fn cj_inline_box_is_opaque_and_non_owning() {
     assert_fills_width(&layout);
 }
 
-/// Justified lines must fill the line across line breaks, hanging whitespace, and white space
-/// handling.
 #[test]
 fn lines_fill_width_with_white_space_handling() {
     use crate::{TextWrapMode, WhiteSpaceCollapse};

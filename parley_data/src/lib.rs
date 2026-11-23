@@ -287,33 +287,25 @@ impl Properties {
         ) != 0
     }
 
-    /// Returns whether the character belongs to a block script for the purposes of justification,
-    /// as computed by [`Self::block_script`].
+    /// Returns whether the character belongs to a block script for justification, as computed by
+    /// [`Self::block_script`].
     #[inline(always)]
     pub fn is_block_script(&self) -> bool {
         self.bits(Self::IS_BLOCK_SCRIPT_SHIFT, Self::IS_BLOCK_SCRIPT_BITS) != 0
     }
 
-    /// Computes whether a character with the given properties belongs to a block script for the
-    /// purposes of justification.
+    /// Returns whether a character with the given properties belongs to a block script for
+    /// justification.
     ///
-    /// This follows the definition of block scripts in [CSS Text Level 3, Appendix D][css], i.e.
-    /// the characters of the Bopomofo, Han, Hiragana, Katakana and Yi scripts, and all characters
-    /// which are `Wide` or `Fullwidth` ([UAX #11][]), with these deviations:
+    /// Follows [CSS Text Level 3, Appendix D][css] (Bopomofo, Han, Hiragana, Katakana, Yi, and
+    /// `Wide` or `Fullwidth` characters per [UAX #11][]), with these deviations:
     ///
-    /// - Hangul is excluded, because Korean is generally written with spaces between words.
-    ///   CSS only wants this where it is the convention of the content language, but we don't
-    ///   make that distinction yet.
-    /// - Currency symbols are excluded, as these attach to the adjacent number. CSS allows
-    ///   reassigning specific symbols and punctuation in this way ([§ 6.4.2][symbols]).
-    ///
-    /// TODO: CSS also includes the `Ambiguous` characters (largely the symbols from legacy East
-    /// Asian character sets) if the content language is Chinese, Japanese or Korean.
-    ///
-    /// TODO: Handle the other traditions for symbols and punctuation ([§ 6.4.2][symbols]). For
-    /// example, there are no justification opportunities between consecutive U+2014 EM DASH,
-    /// U+2015 HORIZONTAL BAR, U+2026 HORIZONTAL ELLIPSIS, or U+2025 TWO DOT LEADER characters
-    /// in Japanese.
+    /// - Hangul is excluded because Korean is normally space-separated (CSS restricts this by
+    ///   content language, which we do not distinguish yet).
+    /// - Currency symbols are excluded because they attach to adjacent numbers (allowed by
+    ///   [§ 6.4.2][symbols]).
+    /// - `Ambiguous` width characters (legacy East Asian symbols) are not included, since doing so
+    ///   depends on the content language.
     ///
     /// [css]: https://www.w3.org/TR/css-text-3/#script-groups
     /// [symbols]: https://www.w3.org/TR/css-text-3/#justify-symbols

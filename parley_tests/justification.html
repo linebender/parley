@@ -25,12 +25,7 @@
   .underline { text-decoration: underline; }
 </style>
 <!--
-  Matches the exact texts in tests/justification.rs. Hover for fixture names.
-  Every fixture is one line at twice its natural advance (minimum 16px).
-  Width measurement preserves whitespace, as Rust's natural advance does.
-  Google Fonts' Japanese font substitutes for the local Noto CJK SC subset;
-  ideograph outlines can differ. Bidi comparisons are best-effort, not parity.
-  Trailing U+3000 already hangs on this branch; it does not own expansion.
+  Manual Chrome comparison for tests/justification.rs (see README.md). Hover for fixture names.
 -->
 <div id="layout">
   <div title="pair">漢字</div>
@@ -56,9 +51,9 @@
   <div title="text_pictograph (differs: Chrome expands)">a✌b</div>
   <div title="halfway_geometry" style="--max-advance: 52"><span class="underline">漢</span>字</div>
   <!--
-    Differences from Chrome, see `README.md`. These are not Rust fixtures (the test fonts lack
-    the glyphs). Each is between Latin letters, so the only opportunities are those provided by
-    the character in question, i.e. there is expansion iff it is expandable.
+    Intentional differences from Chrome (see README.md); not Rust fixtures because the test fonts
+    lack these glyphs. Wrapped in Latin letters so expansion occurs only if the middle character is
+    expandable.
   -->
   <div title="diff: text pictograph (Parley: no, Chrome: yes)">a☎b</div>
   <div title="diff: legacy symbol (Parley: no, Chrome: yes)">a★b</div>

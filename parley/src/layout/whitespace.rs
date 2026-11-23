@@ -79,9 +79,6 @@ pub(crate) fn whitespace_hangs<B: Brush>(whitespace: Whitespace, style: &Style<B
 /// it's a grapheme), but may consist of multiple shaped clusters, of which the spaces can hang.
 /// The atom's spacing at its logical end hangs along with the clusters, and if the atom hangs in
 /// its entirety does its spacing at its logical start hang as well. `gaps` is the atom's spacing.
-///
-/// This decides both whether an atom at the end of a line fits when line breaking, and how much
-/// of the line hangs when committing it, so the two always agree.
 #[inline(always)]
 pub(crate) fn atom_hanging_advance<B: Brush>(
     slice: ShapedSlice<'_>,

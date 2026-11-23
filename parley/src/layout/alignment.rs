@@ -67,14 +67,11 @@ impl Default for AlignmentOptions {
     }
 }
 
-/// Align the lines of the layout, with the alignment set by [`Layout::set_alignment`].
+/// Align the layout's lines according to [`Layout::set_alignment`].
 ///
-/// This is the last step of line breaking. It sets each line's offset, and writes the additional
-/// spacing of the shaped clusters (word and letter spacing, and justification) to
-/// [`LayoutData::cluster_gaps`].
-///
-/// This applies to the full layout at a time, because the alignment implicitly uses the widest
-/// width in the layout if no max advance was provided.
+/// Sets each line's offset and populates [`LayoutData::cluster_gaps`] with word/letter spacing
+/// and justification. Runs over the whole layout at once because alignment falls back to the
+/// widest line when no max advance was provided.
 ///
 /// [`Layout::set_alignment`]: crate::Layout::set_alignment
 pub(crate) fn align<B: Brush>(layout: &mut LayoutData<B>) {
@@ -82,7 +79,6 @@ pub(crate) fn align<B: Brush>(layout: &mut LayoutData<B>) {
     let options = layout.alignment_options;
     layout.alignment = Some(alignment);
     layout.cluster_gaps.clear();
-    // Reused between lines.
     let mut opportunities = Opportunities::default();
 
     let is_rtl = layout.base_level.is_rtl();
@@ -104,7 +100,7 @@ pub(crate) fn align<B: Brush>(layout: &mut LayoutData<B>) {
         let line_width = line.metrics.inline_max_coord - line.metrics.inline_min_coord;
         let free_space = line_width - indent - line.metrics.advance + line.metrics.hanging_advance;
 
-        // The free space to distribute over the line's justification opportunities, if any.
+        // Free space to distribute if this line is justified.
         let justify = 'justify: {
             if !options.align_when_overflowing && free_space <= 0.0 {
                 if is_rtl {
@@ -153,15 +149,13 @@ pub(crate) fn align<B: Brush>(layout: &mut LayoutData<B>) {
         if justify.is_none() && !line.has_spacing {
             continue;
         }
-        // Write the gaps of the line's shaped clusters: their word and letter spacing, and the
-        // justification.
         let items = &mut layout.line_items[line.item_range];
         let line_gaps_start = layout.cluster_gaps.len();
         for item in items.iter_mut() {
             item.gaps_start = None;
             let spacing = layout.runs[item.index].spacing;
-            // On a justified line, every item has gaps, as justification indexes them by
-            // their position in the line.
+            // On a justified line, every item needs gap entries because `Opportunities::justify`
+            // indexes `cluster_gaps` contiguously across the line's items.
             if justify.is_none() && spacing.is_zero() {
                 continue;
             }
@@ -176,8 +170,7 @@ pub(crate) fn align<B: Brush>(layout: &mut LayoutData<B>) {
             opportunities.find(&layout.shaped_text, line, items);
             let justified =
                 opportunities.justify(&mut layout.cluster_gaps[line_gaps_start..], free_space);
-            // Justified alignment doesn't apply if there are no opportunities. In that case,
-            // start-align, i.e., left-align for LTR text and right-align for RTL text.
+            // Without justification opportunities, fall back to start alignment.
             if !justified && is_rtl {
                 line.metrics.offset += free_space;
             }

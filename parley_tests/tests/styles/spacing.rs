@@ -276,12 +276,6 @@ fn spacing_and_multi_shaped_cluster_graphemes() {
     }
 }
 
-/// The additional spacing on shaped clusters is applied consistently: positioned glyphs advance by
-/// exactly their glyph run's advance, a run's clusters add up to the run's advance, and a glyph run
-/// starts where the previous one ended.
-///
-/// This covers multiple glyphs per shaped cluster (combining marks), multiple shaped clusters per
-/// grapheme, RTL text, ligatures, negative spacing, and justification.
 #[test]
 fn spacing_glyph_and_cluster_advances_agree() {
     let mut env = TestEnv::new(test_name!(), None);
@@ -295,6 +289,7 @@ fn spacing_glyph_and_cluster_advances_agree() {
         samples::ARABIC,
         samples::MIXED_BIDI,
         samples::LIGATURES,
+        // Combining marks (multi-glyph clusters and multi-cluster graphemes).
         "a \u{0301}bh\u{0301}d e\u{0301}\u{0323} x\u{0323}\u{0301}y",
     ];
     let spacings = [(0., 0.), (3., 0.), (0., 5.), (-2., 4.), (2., -3.)];

@@ -92,13 +92,13 @@ pub(crate) struct LineData {
     pub(crate) max_advance: f32,
     /// Whether any text run on this line has word or letter spacing.
     pub(crate) has_spacing: bool,
-    /// The start of the logically first atom excluded from justification. Atoms starting at or
-    /// beyond this shaped cluster index are not justified, as they hang past the line's end (even
-    /// if only partially), or are a word separator closing the line (e.g., an NBSP doesn't hang,
-    /// but if it closes the line, it shouldn't get justified).
+    /// Shaped cluster index of the logically first atom excluded from justification (`u32::MAX` if
+    /// none).
     ///
-    /// Other atoms closing the line (that don't hang) are not excluded, as they may still own a
-    /// justification opportunity visually before themselves, see [`crate::layout::justification`].
+    /// Atoms at or beyond this index either hang (in whole or in part) or are trailing word
+    /// separators (such as NBSP, which doesn't hang). Other non-hanging trailing atoms remain
+    /// eligible because they may still own an opportunity visually before them (see
+    /// [`crate::layout::justification`]).
     pub(crate) justification_end_cluster: u32,
     /// This line's entries in [`LayoutData::aligned_subtree_offsets`].
     ///

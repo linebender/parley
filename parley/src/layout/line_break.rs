@@ -1703,8 +1703,8 @@ fn commit_line<B: Brush>(
     state.items.start = state.items.end.saturating_sub(1);
 }
 
-/// Returns the advance of the whitespace hanging past the end of the line made up of `line_items`,
-/// the start of its logically first atom excluded from justification (see
+/// Returns the advance of the whitespace hanging past the end of the line made up of `line_items`
+/// and the start of its logically first atom excluded from justification (see
 /// [`LineData::justification_end_cluster`]).
 ///
 /// `line_items` must be in logical order.
@@ -1729,7 +1729,6 @@ fn hanging_whitespace<B: Brush>(
     overflow: f32,
 ) -> (f32, u32) {
     let mut hanging_whitespace_advance = 0.;
-    // Atoms starting before this shaped cluster index may be stretched by justification.
     let mut justification_end_cluster = u32::MAX;
     // Following CSS Text 4 § 4.3.2, a sequence of whitespace with `WhiteSpaceCollapse::Preserve`
     // directly preceding a forced line break hangs conditionally. All other whitespace hangs
@@ -1789,10 +1788,9 @@ fn hanging_whitespace<B: Brush>(
                 }
             }
             hanging_whitespace_advance += hanging;
-            // Justification can't stretch within an atom, so it stops at the start of the
-            // last atom that hangs in its entirety or only partially. A word separator
-            // closing the line is excluded even if it doesn't hang (e.g., an NBSP). Other
-            // atoms closing the line remain, as they may own an opportunity before them.
+            // Exclude atoms that hang (even partially) and trailing word separators that don't
+            // hang (such as NBSP). Other non-hanging trailing atoms remain eligible because they
+            // may own a justification opportunity before them.
             let last_cluster = atom.shaped_clusters().last().unwrap();
             let ends_in_hanging_whitespace = slice
                 .characters_in(last_cluster.chars_range())

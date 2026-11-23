@@ -97,8 +97,7 @@ pub struct Shaper {
     buffer: harfrust::Buffer,
     features: Vec<harfrust::Feature>,
     char_cluster: CharCluster,
-    /// The text character indices of the first characters of the current run's graphemes which
-    /// are presented as emoji.
+    /// Text character indices starting each emoji-presented grapheme in the current run.
     emoji_graphemes: Vec<u32>,
 }
 
@@ -337,10 +336,8 @@ fn shape_segment(
         )
     }));
 
-    // Shape a run of the segment with a single font, appending it to `shaped_text`.
-    //
-    // `emoji_graphemes` holds the first characters of the run's graphemes which are presented as
-    // emoji, and is cleared for the next run.
+    // Shape a run of the segment with a single font, appending it to `shaped_text`, and clear
+    // `emoji_graphemes` for the next run.
     let mut shape_run = |font: &FontInstance, range: TextRange, emoji_graphemes: &mut Vec<u32>| {
         // Create harfrust font instance
         let base_font = scx.shape_data_cache.entry(

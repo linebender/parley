@@ -155,7 +155,6 @@ pub fn line_breaking() -> Vec<Benchmark> {
         ));
     }
 
-    // Justified, with and without word and letter spacing.
     for sample in samples() {
         for (label, spaced) in [("justified", false), ("spacing + justified", true)] {
             benchmarks.push(benchmark_fn(

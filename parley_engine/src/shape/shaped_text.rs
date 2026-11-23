@@ -276,8 +276,8 @@ impl ShapedText {
 
     /// Appends a shaped run.
     ///
-    /// `emoji_graphemes` holds the sorted text character indices of the first characters of the
-    /// run's graphemes which are presented as emoji.
+    /// `emoji_graphemes` lists the sorted text character indices starting each emoji-presented
+    /// grapheme in the run.
     #[expect(clippy::cast_possible_truncation, reason = "Deferred")]
     pub(crate) fn push_run(
         &mut self,
@@ -481,8 +481,7 @@ pub struct ShapedRun {
 /// * `characters` must contain the shaped characters whose clusters we're now processing, starting at
 ///   index `characters_start`.
 /// * `characters_start` - See `characters`.
-/// * `emoji_graphemes` - The sorted indices into `characters` of the first characters of the
-///   graphemes which are presented as emoji.
+/// * `emoji_graphemes` - Sorted indices into `characters` starting each emoji-presented grapheme.
 /// * `produce_safe_to_concat_flags` - Whether `HarfRust` was asked to produce the unsafe-to-concat
 ///   glyph flags.
 fn process_shaped_clusters<'a>(

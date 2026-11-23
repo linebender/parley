@@ -472,11 +472,11 @@ impl CharInfo {
         self.flags & Self::DEFAULT_IGNORABLE_MASK != 0
     }
 
-    /// Whether this character belongs to a block script for the purposes of justification (see
+    /// Whether this character belongs to a block script for justification (see
     /// [`parley_data::Properties::block_script`]).
     ///
-    /// These are largely the Chinese and Japanese characters, which provide a justification
-    /// opportunity at their boundary with any other character.
+    /// Mainly Chinese and Japanese characters, which allow justification between adjacent
+    /// characters.
     #[inline(always)]
     pub fn is_block_script(self) -> bool {
         self.flags & Self::BLOCK_SCRIPT_MASK != 0
