@@ -222,6 +222,13 @@ impl FontInfo {
         // It's probably not useful to retain fonts that don't have
         // a valid cmap so just bail here if we fail.
         let charmap_index = CharmapIndex::new(font)?;
+        // Nor fonts without an em to scale their glyphs by: an Apple bitmap
+        // font has `bhed` in place of `head` (macOS's GB18030 Bitmap is one)
+        // and no outlines, so text asking for it should fall back to a font
+        // that can be drawn. OTS rejects such fonts too.
+        if font.head().map_or(true, |head| head.units_per_em() == 0) {
+            return None;
+        }
         let (width, style, weight) = read_attributes(font);
         let (axes, attr_axes) = if let Ok(fvar_axes) = font.fvar().and_then(|fvar| fvar.axes()) {
             let mut axes = SmallVec::<[AxisInfo; 1]>::with_capacity(fvar_axes.len());
@@ -458,11 +465,37 @@ mod tests {
         include_bytes!("../../parley_dev/assets/fonts/roboto_fonts/RobotoFlex-VariableFont.ttf");
 
     fn font_info(data: &[u8]) -> FontInfo {
+        try_font_info(data).unwrap()
+    }
+
+    fn try_font_info(data: &[u8]) -> Option<FontInfo> {
         let source = SourceInfo::new(
             SourceId::new(),
             SourceKind::Memory(Blob::new(Arc::new(data.to_vec()))),
         );
-        FontInfo::from_source(source, 0).unwrap()
+        FontInfo::from_source(source, 0)
+    }
+
+    /// Where the record of the table `tag` is in a font's table directory: the
+    /// 16-byte records of a tag, a checksum, an offset and a length, after the
+    /// 12-byte header.
+    fn table_record(data: &[u8], tag: [u8; 4]) -> usize {
+        let num_tables = usize::from(u16::from_be_bytes([data[4], data[5]]));
+        (0..num_tables)
+            .map(|i| 12 + i * 16)
+            .find(|&record| data[record..record + 4] == tag)
+            .unwrap()
+    }
+
+    /// Roboto with its `head` table's `unitsPerEm` set to `units_per_em`.
+    fn roboto_with_units_per_em(units_per_em: u16) -> alloc::vec::Vec<u8> {
+        let mut data = ROBOTO.to_vec();
+        let record = table_record(&data, *b"head");
+        let offset = u32::from_be_bytes(data[record + 8..record + 12].try_into().unwrap());
+        // `unitsPerEm` is 18 bytes into `head`.
+        let at = usize::try_from(offset).unwrap() + 18;
+        data[at..at + 2].copy_from_slice(&units_per_em.to_be_bytes());
+        data
     }
 
     #[test]
@@ -517,5 +550,22 @@ mod tests {
         );
         assert!(synthesis.embolden());
         assert!(!synthesis.has_variations());
+    }
+
+    #[test]
+    fn font_without_an_em_is_left_out() {
+        assert!(try_font_info(ROBOTO).is_some());
+        // Patching the font isn't what leaves it out.
+        assert!(try_font_info(&roboto_with_units_per_em(1000)).is_some());
+        assert!(try_font_info(&roboto_with_units_per_em(0)).is_none());
+    }
+
+    #[test]
+    fn font_without_a_head_table_is_left_out() {
+        let mut data = ROBOTO.to_vec();
+        let record = table_record(&data, *b"head");
+        // Another tag in its place, which keeps the records sorted.
+        data[record..record + 4].copy_from_slice(b"hea_");
+        assert!(try_font_info(&data).is_none());
     }
 }
