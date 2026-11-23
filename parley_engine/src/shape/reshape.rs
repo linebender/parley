@@ -381,8 +381,7 @@ struct CachedFragment {
 ///
 /// 1. Measure the effect of breaking at candidate line edges using [`Self::measure_start`] and
 ///    [`Self::measure_end`].
-/// 2. Create a line from a start and end using [`Self::line`]. Optionally make the line you keep
-///    exact with [`Self::make_exact`].
+/// 2. Create a line from a start and end using [`Self::line`].
 /// 3. Store the line using [`Self::push_line`].
 ///
 /// Line edges can be at any character boundary, including inside a grapheme. [`Reshaper`] itself
