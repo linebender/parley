@@ -505,8 +505,9 @@ impl Reshaper {
     ///
     /// # Panics
     ///
-    /// Panics if the edits of a line together replace more characters than the line has (unless the
-    /// line is empty, in which case the edits are dropped).
+    /// Panics if the characters replaced by the line's two edits overlap, or one edit replaces more
+    /// characters than the line has (unless the line is empty, in which case the edits are
+    /// dropped).
     #[inline]
     #[expect(clippy::cast_possible_truncation, reason = "Deferred")]
     pub fn line<'e>(
