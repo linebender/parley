@@ -4,77 +4,105 @@
 use alloc::vec::Vec;
 use hashbrown::Equivalent;
 
-/// An entry in the cache.
-pub(crate) struct Entry<ID, T> {
-    pub epoch: u64,
-    pub id: ID,
-    pub data: T,
-}
-
 /// A least-recently-used cache. This cache uses a linear scan of its entries
 /// to find a given entry - it is optimised for a low number of entries. Preferably
 /// keep `max_entries` low - in the order of tens.
-pub(crate) struct LruCache<ID, T> {
-    entries: Vec<Entry<ID, T>>,
-    epoch: u64,
-    max_entries: usize,
+pub(crate) struct LruCache<Id, T> {
+    store: LruStore<(Id, T)>,
 }
 
-impl<ID, T> LruCache<ID, T> {
+impl<Id, T> LruCache<Id, T> {
     pub(crate) fn new(max_entries: usize) -> Self {
         Self {
-            entries: Vec::default(),
-            epoch: 0,
-            max_entries,
+            store: LruStore::new(max_entries),
         }
     }
 
     /// Returns a reference to the entry with the given ID. If the entry is not
     /// found, it is created and returned using `make_data`.
-    ///
-    /// The lookup key must be `Equivalent` to ID for lookups and convertible `Into<ID>`
-    /// for creating new entries.
-    pub(crate) fn entry<K>(&mut self, id: K, make_data: impl FnOnce() -> T) -> &T
+    pub(crate) fn entry<K>(&mut self, key: K, make: impl FnOnce() -> T) -> &T
     where
-        K: Equivalent<ID> + Into<ID>,
+        K: Equivalent<Id> + Into<Id>,
     {
-        let index = self.find_entry(id, make_data);
-        self.epoch += 1;
-        let entry = &mut self.entries[index];
-        entry.epoch = self.epoch;
-        &entry.data
+        let (_, value) = self
+            .store
+            .entry(|(id, _)| key.equivalent(id))
+            .or_insert_with(|| (key.into(), make()));
+        value
+    }
+}
+
+struct Record<T> {
+    epoch: u64,
+    data: T,
+}
+
+pub(crate) struct LruStore<T> {
+    entries: Vec<Record<T>>,
+    epoch: u64,
+    max_entries: usize,
+}
+
+impl<T> LruStore<T> {
+    pub(crate) fn new(max_entries: usize) -> Self {
+        Self {
+            entries: Vec::new(),
+            epoch: 0,
+            max_entries,
+        }
     }
 
-    fn find_entry<K>(&mut self, id: K, make_data: impl FnOnce() -> T) -> usize
-    where
-        K: Equivalent<ID> + Into<ID>,
-    {
-        let epoch = self.epoch;
-        let mut lowest_serial = epoch;
-        let mut lowest_index = 0;
+    /// Finds the first matching entry, or a slot for insertion on a miss.
+    pub(crate) fn entry(&mut self, mut is_match: impl FnMut(&T) -> bool) -> Entry<'_, T> {
+        self.epoch += 1;
+        let mut oldest_epoch = self.epoch;
+        let mut oldest_index = 0;
         for (i, entry) in self.entries.iter().enumerate() {
-            if id.equivalent(&entry.id) {
-                return i;
+            if is_match(&entry.data) {
+                let entry = &mut self.entries[i];
+                entry.epoch = self.epoch;
+                return Entry::Occupied(&entry.data);
             }
-            if entry.epoch < lowest_serial {
-                lowest_serial = entry.epoch;
-                lowest_index = i;
+            if entry.epoch < oldest_epoch {
+                oldest_epoch = entry.epoch;
+                oldest_index = i;
             }
         }
-        if self.entries.len() < self.max_entries {
-            lowest_index = self.entries.len();
-            self.entries.push(Entry {
-                epoch,
-                id: id.into(),
-                data: make_data(),
-            });
-        } else {
-            let entry = &mut self.entries[lowest_index];
-            entry.epoch = epoch;
-            entry.id = id.into();
-            entry.data = make_data();
+        Entry::Vacant {
+            store: self,
+            oldest_index,
         }
-        lowest_index
+    }
+}
+
+pub(crate) enum Entry<'a, T> {
+    Occupied(&'a T),
+    Vacant {
+        store: &'a mut LruStore<T>,
+        oldest_index: usize,
+    },
+}
+
+impl<'a, T> Entry<'a, T> {
+    pub(crate) fn or_insert_with(self, make: impl FnOnce() -> T) -> &'a T {
+        match self {
+            Self::Occupied(data) => data,
+            Self::Vacant {
+                store,
+                oldest_index,
+            } => {
+                let entry = Record {
+                    epoch: store.epoch,
+                    data: make(),
+                };
+                if store.entries.len() < store.max_entries {
+                    &store.entries.push_mut(entry).data
+                } else {
+                    store.entries[oldest_index] = entry;
+                    &store.entries[oldest_index].data
+                }
+            }
+        }
     }
 }
 
@@ -118,7 +146,7 @@ mod tests {
             panic!("Should not create new data")
         });
         assert_eq!(*value2, 42);
-        assert_eq!(cache.entries.len(), 1);
+        assert_eq!(cache.store.entries.len(), 1);
     }
 
     #[test]
@@ -134,8 +162,8 @@ mod tests {
         let value3 = cache.entry(TestLookupKey("key3"), || 3);
         assert_eq!(*value3, 3);
 
-        assert_eq!(cache.entries.len(), 3);
-        assert_eq!(cache.epoch, 3);
+        assert_eq!(cache.store.entries.len(), 3);
+        assert_eq!(cache.store.epoch, 3);
     }
 
     #[test]
