@@ -497,6 +497,8 @@ impl Reshaper {
 
     /// Create the line from `start` to `end`.
     ///
+    /// Store the resulting line using [`Self::push_line`].
+    ///
     /// `end` must not be before `start`. If the line is so short that its reshaped start and end
     /// overlap, the whole line is reshaped as one piece. An empty line drops the edits, as it has
     /// no characters for inserted text to attach to.
