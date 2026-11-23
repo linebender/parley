@@ -386,7 +386,7 @@ struct CachedFragment {
 /// 3. Store the line using [`Self::push_line`].
 ///
 /// Line edges can be at any character boundary, including inside a grapheme. [`Reshaper`] itself
-/// does not introduce boundaries inside graphemes.
+/// does not introduce new boundaries inside graphemes.
 ///
 /// The text passed to [`Reshaper`]'s methods must be the text [`ShapedText`] was shaped from, and
 /// [`Reshaper::clear`] must be called when reusing the [`Reshaper`] on a different [`ShapedText`]
@@ -473,7 +473,7 @@ impl Reshaper {
         edit: Option<Edit<'e>>,
     ) -> LineStart<'e> {
         self.reshape_line_start(text, shaped, line_start_char, edit, SpliceMode::Fast, None)
-            .expect("an unbounded line start can't overlap a line end")
+            .unwrap()
     }
 
     /// Measure the effect of ending a line at character index `line_end_char` with the given
