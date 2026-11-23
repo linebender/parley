@@ -231,6 +231,9 @@ impl PendingLine<'_> {
 ///
 /// In logical order, the line consists of [`Self::start_run`], shaped clusters taken from the
 /// source [`ShapedText`] in [`Self::source_shaped_clusters_range`], and [`Self::end_run`].
+///
+/// Note that this is not necessarily the visual order. A reshaped run belongs to one source run
+/// ([`ReshapedRun::source_run`]) and has that run's bidi level.
 #[derive(Clone, Copy, Debug)]
 pub struct ReshapedLine {
     /// The index into [`ReshapedText::runs`] that starts this line, if the start needed reshaping.
