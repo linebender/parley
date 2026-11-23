@@ -67,9 +67,6 @@ impl<'a> ShapedSlice<'a> {
     /// This is `false` for an empty slice.
     ///
     /// [`ShapedRun`]: crate::ShapedRun
-    //
-    // TODO: once reshaping lands, perhaps also mention it here (if we indeed allow reshaping
-    // partial graphemes).
     #[inline]
     pub fn grapheme_continues_before(&self) -> bool {
         let char_range = self.char_range();
