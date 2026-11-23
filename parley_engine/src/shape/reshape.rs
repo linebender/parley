@@ -412,10 +412,10 @@ struct CachedFragment {
 /// cluster that is marked [`ShapedCluster::is_safe_to_break_before`]. These reshaped fragments tend
 /// to be short, and the result almost always matches [`Self::make_exact`]. However, this method of
 /// splicing is based only on the source text, and a change within the reshaped clusters could
-/// technically miss a reshape past the seam. For example, Fira Code gives the hyphen in "down-town"
-/// a lowercase form because of the "t" after it. A line ending in "down-" should keep that form
-/// because of the "n" before it, but measuring reshapes only the hyphen, which then takes its
-/// default form.
+/// technically require reshaping past the splice point. For example, Fira Code gives the hyphen in
+/// "down-town" a lowercase form because of the "t" after it. A line ending in "down-" should keep
+/// that form because of the "n" before it, but measuring reshapes only the hyphen, which then takes
+/// its default form.
 pub struct Reshaper {
     shape_data_cache: LruCache<cache::ShapeDataKey, harfrust::Font>,
     shape_plan_cache: LruCache<cache::ShapePlanId, harfrust::ShapePlan>,
@@ -557,8 +557,8 @@ impl Reshaper {
     ///
     /// This splices the line's reshaped fragments to the source glyphs at the nearest cluster that
     /// is marked [`ShapedCluster::is_safe_to_concat_before`] in both the source and the reshaped
-    /// fragment, extending the fragments until such a boundary is found, or reshaping the whole line
-    /// if they would overlap. Note this repeatedly reshapes the fragments.
+    /// fragment, extending the fragments until such a splice point is found, or reshaping the whole
+    /// line if they would overlap. Note this repeatedly reshapes the fragments.
     ///
     /// # Panics
     ///
@@ -685,8 +685,9 @@ impl Reshaper {
                 shaped.shaped_clusters()[i].chars_range().start
             }
         };
-        let cluster_is_seam = |i: usize, splice: SpliceMode| {
-            // Note that separate runs are shaped separately, so a run's edge is a seam.
+        let can_splice_before = |i: usize, splice: SpliceMode| {
+            // Note that separate runs are shaped separately, so a run's edge is a safe splice
+            // point.
             i == run_start_cluster
                 || i == run_end_cluster
                 || splice.is_safe_to_splice_before(shaped.shaped_clusters()[i])
@@ -694,10 +695,10 @@ impl Reshaper {
 
         // The reshaped start can't end after the reshaped end starts, which is where the source
         // clusters end.
-        let max_seam_cluster =
+        let max_splice_cluster =
             line_end.map_or(usize::MAX, |line_end| line_end.source_clusters_end as usize);
 
-        let mut seam_cluster = run_start_cluster
+        let mut splice_cluster = run_start_cluster
             + match edit {
                 None => run_clusters
                     .partition_point(|cluster| cluster.chars_range().start < line_start_char),
@@ -710,24 +711,24 @@ impl Reshaper {
 
         // With no `edit`, no reshaping is necessary when at a cluster that is safe to break before.
         if edit.is_none()
-            && first_char_idx_of_cluster(seam_cluster) == line_start_char
-            && cluster_is_seam(seam_cluster, SpliceMode::Fast)
+            && first_char_idx_of_cluster(splice_cluster) == line_start_char
+            && can_splice_before(splice_cluster, SpliceMode::Fast)
         {
             return Some(line_start);
         }
 
-        while !cluster_is_seam(seam_cluster, splice) {
-            seam_cluster += 1;
+        while !can_splice_before(splice_cluster, splice) {
+            splice_cluster += 1;
         }
 
         let advance = loop {
-            if splice == SpliceMode::Fast || seam_cluster == run_end_cluster {
-                if seam_cluster > max_seam_cluster {
+            if splice == SpliceMode::Fast || splice_cluster == run_end_cluster {
+                if splice_cluster > max_splice_cluster {
                     return None;
                 }
                 let fragment = Fragment {
                     run: run_index as u32,
-                    chars: (line_start_char, first_char_idx_of_cluster(seam_cluster)),
+                    chars: (line_start_char, first_char_idx_of_cluster(splice_cluster)),
                 };
                 line_start.start_fragment = Some(fragment);
                 break self
@@ -735,40 +736,40 @@ impl Reshaper {
                     .1;
             }
 
-            let mut next_seam_cluster = seam_cluster + 1;
-            while !cluster_is_seam(next_seam_cluster, splice) {
-                next_seam_cluster += 1;
+            let mut next_splice_cluster = splice_cluster + 1;
+            while !can_splice_before(next_splice_cluster, splice) {
+                next_splice_cluster += 1;
             }
-            if next_seam_cluster > max_seam_cluster {
+            if next_splice_cluster > max_splice_cluster {
                 return None;
             }
             let fragment = Fragment {
                 run: run_index as u32,
                 chars: (
                     line_start_char,
-                    first_char_idx_of_cluster(next_seam_cluster),
+                    first_char_idx_of_cluster(next_splice_cluster),
                 ),
             };
             let (slot, advance) =
                 self.shape(text, shaped, FragmentCache::STARTS, fragment, [edit, None]);
             // The fragment has no concat flag at its end, but if the fragment is safe to concat at
-            // a seam before its end, we know the fragment and the source glyphs will match from
-            // that point on (we could in principle trim the fragment back to that point).
+            // a splice point before its end, we know the fragment and the source glyphs will match
+            // from that point on (we could in principle trim the fragment back to that point).
             let fragment_clusters = self.cache.slots[slot]
                 .fragment
                 .run_slice(shaped, 0)
                 .shaped_clusters();
-            let is_safe = next_seam_cluster == run_end_cluster
+            let is_safe = next_splice_cluster == run_end_cluster
                 // A fragment up to an unreshaped line end is the whole line.
                 || line_end.is_some_and(|line_end| {
-                    line_end.end_fragment.is_none() && next_seam_cluster == max_seam_cluster
+                    line_end.end_fragment.is_none() && next_splice_cluster == max_splice_cluster
                 })
                 || fragment_clusters
-                    .binary_search_by_key(&first_char_idx_of_cluster(seam_cluster), |c| {
+                    .binary_search_by_key(&first_char_idx_of_cluster(splice_cluster), |c| {
                         c.chars_range().start
                     })
                     .is_ok_and(|i| fragment_clusters[i].is_safe_to_concat_before());
-            seam_cluster = next_seam_cluster;
+            splice_cluster = next_splice_cluster;
             if is_safe {
                 line_start.start_fragment = Some(fragment);
                 break advance;
@@ -778,11 +779,11 @@ impl Reshaper {
         };
 
         let line_start_cluster = line_start.source_clusters_start as usize;
-        let source_advance: f32 = shaped.shaped_clusters()[line_start_cluster..seam_cluster]
+        let source_advance: f32 = shaped.shaped_clusters()[line_start_cluster..splice_cluster]
             .iter()
             .map(|c| c.advance)
             .sum();
-        line_start.source_clusters_start = seam_cluster as u32;
+        line_start.source_clusters_start = splice_cluster as u32;
         line_start.advance_delta = advance - source_advance;
         Some(line_start)
     }
@@ -832,8 +833,9 @@ impl Reshaper {
                 shaped.shaped_clusters()[i].chars_range().start
             }
         };
-        let cluster_is_seam = |i: usize, splice: SpliceMode| {
-            // Note that separate runs are shaped separately, so a run's edge is a seam.
+        let can_splice_before = |i: usize, splice: SpliceMode| {
+            // Note that separate runs are shaped separately, so a run's edge is a safe splice
+            // point.
             i == run_start_cluster
                 || i == run_end_cluster
                 || splice.is_safe_to_splice_before(shaped.shaped_clusters()[i])
@@ -841,10 +843,10 @@ impl Reshaper {
 
         // The reshaped end can't start before the reshaped start ends, which is where the source
         // clusters start.
-        let min_seam_cluster =
+        let min_splice_cluster =
             line_start.map_or(0, |line_start| line_start.source_clusters_start as usize);
 
-        let mut seam_cluster = run_start_cluster
+        let mut splice_cluster = run_start_cluster
             + match edit {
                 None if line_end_char == run.characters_range.end => run_clusters.len(),
                 None => {
@@ -865,25 +867,25 @@ impl Reshaper {
         // With no `edit`, the line end needs no reshaping when at a cluster that is safe to break
         // before.
         if edit.is_none()
-            && first_char_idx_of_cluster(seam_cluster) == line_end_char
-            && cluster_is_seam(seam_cluster, SpliceMode::Fast)
+            && first_char_idx_of_cluster(splice_cluster) == line_end_char
+            && can_splice_before(splice_cluster, SpliceMode::Fast)
         {
             return Some(line_end);
         }
 
-        while !cluster_is_seam(seam_cluster, splice) {
-            seam_cluster -= 1;
+        while !can_splice_before(splice_cluster, splice) {
+            splice_cluster -= 1;
         }
 
         let advance = loop {
-            if seam_cluster < min_seam_cluster {
+            if splice_cluster < min_splice_cluster {
                 // The reshaped start and end would overlap.
                 return None;
             }
 
             let fragment = Fragment {
                 run: run_index as u32,
-                chars: (first_char_idx_of_cluster(seam_cluster), line_end_char),
+                chars: (first_char_idx_of_cluster(splice_cluster), line_end_char),
             };
             let (slot, advance) =
                 self.shape(text, shaped, FragmentCache::ENDS, fragment, [None, edit]);
@@ -891,9 +893,9 @@ impl Reshaper {
             let reshaped = &self.cache.slots[slot].fragment;
             let first_cluster = reshaped.runs[0].run.shaped_clusters_range.start;
             if splice == SpliceMode::Fast
-                || seam_cluster == run_start_cluster
+                || splice_cluster == run_start_cluster
                 || line_start.is_some_and(|line_start| {
-                    first_char_idx_of_cluster(seam_cluster) == line_start.line_start_char
+                    first_char_idx_of_cluster(splice_cluster) == line_start.line_start_char
                 })
                 || reshaped.shaped_clusters[first_cluster as usize].is_safe_to_concat_before()
             {
@@ -902,18 +904,18 @@ impl Reshaper {
             }
             // Let the next attempt take this slot.
             self.cache.recent[slot / 2] = 1 - slot % 2;
-            seam_cluster -= 1;
-            while !cluster_is_seam(seam_cluster, splice) {
-                seam_cluster -= 1;
+            splice_cluster -= 1;
+            while !can_splice_before(splice_cluster, splice) {
+                splice_cluster -= 1;
             }
         };
 
         let source_advance: f32 = shaped.shaped_clusters()
-            [seam_cluster..source_clusters_end as usize]
+            [splice_cluster..source_clusters_end as usize]
             .iter()
             .map(|c| c.advance)
             .sum();
-        line_end.source_clusters_end = seam_cluster as u32;
+        line_end.source_clusters_end = splice_cluster as u32;
         line_end.advance_delta = advance - source_advance;
         Some(line_end)
     }
