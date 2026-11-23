@@ -47,6 +47,8 @@ pub(crate) struct TreeStyleBuilder<B: Brush> {
     /// same inline formatting context, so that it can collapse across span and inline box
     /// boundaries and be removed at the end of the text.
     pending_whitespace: Option<PendingWhitespace>,
+    /// Whether [`Self::push_shaping_split`] was called while whitespace was pending.
+    pending_shaping_split: bool,
 }
 
 impl<B: Brush> Default for TreeStyleBuilder<B> {
@@ -58,6 +60,7 @@ impl<B: Brush> Default for TreeStyleBuilder<B> {
             text: String::new(),
             current_span: usize::MAX,
             pending_whitespace: None,
+            pending_shaping_split: false,
         }
     }
 }
@@ -77,6 +80,7 @@ impl<B: Brush> TreeStyleBuilder<B> {
         self.style_runs.clear();
         self.text.clear();
         self.pending_whitespace = None;
+        self.pending_shaping_split = false;
 
         // The root style is always materialised at index 0 so that it can act as the parent of
         // every other style (and as the strut for otherwise empty lines).
@@ -93,19 +97,27 @@ impl<B: Brush> TreeStyleBuilder<B> {
     }
 
     /// Appends a U+FFFC OBJECT REPLACEMENT CHARACTER representing an
-    /// [`crate::InlineBoxKind::InFlow`] to the current span.
+    /// [`crate::InlineBox`] to the current span.
     ///
     /// Returns the new character's byte offset.
-    pub(crate) fn push_inline_object(&mut self) -> usize {
+    pub(crate) fn push_inline_object(&mut self, shaping_splits: &mut Vec<usize>) -> usize {
         self.flush_pending_whitespace();
         let index = self.text.len();
-        self.commit_text(self.current_span, "\u{FFFC}");
+        self.commit_text(self.current_span, "\u{FFFC}", shaping_splits);
         index
+    }
+
+    pub(crate) fn push_shaping_split(&mut self, shaping_splits: &mut Vec<usize>) {
+        if self.pending_whitespace.is_some() {
+            self.pending_shaping_split = true;
+        } else {
+            shaping_splits.push(self.text.len());
+        }
     }
 
     /// Applies white space processing to `text` in the current span and commits the result, leaving
     /// any trailing collapsible whitespace pending.
-    pub(crate) fn push_text(&mut self, text: &str) {
+    pub(crate) fn push_text(&mut self, text: &str, shaping_splits: &mut Vec<usize>) {
         if text.is_empty() {
             return;
         }
@@ -120,7 +132,7 @@ impl<B: Brush> TreeStyleBuilder<B> {
                     self.pending_whitespace = None;
                 }
                 self.flush_pending_whitespace();
-                self.commit_text(span, text);
+                self.commit_text(span, text, shaping_splits);
             }
             mode @ (WhiteSpaceCollapse::Collapse | WhiteSpaceCollapse::PreserveBreaks) => {
                 let mut rest = text;
@@ -148,7 +160,7 @@ impl<B: Brush> TreeStyleBuilder<B> {
                         // preserved as forced breaks.
                         self.pending_whitespace = None;
                         let break_len = rest.chars().next().unwrap().len_utf8();
-                        self.commit_text(span, &rest[..break_len]);
+                        self.commit_text(span, &rest[..break_len], shaping_splits);
                         rest = &rest[break_len..];
                         continue;
                     }
@@ -156,7 +168,7 @@ impl<B: Brush> TreeStyleBuilder<B> {
                         .find(|c| mode.is_collapsible(c) || is_segment_break(c))
                         .unwrap_or(rest.len());
                     self.flush_pending_whitespace();
-                    self.commit_text(span, &rest[..text_len]);
+                    self.commit_text(span, &rest[..text_len], shaping_splits);
                     rest = &rest[text_len..];
                 }
             }
@@ -183,7 +195,8 @@ impl<B: Brush> TreeStyleBuilder<B> {
         } else {
             self.resolve_style_id(pending.span)
         };
-        self.commit_styled_text(style_index, " ");
+        let space = self.tree[pending.span].style.collapsed_space;
+        self.commit_styled_text(style_index, space.as_str());
     }
 
     /// The style table index of the span that text is currently being pushed into.
@@ -192,7 +205,11 @@ impl<B: Brush> TreeStyleBuilder<B> {
     }
 
     /// Appends already white space processed `text` to the buffer, attributed to `span`.
-    fn commit_text(&mut self, span: usize, text: &str) {
+    fn commit_text(&mut self, span: usize, text: &str, shaping_splits: &mut Vec<usize>) {
+        if self.pending_shaping_split {
+            shaping_splits.push(self.text.len());
+            self.pending_shaping_split = false;
+        }
         let style_index = self.resolve_style_id(span);
         self.commit_styled_text(style_index, text);
     }
@@ -207,7 +224,7 @@ impl<B: Brush> TreeStyleBuilder<B> {
             }
             _ => self.style_runs.push(StyleRun {
                 style_index,
-                range: start..self.text.len(),
+                range: (start..self.text.len()).into(),
             }),
         }
     }
@@ -300,6 +317,8 @@ impl<B: Brush> TreeStyleBuilder<B> {
         style_table: &mut Vec<ResolvedStyle<B>>,
         style_runs: &mut Vec<StyleRun>,
     ) -> String {
+        self.pending_whitespace = None;
+        self.pending_shaping_split = false;
         while self.tree[self.current_span].parent.is_some() {
             self.pop_style_span();
         }
@@ -313,7 +332,7 @@ impl<B: Brush> TreeStyleBuilder<B> {
             // If there's no text, the layout still needs the root style, e.g., to size a cursor.
             style_runs.push(StyleRun {
                 style_index: 0,
-                range: 0..0,
+                range: (0..0).into(),
             });
         }
 
@@ -324,8 +343,9 @@ impl<B: Brush> TreeStyleBuilder<B> {
 #[cfg(test)]
 mod tests {
     use super::*;
+    use crate::CollapsedSpace;
     use alloc::vec::Vec;
-    use core::ops::Range;
+    use core::range::Range;
 
     #[test]
     fn preserve_breaks_collapses_across_text_and_style_boundaries() {
@@ -339,14 +359,15 @@ mod tests {
             ("a\u{000b}\u{000c}\u{0085}b", "a\u{000b}\u{000c}\u{0085}b"),
         ] {
             for split in (0..=input.len()).filter(|&i| input.is_char_boundary(i)) {
+                let mut shaping_splits = Vec::new();
                 let mut builder = TreeStyleBuilder::<u32>::default();
                 builder.begin(ResolvedStyle {
                     white_space_collapse: WhiteSpaceCollapse::PreserveBreaks,
                     ..ResolvedStyle::default()
                 });
-                builder.push_text(&input[..split]);
+                builder.push_text(&input[..split], &mut shaping_splits);
                 builder.push_style_modification_span([ResolvedProperty::FontSize(20.)].into_iter());
-                builder.push_text(&input[split..]);
+                builder.push_text(&input[split..], &mut shaping_splits);
                 builder.pop_style_span();
                 let text = builder.finish(&mut Vec::new(), &mut Vec::new());
                 assert_eq!(text, expected, "{input:?} split at {split}");
@@ -356,6 +377,7 @@ mod tests {
 
     #[test]
     fn preserve_breaks_keeps_pending_whitespace_provenance_across_modes() {
+        let mut shaping_splits = Vec::new();
         let mut builder = TreeStyleBuilder::<u32>::default();
         builder.begin(ResolvedStyle {
             white_space_collapse: WhiteSpaceCollapse::Collapse,
@@ -368,7 +390,7 @@ mod tests {
             ]
             .into_iter(),
         );
-        builder.push_text("a ");
+        builder.push_text("a ", &mut shaping_splits);
         builder.pop_style_span();
         builder.push_style_modification_span(
             [ResolvedProperty::WhiteSpaceCollapse(
@@ -376,7 +398,7 @@ mod tests {
             )]
             .into_iter(),
         );
-        builder.push_text("\tb \t\n \tc");
+        builder.push_text("\tb \t\n \tc", &mut shaping_splits);
 
         let mut styles = Vec::new();
         let mut runs = Vec::new();
@@ -391,12 +413,13 @@ mod tests {
 
     #[test]
     fn collapses_ascii_whitespace_without_trimming_non_ascii_whitespace() {
+        let mut shaping_splits = Vec::new();
         let mut builder = TreeStyleBuilder::<u32>::default();
         builder.begin(ResolvedStyle {
             white_space_collapse: WhiteSpaceCollapse::Collapse,
             ..ResolvedStyle::default()
         });
-        builder.push_text(" \u{00a0}text\u{00a0} ");
+        builder.push_text(" \u{00a0}text\u{00a0} ", &mut shaping_splits);
 
         let mut style_table = Vec::new();
         let mut style_runs = Vec::new();
@@ -407,15 +430,16 @@ mod tests {
 
     #[test]
     fn collapsible_whitespace_at_span_end_is_committed_with_the_span_style() {
+        let mut shaping_splits = Vec::new();
         let mut builder = TreeStyleBuilder::<u32>::default();
         builder.begin(ResolvedStyle {
             white_space_collapse: WhiteSpaceCollapse::Collapse,
             ..ResolvedStyle::default()
         });
         builder.push_style_modification_span([ResolvedProperty::FontSize(20.)].into_iter());
-        builder.push_text("A ");
+        builder.push_text("A ", &mut shaping_splits);
         builder.pop_style_span();
-        builder.push_text("B");
+        builder.push_text("B", &mut shaping_splits);
 
         let mut style_table = Vec::new();
         let mut style_runs = Vec::new();
@@ -431,21 +455,22 @@ mod tests {
 
     #[test]
     fn collapsible_whitespace_before_preserved_text_is_committed() {
+        let mut shaping_splits = Vec::new();
         let mut builder = TreeStyleBuilder::<u32>::default();
         builder.begin(ResolvedStyle {
             white_space_collapse: WhiteSpaceCollapse::Collapse,
             ..ResolvedStyle::default()
         });
-        builder.push_text("A ");
+        builder.push_text("A ", &mut shaping_splits);
         builder.push_style_modification_span(
             [ResolvedProperty::WhiteSpaceCollapse(
                 WhiteSpaceCollapse::Preserve,
             )]
             .into_iter(),
         );
-        builder.push_text("  B  ");
+        builder.push_text("  B  ", &mut shaping_splits);
         builder.pop_style_span();
-        builder.push_text("  C");
+        builder.push_text("  C", &mut shaping_splits);
 
         let mut style_table = Vec::new();
         let mut style_runs = Vec::new();
@@ -456,21 +481,22 @@ mod tests {
 
     #[test]
     fn collapsible_whitespace_around_a_preserved_segment_break_is_removed() {
+        let mut shaping_splits = Vec::new();
         let mut builder = TreeStyleBuilder::<u32>::default();
         builder.begin(ResolvedStyle {
             white_space_collapse: WhiteSpaceCollapse::Collapse,
             ..ResolvedStyle::default()
         });
-        builder.push_text("A  ");
+        builder.push_text("A  ", &mut shaping_splits);
         builder.push_style_modification_span(
             [ResolvedProperty::WhiteSpaceCollapse(
                 WhiteSpaceCollapse::Preserve,
             )]
             .into_iter(),
         );
-        builder.push_text("\n");
+        builder.push_text("\n", &mut shaping_splits);
         builder.pop_style_span();
-        builder.push_text("  B");
+        builder.push_text("  B", &mut shaping_splits);
 
         let mut style_table = Vec::new();
         let mut style_runs = Vec::new();
@@ -481,13 +507,14 @@ mod tests {
 
     #[test]
     fn reuses_style_id_when_returning_to_parent_span() {
+        let mut shaping_splits = Vec::new();
         let mut builder = TreeStyleBuilder::<u32>::default();
         builder.begin(ResolvedStyle::default());
-        builder.push_text("A");
+        builder.push_text("A", &mut shaping_splits);
         builder.push_style_modification_span([ResolvedProperty::FontSize(20.)].into_iter());
-        builder.push_text("B");
+        builder.push_text("B", &mut shaping_splits);
         builder.pop_style_span();
-        builder.push_text("C");
+        builder.push_text("C", &mut shaping_splits);
 
         let mut style_table = Vec::new();
         let mut style_runs = Vec::new();
@@ -506,17 +533,18 @@ mod tests {
 
     #[test]
     fn reuses_root_style_id_across_multiple_pop_return_cycles() {
+        let mut shaping_splits = Vec::new();
         let mut builder = TreeStyleBuilder::<u32>::default();
         builder.begin(ResolvedStyle::default());
-        builder.push_text("A");
+        builder.push_text("A", &mut shaping_splits);
         builder.push_style_modification_span([ResolvedProperty::FontSize(20.)].into_iter());
-        builder.push_text("B");
+        builder.push_text("B", &mut shaping_splits);
         builder.pop_style_span();
-        builder.push_text("C");
+        builder.push_text("C", &mut shaping_splits);
         builder.push_style_modification_span([ResolvedProperty::LetterSpacing(1.)].into_iter());
-        builder.push_text("D");
+        builder.push_text("D", &mut shaping_splits);
         builder.pop_style_span();
-        builder.push_text("E");
+        builder.push_text("E", &mut shaping_splits);
 
         let mut style_table = Vec::new();
         let mut style_runs = Vec::new();
@@ -534,11 +562,12 @@ mod tests {
 
     #[test]
     fn materialises_ancestor_spans_without_text() {
+        let mut shaping_splits = Vec::new();
         let mut builder = TreeStyleBuilder::<u32>::default();
         builder.begin(ResolvedStyle::default());
         builder.push_style_modification_span([ResolvedProperty::FontSize(40.)].into_iter());
         builder.push_style_modification_span([ResolvedProperty::FontSize(20.)].into_iter());
-        builder.push_text("B");
+        builder.push_text("B", &mut shaping_splits);
         builder.pop_style_span();
         builder.pop_style_span();
 
@@ -574,17 +603,18 @@ mod tests {
 
     #[test]
     fn reuses_parent_and_root_style_ids_after_nested_pop() {
+        let mut shaping_splits = Vec::new();
         let mut builder = TreeStyleBuilder::<u32>::default();
         builder.begin(ResolvedStyle::default());
-        builder.push_text("R");
+        builder.push_text("R", &mut shaping_splits);
         builder.push_style_modification_span([ResolvedProperty::FontSize(20.)].into_iter());
-        builder.push_text("A");
+        builder.push_text("A", &mut shaping_splits);
         builder.push_style_modification_span([ResolvedProperty::LetterSpacing(1.)].into_iter());
-        builder.push_text("B");
+        builder.push_text("B", &mut shaping_splits);
         builder.pop_style_span();
-        builder.push_text("C");
+        builder.push_text("C", &mut shaping_splits);
         builder.pop_style_span();
-        builder.push_text("D");
+        builder.push_text("D", &mut shaping_splits);
 
         let mut style_table = Vec::new();
         let mut style_runs = Vec::new();
@@ -601,7 +631,36 @@ mod tests {
     }
 
     #[test]
+    fn collapsed_space_uses_style_of_first_whitespace() {
+        let ideographic = [ResolvedProperty::CollapsedSpace(
+            CollapsedSpace::IdeographicSpace,
+        )];
+        for (before, inside, after, expected) in [
+            ("x", "   ", "x", "x\u{3000}x"),
+            ("x ", "  ", "x", "x x"),
+            ("x", " \n\t", " x", "x\u{3000}x"),
+            ("x", "a  b", "", "xa\u{3000}b"),
+            ("", "  a  ", "", "a"),
+        ] {
+            let mut shaping_splits = Vec::new();
+            let mut builder = TreeStyleBuilder::<u32>::default();
+            builder.begin(ResolvedStyle {
+                white_space_collapse: WhiteSpaceCollapse::Collapse,
+                ..ResolvedStyle::default()
+            });
+            builder.push_text(before, &mut shaping_splits);
+            builder.push_style_modification_span(ideographic.clone().into_iter());
+            builder.push_text(inside, &mut shaping_splits);
+            builder.pop_style_span();
+            builder.push_text(after, &mut shaping_splits);
+            let text = builder.finish(&mut Vec::new(), &mut Vec::new());
+            assert_eq!(text, expected, "{before:?} {inside:?} {after:?}");
+        }
+    }
+
+    #[test]
     fn reports_pending_whitespace() {
+        let mut shaping_splits = Vec::new();
         let mut builder = TreeStyleBuilder::<u32>::default();
         builder.begin(ResolvedStyle {
             white_space_collapse: WhiteSpaceCollapse::Collapse,
@@ -609,11 +668,11 @@ mod tests {
         });
         assert_eq!(builder.text(), "");
         assert!(!builder.has_pending_whitespace());
-        builder.push_text("  a  ");
+        builder.push_text("  a  ", &mut shaping_splits);
         assert_eq!(builder.text(), "a");
         assert!(builder.has_pending_whitespace());
         builder.push_style_modification_span([ResolvedProperty::FontSize(20.)].into_iter());
-        builder.push_text(" b");
+        builder.push_text(" b", &mut shaping_splits);
         assert_eq!(builder.text(), "a b");
         assert!(!builder.has_pending_whitespace());
         builder.pop_style_span();

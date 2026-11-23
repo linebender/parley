@@ -18,8 +18,8 @@ fn build_indented_layout(
     let builder = env.ranged_builder(text);
     let mut layout = builder.build(text);
     layout.set_text_indent(indent_amount, indent_options);
+    layout.set_alignment(alignment, AlignmentOptions::default());
     layout.break_all_lines(Some(wrap_width));
-    layout.align(alignment, AlignmentOptions::default());
     layout
 }
 

@@ -12,7 +12,7 @@ use crate::{
     test_name,
     util::{ColorBrush, CursorTest, TestEnv, env::create_font_context},
 };
-use parley::{Affinity, Cluster, ClusterPath, Cursor, LayoutContext, Selection};
+use parley::{Affinity, BaseDirection, Cluster, ClusterPath, Cursor, LayoutContext, Selection};
 
 #[test]
 fn cursor_previous_visual() {
@@ -67,6 +67,19 @@ fn cursor_ligature_selection() {
     let clusters = focus.logical_clusters(&layout);
 
     assert_eq!(clusters[0].as_ref().map(|c| c.text_range()), Some(1..2));
+}
+
+#[test]
+fn cursor_geometry_on_shifted_line() {
+    let mut env = TestEnv::new(test_name!(), None);
+    let text = "abc";
+    let mut layout = env.ranged_builder(text).build(text);
+    let mut breaker = layout.break_lines();
+    breaker.state_mut().set_line_x(13.);
+    breaker.break_remaining(f32::MAX);
+
+    let cursor = Cursor::from_byte_index(&layout, 0, Affinity::Downstream);
+    assert_eq!(cursor.geometry(&layout, 0.).x0 as f32, 13.);
 }
 
 /// Check consistency of cluster paths, navigation, and lookups.
@@ -143,4 +156,50 @@ fn cluster_navigation_hard_breaks_and_trailing_newline() {
 #[test]
 fn cluster_navigation_multi_character_graphemes() {
     check_cluster_navigation("e\u{0301}x 🇳🇱 a\r\nb", None);
+}
+
+#[test]
+fn primary_caret_position() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    for text in ["aaa bbb", "aaa ببب"] {
+        // These are some positions where the caret lands exactly on one edge of the line.
+        //
+        // Returns the start of the caret's line, and which edge of the line's content the caret is
+        // at, if either.
+        let mut position = |direction, index, wrap: bool| {
+            let mut builder = env.ranged_builder(text);
+            builder.set_base_direction(direction);
+            let mut layout = builder.build(text);
+            layout.break_all_lines(wrap.then(|| layout.calculate_content_widths().min));
+            let (line, x) = layout.primary_caret(index).unwrap();
+            let left = line.metrics().offset + line.metrics().inline_min_coord;
+            let edges = [(left, "left"), (left + line.metrics().advance, "right")];
+            let edge = edges.into_iter().find(|(edge, _)| (edge - x).abs() < 1e-3);
+            (line.text_range().start, edge.map(|(_, side)| side))
+        };
+        assert_eq!(position(BaseDirection::Ltr, 0, false), (0, Some("left")));
+        assert_eq!(
+            position(BaseDirection::Ltr, text.len(), false),
+            (0, Some("right"))
+        );
+        assert_eq!(position(BaseDirection::Rtl, 0, false), (0, Some("right")));
+        assert_eq!(
+            position(BaseDirection::Rtl, text.len(), false),
+            (0, Some("left"))
+        );
+        assert_eq!(position(BaseDirection::Ltr, 4, true), (4, Some("left")));
+    }
+
+    // In an LTR paragraph, between an RTL word and a space, the caret sits against the space.
+    let text = "ببب aaa";
+    let mut builder = env.ranged_builder(text);
+    builder.set_base_direction(BaseDirection::Ltr);
+    let mut layout = builder.build(text);
+    layout.break_all_lines(None);
+    let space = Cluster::from_byte_index(&layout, 6).unwrap();
+    assert_eq!(
+        layout.primary_caret(6).unwrap().1,
+        space.visual_offset().unwrap()
+    );
 }

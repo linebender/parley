@@ -43,7 +43,6 @@
 #![expect(
     missing_debug_implementations,
     unnameable_types,
-    unreachable_pub,
     clippy::allow_attributes_without_reason,
     clippy::cast_possible_truncation,
     reason = "Deferred"
@@ -82,13 +81,13 @@ pub use linebender_resource_handle::Blob;
 pub use script::ScriptExt;
 
 pub use attributes::Attributes;
-pub use charmap::{Charmap, CharmapIndex};
+pub use charmap::{Charmap, CharmapIndex, UnicodeRangeSet};
 pub use collection::{Collection, CollectionOptions, Query, QueryFamily, QueryFont, QueryStatus};
 pub use fallback::FallbackKey;
 pub use family::{FamilyId, FamilyInfo};
-pub use font::{AxisInfo, FontInfo, FontInfoOverride, Synthesis};
+pub use font::{AxisInfo, FontInfo, FontInfoOverride};
 pub use impl_fontconfig::FromFontconfig;
-pub use parlance::{FontStyle, FontWeight, FontWidth, GenericFamily, Language, Script};
+pub use parlance::{FontStyle, FontWeight, FontWidth, GenericFamily, Language, Script, Synthesis};
 pub use source::{SourceId, SourceInfo, SourceKind};
 
 #[cfg(all(feature = "system", target_vendor = "apple"))]

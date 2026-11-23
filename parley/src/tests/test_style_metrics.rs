@@ -7,7 +7,7 @@ use super::utils::ColorBrush;
 use super::utils::fonts::{FONT_FAMILY_LIST, create_font_context};
 use crate::layout::style_metrics::StyleMetrics;
 use crate::{
-    AlignmentBaseline, BaselineShift, FontFamily, InlineBox, InlineBoxKind, Layout, LayoutContext,
+    AlignmentBaseline, BaselineShift, FloatedBox, FontFamily, InlineBox, Layout, LayoutContext,
     LineHeight, StyleProperty, TextStyle, VerticalAlign,
 };
 
@@ -292,30 +292,33 @@ fn quantized_metrics_are_whole_pixels() {
 }
 
 #[test]
-fn line_with_only_out_of_flow_boxes_is_invisible() {
+fn line_with_only_floated_boxes_is_invisible() {
     let mut fcx = create_font_context();
     let mut lcx: LayoutContext<ColorBrush> = LayoutContext::new();
     let root = root_style();
-    let mut line_height = |height: f32, kind: InlineBoxKind| {
+    let mut line_height = |height: f32, in_flow: bool| {
         let mut builder = lcx.tree_builder(&mut fcx, 1., false, &root);
-        builder.push_inline_box(InlineBox {
-            id: 0,
-            kind,
-            index: 0,
-            width: 0.,
-            height,
-            baseline: None,
-            vertical_align: VerticalAlign::BASELINE,
-        });
+        if in_flow {
+            builder.push_inline_box(InlineBox {
+                id: 0,
+                index: 0,
+                width: 0.,
+                height,
+                baseline: None,
+                vertical_align: VerticalAlign::BASELINE,
+            });
+        } else {
+            builder.push_floated_box(FloatedBox { id: 0, index: 0 });
+        }
         let (mut layout, _) = builder.build();
         layout.break_all_lines(None);
         layout.lines().next().unwrap().metrics().line_height
     };
-    // Out-of-flow boxes alone do not make the strut apply.
-    assert_eq!(line_height(10., InlineBoxKind::OutOfFlow), 0.);
+    // Floated boxes alone do not make the strut apply.
+    assert_eq!(line_height(10., false), 0.);
     // An in-flow box does, even if empty.
-    assert_eq!(line_height(0., InlineBoxKind::InFlow), 30.);
-    assert_eq!(line_height(10., InlineBoxKind::InFlow), 30.);
+    assert_eq!(line_height(0., true), 30.);
+    assert_eq!(line_height(10., true), 30.);
 }
 
 /// With quantization, an inline box's fractional height must not be rounded up twice (once for
@@ -330,7 +333,6 @@ fn quantized_inline_box_extents_are_not_rounded_separately() {
     // separately would reserve 82px for an 81px box.
     builder.push_inline_box(InlineBox {
         id: 0,
-        kind: InlineBoxKind::InFlow,
         index: 0,
         width: 10.,
         height: 81.,
@@ -353,7 +355,6 @@ fn line_with_negative_height_inline_box_is_not_invisible() {
     let mut builder = lcx.tree_builder(&mut fcx, 1., false, &root);
     builder.push_inline_box(InlineBox {
         id: 0,
-        kind: InlineBoxKind::InFlow,
         index: 0,
         width: 10.,
         height: -300.,

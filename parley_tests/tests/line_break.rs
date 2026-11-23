@@ -10,7 +10,7 @@ use crate::test_name;
 use crate::util::TestEnv;
 use parley::VerticalAlign;
 use parley::style::FontFamily;
-use parley::{Alignment, AlignmentOptions, InlineBox, InlineBoxKind, StyleProperty, YieldData};
+use parley::{Alignment, AlignmentOptions, InlineBox, StyleProperty, YieldData};
 
 #[test]
 fn break_by_length_basic() {
@@ -101,7 +101,6 @@ fn break_by_length_with_inline_box() {
     let mut builder = env.ranged_builder(text);
     builder.push_inline_box(InlineBox {
         id: 0,
-        kind: InlineBoxKind::InFlow,
         index: 1, // After 'A'
         width: 10.0,
         height: 10.0,
@@ -130,7 +129,6 @@ fn break_by_length_multiple_inline_boxes() {
     for id in 0..3 {
         builder.push_inline_box(InlineBox {
             id,
-            kind: InlineBoxKind::InFlow,
             index: id as usize * '\u{FFFC}'.len_utf8(),
             width: 10.0,
             height: 10.0,
@@ -317,7 +315,6 @@ fn break_by_length_matches_max_advance_with_letter_spacing() {
     builder.push_default(StyleProperty::LetterSpacing(2.0));
     let mut layout_max_advance = builder.build(text);
     layout_max_advance.break_all_lines(None);
-    layout_max_advance.align(Alignment::Start, AlignmentOptions::default());
 
     // Count clusters per line from the max_advance layout using public API
     let cluster_counts: Vec<u32> = layout_max_advance
@@ -335,7 +332,6 @@ fn break_by_length_matches_max_advance_with_letter_spacing() {
         breaker.break_next_with_length(*count);
     }
     breaker.finish();
-    layout_by_length.align(Alignment::Start, AlignmentOptions::default());
 
     // Compare the layouts - they should have the same line count
     assert_eq!(
@@ -417,8 +413,8 @@ fn break_by_length_justified_last_line_start_aligned() {
     // Create layout with break_all_lines and justify
     let builder = env.ranged_builder(text);
     let mut layout_max_advance = builder.build(text);
+    layout_max_advance.set_alignment(Alignment::Justify, AlignmentOptions::default());
     layout_max_advance.break_all_lines(Some(60.0)); // Force wrapping
-    layout_max_advance.align(Alignment::Justify, AlignmentOptions::default());
 
     // Get cluster counts per line using public API
     let cluster_counts: Vec<u32> = layout_max_advance
@@ -429,12 +425,12 @@ fn break_by_length_justified_last_line_start_aligned() {
     // Create layout with break_next_with_length and justify
     let builder2 = env.ranged_builder(text);
     let mut layout_by_length = builder2.build(text);
+    layout_by_length.set_alignment(Alignment::Justify, AlignmentOptions::default());
     let mut breaker = layout_by_length.break_lines();
     for count in &cluster_counts {
         breaker.break_next_with_length(*count);
     }
     breaker.finish();
-    layout_by_length.align(Alignment::Justify, AlignmentOptions::default());
 
     // Verify both layouts have the same number of lines
     assert_eq!(layout_max_advance.len(), layout_by_length.len());

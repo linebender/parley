@@ -55,6 +55,7 @@
 //!         char_end: char_count.try_into().unwrap(),
 //!         options: ShapeOptions {
 //!             font_size: 16.0,
+//!             point_size: 16.0,
 //!             language: None,
 //!             features: &[],
 //!             variations: &[],
@@ -137,7 +138,7 @@ mod lru_cache;
 pub mod shape;
 
 pub use linebender_resource_handle::FontData;
-pub use parlance::{BaseDirection, NormalizedCoord};
+pub use parlance::{BaseDirection, NormalizedCoord, Synthesis};
 
 pub use analysis::{Analysis, AnalysisDataSources, CharInfo, DictionaryProvider};
 pub use analyzer::{AnalysisOptions, Analyzer, InlineObject, LineBreakConfig};

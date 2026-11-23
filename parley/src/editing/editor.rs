@@ -107,10 +107,9 @@ where
     // Not all operations on `PlainEditor` need to operate on a
     // clean layout, and not all operations trigger a layout.
     layout_dirty: bool,
-    // TODO: We could avoid redoing the full text layout if only
-    // linebreaking or alignment were changed.
+    // TODO: We could avoid redoing the full text analysis if only
+    // dimensions or alignment were changed.
     // linebreak_dirty: bool,
-    // alignment_dirty: bool,
     alignment: Alignment,
     base_direction: BaseDirection,
     generation: Generation,
@@ -441,12 +440,7 @@ where
 
     /// Move the cursor to the start of the buffer.
     pub fn move_to_text_start(&mut self) {
-        self.refresh_layout();
-        self.editor.set_selection(self.editor.selection.move_lines(
-            &self.editor.layout,
-            isize::MIN,
-            false,
-        ));
+        self.move_to_byte(0);
     }
 
     /// Move the cursor to just after the previous hard line break (such as `\n`).
@@ -468,12 +462,7 @@ where
 
     /// Move the cursor to the end of the buffer.
     pub fn move_to_text_end(&mut self) {
-        self.refresh_layout();
-        self.editor.set_selection(self.editor.selection.move_lines(
-            &self.editor.layout,
-            isize::MAX,
-            false,
-        ));
+        self.move_to_byte(self.editor.buffer.len());
     }
 
     /// Move the cursor to just before the next hard line break (such as `\n`).
@@ -552,11 +541,7 @@ where
 
     /// Select the whole buffer.
     pub fn select_all(&mut self) {
-        self.refresh_layout();
-        self.editor.set_selection(
-            Selection::from_byte_index(&self.editor.layout, 0_usize, Affinity::default())
-                .move_lines(&self.editor.layout, isize::MAX, true),
-        );
+        self.select_byte_range(0, self.editor.buffer.len());
     }
 
     /// Collapse selection into caret.
@@ -566,12 +551,7 @@ where
 
     /// Move the selection focus point to the start of the buffer.
     pub fn select_to_text_start(&mut self) {
-        self.refresh_layout();
-        self.editor.set_selection(self.editor.selection.move_lines(
-            &self.editor.layout,
-            isize::MIN,
-            true,
-        ));
+        self.extend_selection_to_byte(0);
     }
 
     /// Move the selection focus point to just after the previous hard line break (such as `\n`).
@@ -593,12 +573,7 @@ where
 
     /// Move the selection focus point to the end of the buffer.
     pub fn select_to_text_end(&mut self) {
-        self.refresh_layout();
-        self.editor.set_selection(self.editor.selection.move_lines(
-            &self.editor.layout,
-            isize::MAX,
-            true,
-        ));
+        self.extend_selection_to_byte(self.editor.buffer.len());
     }
 
     /// Move the selection focus point to just before the next hard line break (such as `\n`).
@@ -1207,9 +1182,9 @@ where
             builder.push(StyleProperty::Underline(true), preedit_range.clone());
         }
         builder.build_into(&mut self.layout, &self.buffer);
-        self.layout.break_all_lines(self.width);
         self.layout
-            .align(self.alignment, AlignmentOptions::default());
+            .set_alignment(self.alignment, AlignmentOptions::default());
+        self.layout.break_all_lines(self.width);
         self.selection = self.selection.refresh(&self.layout);
         self.layout_dirty = false;
         self.generation.nudge();

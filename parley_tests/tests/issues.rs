@@ -7,7 +7,7 @@ use crate::test_name;
 use crate::util::TestEnv;
 use parley::VerticalAlign;
 use parley::{
-    Alignment, AlignmentOptions, FontFamily, InlineBox, InlineBoxKind, PositionedLayoutItem,
+    Alignment, AlignmentOptions, FloatedBox, FontFamily, InlineBox, PositionedLayoutItem,
     StyleProperty, TextWrapMode,
 };
 
@@ -23,7 +23,6 @@ fn issue_489() {
         let builder = env.ranged_builder(text);
         let mut layout = builder.build(text);
         layout.break_all_lines(Some(200.0));
-        layout.align(Alignment::Start, AlignmentOptions::default());
 
         assert!(layout.is_rtl());
     }
@@ -34,7 +33,6 @@ fn issue_489() {
         let builder = env.ranged_builder(text);
         let mut layout = builder.build(text);
         layout.break_all_lines(Some(200.0));
-        layout.align(Alignment::Start, AlignmentOptions::default());
 
         assert!(!layout.is_rtl());
 
@@ -82,8 +80,8 @@ And, finally, yet another sentence."#;
     ] {
         let builder = env.ranged_builder(text);
         let mut layout = builder.build(text);
+        layout.set_alignment(Alignment::Justify, AlignmentOptions::default());
         layout.break_all_lines(Some(150.0));
-        layout.align(Alignment::Justify, AlignmentOptions::default());
         env.with_name(test_case_name).check_layout_snapshot(&layout);
     }
 }
@@ -114,13 +112,12 @@ Third line that ends with newlines\n\n";
     assert!(content_widths.max != 0.0);
 
     layout.break_all_lines(Some(content_widths.max));
-    layout.align(Alignment::Start, AlignmentOptions::default());
     env.with_name("max_context_with_mandatory_breaks")
         .check_layout_snapshot(&layout);
 }
 
 /// Test that `break_all_lines` terminates when the layout contains a
-/// `CustomOutOfFlow` inline box.
+/// floated box.
 ///
 /// Regression test for <https://github.com/linebender/parley/issues/752>.
 #[test]
@@ -130,15 +127,7 @@ fn issue_752() {
     let text = "Hello world this is some text";
 
     let mut builder = env.ranged_builder(text);
-    builder.push_inline_box(InlineBox {
-        id: 0,
-        kind: InlineBoxKind::CustomOutOfFlow,
-        index: 5,
-        width: 10.0,
-        height: 10.0,
-        baseline: None,
-        vertical_align: VerticalAlign::BASELINE,
-    });
+    builder.push_floated_box(FloatedBox { id: 0, index: 5 });
     let mut layout = builder.build(text);
     layout.break_all_lines(Some(100.0));
 
@@ -171,7 +160,6 @@ fn issue_748_language_subtags() {
 
     let mut layout = builder.build(text);
     layout.break_all_lines(None);
-    layout.align(Alignment::Start, AlignmentOptions::default());
     env.check_layout_snapshot(&layout);
 }
 
@@ -187,7 +175,6 @@ fn inline_boxes_after_newline_max_content_width() {
     for (id, index) in [(0_u64, 1_usize), (1, 5), (2, 9)] {
         builder.push_inline_box(InlineBox {
             id,
-            kind: InlineBoxKind::InFlow,
             index,
             width: 14.0,
             height: 30.0,
@@ -200,7 +187,6 @@ fn inline_boxes_after_newline_max_content_width() {
     let content_widths = layout.calculate_content_widths();
 
     layout.break_all_lines(Some(content_widths.max));
-    layout.align(Alignment::Start, AlignmentOptions::default());
     assert!(
         layout.width() <= content_widths.max,
         "Layout should never be wider than the max content width (width: {}, max: {})",
@@ -222,7 +208,6 @@ fn no_break_after_inline_box_with_nowrap() {
         builder.push_default(StyleProperty::TextWrapMode(text_wrap_mode));
         builder.push_inline_box(InlineBox {
             id: 0,
-            kind: InlineBoxKind::InFlow,
             index: 1,
             width: 10.0,
             height: 10.0,

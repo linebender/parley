@@ -5,9 +5,8 @@
 
 use crate::test_name;
 use crate::util::TestEnv;
-use parley::layout::Alignment;
 use parley::style::StyleProperty;
-use parley::{AlignmentOptions, InlineBox, InlineBoxKind, VerticalAlign};
+use parley::{InlineBox, VerticalAlign};
 
 /// Every keyword, applied to a span in the middle of a line of text.
 #[test]
@@ -39,7 +38,6 @@ fn vertical_align_keywords() {
         builder.pop_style_span();
         let (mut layout, _) = builder.build();
         layout.break_all_lines(None);
-        layout.align(Alignment::Start, AlignmentOptions::default());
 
         env.with_name(name).check_layout_snapshot(&layout);
     }
@@ -68,7 +66,6 @@ fn vertical_align_nested_super() {
     builder.pop_style_span();
     let (mut layout, _) = builder.build();
     layout.break_all_lines(None);
-    layout.align(Alignment::Start, AlignmentOptions::default());
 
     env.check_layout_snapshot(&layout);
 }
@@ -87,7 +84,6 @@ fn vertical_align_ancestor_without_text() {
     builder.pop_style_span();
     let (mut layout, _) = builder.build();
     layout.break_all_lines(None);
-    layout.align(Alignment::Start, AlignmentOptions::default());
 
     env.check_layout_snapshot(&layout);
 }
@@ -109,7 +105,6 @@ fn vertical_align_inline_boxes() {
         builder.push_text("Hx");
         builder.push_inline_box(InlineBox {
             id: 0,
-            kind: InlineBoxKind::InFlow,
             index: 0,
             width: 12.,
             height: 12.,
@@ -120,7 +115,6 @@ fn vertical_align_inline_boxes() {
         builder.pop_style_span();
         let (mut layout, _) = builder.build();
         layout.break_all_lines(None);
-        layout.align(Alignment::Start, AlignmentOptions::default());
 
         env.with_name(name).check_layout_snapshot(&layout);
     }
@@ -149,7 +143,6 @@ fn vertical_align_tall_top_bottom() {
         builder.pop_style_span();
         let (mut layout, _) = builder.build();
         layout.break_all_lines(None);
-        layout.align(Alignment::Start, AlignmentOptions::default());
 
         env.with_name(name).check_layout_snapshot(&layout);
     }

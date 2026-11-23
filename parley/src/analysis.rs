@@ -16,8 +16,6 @@ pub(crate) fn analyze_text<B: Brush>(
     line_break_override: Option<&LineBreakOverrideFn>,
     data_sources: &parley_engine::AnalysisDataSources<'_>,
 ) {
-    let text = if text.is_empty() { " " } else { text };
-
     // Collect the style runs' line break configurations. Gaps use the default configuration, so
     // only non-default configurations need an entry, and adjacent equal configurations are merged.
     //
@@ -40,13 +38,13 @@ pub(crate) fn analyze_text<B: Brush>(
                 {
                     range.end = style_run.range.end;
                 }
-                _ => lcx.line_break.push((style_run.range.clone(), line_break)),
+                _ => lcx.line_break.push((style_run.range.into(), line_break)),
             }
         }
         if style.white_space_collapse == WhiteSpaceCollapse::BreakSpaces {
             match lcx.break_spaces.last_mut() {
                 Some(last) if last.end == style_run.range.start => last.end = style_run.range.end,
-                _ => lcx.break_spaces.push(style_run.range.clone()),
+                _ => lcx.break_spaces.push(style_run.range.into()),
             }
         }
     }

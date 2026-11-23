@@ -17,10 +17,10 @@ use super::style::{
 use crate::font::FontContext;
 use crate::style::TextStyle;
 use crate::util::nearly_eq;
+use crate::{CollapsedSpace, TextWrapMode, WhiteSpaceCollapse, WordBreak};
 use crate::{LineBreak, LineHeight, OverflowWrap, VerticalAlign, layout};
-use crate::{TextWrapMode, WhiteSpaceCollapse, WordBreak};
 use core::borrow::Borrow;
-use core::ops::Range;
+use core::range::Range;
 use fontique::FamilyId;
 use fontique::Language;
 
@@ -71,7 +71,7 @@ struct Cache<T> {
     /// Items in the cache. May contain sequences.
     items: Vec<T>,
     /// Each entry represents a range of items in `data`.
-    entries: Vec<(usize, usize)>,
+    entries: Vec<Range<usize>>,
 }
 
 impl<T> Default for Cache<T> {
@@ -90,9 +90,8 @@ impl<T: Clone + PartialEq> Cache<T> {
     }
 
     pub(crate) fn insert(&mut self, items: &[T]) -> Resolved<T> {
-        for (i, entry) in self.entries.iter().enumerate() {
-            let range = entry.0..entry.1;
-            if range.len() != items.len() {
+        for (i, &range) in self.entries.iter().enumerate() {
+            if range.end - range.start != items.len() {
                 continue;
             }
             if let Some(existing) = self.items.get(range)
@@ -108,7 +107,7 @@ impl<T: Clone + PartialEq> Cache<T> {
         let start = self.items.len();
         self.items.extend(items.iter().cloned());
         let end = self.items.len();
-        self.entries.push((start, end));
+        self.entries.push(Range::from(start..end));
         Resolved {
             index,
             _phantom: core::marker::PhantomData,
@@ -116,8 +115,7 @@ impl<T: Clone + PartialEq> Cache<T> {
     }
 
     pub(crate) fn get(&self, handle: Resolved<T>) -> Option<&[T]> {
-        let (start, end) = *self.entries.get(handle.index)?;
-        self.items.get(start..end)
+        self.items.get(*self.entries.get(handle.index)?)
     }
 }
 
@@ -169,6 +167,7 @@ impl ResolveContext {
             StyleProperty::OverflowWrap(value) => OverflowWrap(*value),
             StyleProperty::TextWrapMode(value) => TextWrapMode(*value),
             StyleProperty::WhiteSpaceCollapse(value) => WhiteSpaceCollapse(*value),
+            StyleProperty::CollapsedSpace(value) => CollapsedSpace(*value),
         }
     }
 
@@ -210,6 +209,7 @@ impl ResolveContext {
             overflow_wrap: raw_style.overflow_wrap,
             text_wrap_mode: raw_style.text_wrap_mode,
             white_space_collapse: raw_style.white_space_collapse,
+            collapsed_space: raw_style.collapsed_space,
         }
     }
 
@@ -400,6 +400,8 @@ pub(crate) enum ResolvedProperty<B: Brush> {
     TextWrapMode(TextWrapMode),
     /// Whitespace collapsing and hanging behavior.
     WhiteSpaceCollapse(WhiteSpaceCollapse),
+    /// The character that collapsible whitespace collapses to.
+    CollapsedSpace(CollapsedSpace),
 }
 
 /// Flattened group of style properties.
@@ -448,6 +450,8 @@ pub(crate) struct ResolvedStyle<B: Brush> {
     pub(crate) text_wrap_mode: TextWrapMode,
     /// Whitespace collapsing and hanging behavior.
     pub(crate) white_space_collapse: WhiteSpaceCollapse,
+    /// The character that collapsible whitespace collapses to.
+    pub(crate) collapsed_space: CollapsedSpace,
 }
 
 impl<B: Brush> ResolvedStyle<B> {
@@ -481,6 +485,7 @@ impl<B: Brush> ResolvedStyle<B> {
             OverflowWrap(value) => self.overflow_wrap = value,
             TextWrapMode(value) => self.text_wrap_mode = value,
             WhiteSpaceCollapse(value) => self.white_space_collapse = value,
+            CollapsedSpace(value) => self.collapsed_space = value,
         }
     }
 
@@ -513,6 +518,7 @@ impl<B: Brush> ResolvedStyle<B> {
             OverflowWrap(value) => self.overflow_wrap == *value,
             TextWrapMode(value) => self.text_wrap_mode == *value,
             WhiteSpaceCollapse(value) => self.white_space_collapse == *value,
+            CollapsedSpace(value) => self.collapsed_space == *value,
         }
     }
 

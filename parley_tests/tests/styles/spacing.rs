@@ -5,9 +5,8 @@
 
 use crate::test_name;
 use crate::util::{ColorBrush, TestEnv, draw_layout, render_to_pixmap, samples};
-use parley::layout::Alignment;
+use parley::Layout;
 use parley::style::{LineHeight, StyleProperty};
-use parley::{AlignmentOptions, Layout};
 
 /// Helper to build a layout with line height applied
 fn build_with_line_height(
@@ -19,7 +18,6 @@ fn build_with_line_height(
     builder.push_default(StyleProperty::LineHeight(line_height));
     let mut layout = builder.build(text);
     layout.break_all_lines(None);
-    layout.align(Alignment::Start, AlignmentOptions::default());
     layout
 }
 
@@ -29,7 +27,6 @@ fn build_with_letter_spacing(env: &mut TestEnv, text: &str, spacing: f32) -> Lay
     builder.push_default(StyleProperty::LetterSpacing(spacing));
     let mut layout = builder.build(text);
     layout.break_all_lines(None);
-    layout.align(Alignment::Start, AlignmentOptions::default());
     layout
 }
 
@@ -39,7 +36,6 @@ fn build_with_word_spacing(env: &mut TestEnv, text: &str, spacing: f32) -> Layou
     builder.push_default(StyleProperty::WordSpacing(spacing));
     let mut layout = builder.build(text);
     layout.break_all_lines(None);
-    layout.align(Alignment::Start, AlignmentOptions::default());
     layout
 }
 

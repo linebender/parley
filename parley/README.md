@@ -61,8 +61,8 @@ See the [examples](https://github.com/linebender/parley/tree/main/examples) dire
 
 ```rust
 use parley::{
-   Alignment, AlignmentOptions, FontContext, FontWeight, InlineBox, InlineBoxKind, Layout,
-   LayoutContext, LineHeight, PositionedLayoutItem, StyleProperty, VerticalAlign,
+   FontContext, FontWeight, InlineBox, Layout, LayoutContext, LineHeight, PositionedLayoutItem,
+   StyleProperty, VerticalAlign,
 };
 
 // Create a FontContext (font database) and LayoutContext (scratch space).
@@ -83,7 +83,7 @@ builder.push(StyleProperty::FontWeight(FontWeight::new(600.0)), 0..4);
 
 // Add a box to be laid out inline with the text, in place of the U+FFFC OBJECT REPLACEMENT
 // CHARACTER
-builder.push_inline_box(InlineBox { id: 0, kind: InlineBoxKind::InFlow, index: 5, width: 50.0, height: 50.0, baseline: None, vertical_align: VerticalAlign::BASELINE });
+builder.push_inline_box(InlineBox { id: 0, index: 5, width: 50.0, height: 50.0, baseline: None, vertical_align: VerticalAlign::BASELINE });
 
 // Build the builder into a Layout
 let mut layout: Layout<()> = builder.build(&TEXT);
@@ -91,7 +91,6 @@ let mut layout: Layout<()> = builder.build(&TEXT);
 // Run line-breaking and alignment on the Layout
 const MAX_WIDTH : Option<f32> = Some(100.0);
 layout.break_all_lines(MAX_WIDTH);
-layout.align(Alignment::Start, AlignmentOptions::default());
 
 // Inspect computed layout (see examples for more details)
 let width = layout.width();
@@ -135,7 +134,7 @@ Note that Parley requires that an allocator is available (i.e. it uses [`alloc`]
 
 ## Minimum supported Rust Version (MSRV)
 
-This version of Parley has been verified to compile with **Rust 1.88** and later.
+This version of Parley has been verified to compile with **Rust 1.96** and later.
 
 Future versions of Parley might increase the Rust version requirement.
 It will not be treated as a breaking change and as such can even happen with small patch releases.

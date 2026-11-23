@@ -3,7 +3,7 @@
 
 //! Query support.
 
-use crate::{Charmap, CharmapIndex};
+use crate::{Charmap, CharmapIndex, UnicodeRangeSet};
 
 use super::super::{Collection, SourceCache, matching::match_fonts};
 
@@ -147,26 +147,22 @@ impl<'a> Query<'a> {
                 &mut family.best,
                 self.source_cache,
             );
-            let mut yielded_default = false;
-            for font in bucket {
+            let mut fonts = bucket.iter();
+            let mut default = Some(&mut family.default);
+            while let Some(font) = fonts.next().or_else(|| {
+                load_font(
+                    family_info,
+                    self.attributes,
+                    default.take()?,
+                    self.source_cache,
+                )
+            }) {
                 if font.family.1 == family_info.default_font_index() {
-                    yielded_default = true;
+                    default = None;
                 }
                 if f(font) == QueryStatus::Stop {
                     return;
                 }
-            }
-            if yielded_default {
-                continue;
-            }
-            if let Some(font) = load_font(
-                family_info,
-                self.attributes,
-                &mut family.default,
-                self.source_cache,
-            ) && f(font) == QueryStatus::Stop
-            {
-                return;
             }
         }
     }
@@ -174,13 +170,16 @@ impl<'a> Query<'a> {
     /// Returns the [first available font] for the current settings: the first
     /// font that [`matches_with`](Self::matches_with) would yield, if any.
     ///
-    /// CSS additionally requires the font's `unicode-range` to include U+0020
-    /// SPACE; fontique has no `unicode-range`, so every available font qualifies.
+    /// As in CSS, fonts whose [unicode range] excludes U+0020 SPACE are skipped.
     ///
     /// [first available font]: https://drafts.csswg.org/css-fonts-4/#first-available-font
+    /// [unicode range]: crate::FontInfoOverride::unicode_range
     pub fn first_available_font(&mut self) -> Option<QueryFont> {
         let mut found = None;
         self.matches_with(|font| {
+            if !font.in_unicode_range(' ') {
+                return QueryStatus::Continue;
+            }
             found = Some(font.clone());
             QueryStatus::Stop
         });
@@ -250,12 +249,48 @@ pub struct QueryFont {
     pub synthesis: Synthesis,
     /// Data used for constructing a character map for this font.
     pub charmap_index: CharmapIndex,
+    /// The codepoints the font may be used for.
+    ///
+    /// See [`FontInfoOverride::unicode_range`](crate::FontInfoOverride::unicode_range).
+    pub unicode_range: Option<UnicodeRangeSet>,
 }
 
 impl QueryFont {
     /// Attempts to construct a [Charmap] for this font.
+    ///
+    /// This maps all codepoints the font has glyphs for, including those outside its
+    /// [unicode range](Self::unicode_range).
+    #[inline]
     pub fn charmap(&self) -> Option<Charmap<'_>> {
         self.charmap_index.charmap(self.blob.as_ref())
+    }
+
+    /// Returns `true` if the font may be used for the given codepoint, see
+    /// [`FontInfoOverride::unicode_range`](crate::FontInfoOverride::unicode_range).
+    ///
+    /// This doesn't mean the font has a glyph for it.
+    #[inline]
+    pub fn in_unicode_range(&self, codepoint: impl Into<u32>) -> bool {
+        let unicode_range = self.unicode_range.as_ref();
+        unicode_range.is_none_or(|set| set.contains(codepoint))
+    }
+
+    /// Loads the font at `index` in `family`.
+    fn load(
+        family: &FamilyInfo,
+        index: usize,
+        attributes: Attributes,
+        source_cache: &mut SourceCache,
+    ) -> Option<Self> {
+        let font_info = family.fonts().get(index)?;
+        Some(Self {
+            family: (family.id(), index),
+            blob: font_info.load(Some(source_cache))?,
+            index: font_info.index(),
+            synthesis: font_info.synthesis(attributes.width, attributes.style, attributes.weight),
+            charmap_index: font_info.charmap_index(),
+            unicode_range: font_info.unicode_range().cloned(),
+        })
     }
 }
 
@@ -278,26 +313,9 @@ fn load_bucket<'a>(
                 attributes.weight,
                 true,
             );
-            let mut fonts: SmallVec<[QueryFont; 1]> = SmallVec::new();
-            for index in indices {
-                let Some(font_info) = family.fonts().get(index) else {
-                    continue;
-                };
-                let Some(blob) = font_info.load(Some(source_cache)) else {
-                    continue;
-                };
-                fonts.push(QueryFont {
-                    family: (family.id(), index),
-                    blob: blob.clone(),
-                    index: font_info.index(),
-                    synthesis: font_info.synthesis(
-                        attributes.width,
-                        attributes.style,
-                        attributes.weight,
-                    ),
-                    charmap_index: font_info.charmap_index(),
-                });
-            }
+            let fonts: SmallVec<[QueryFont; 1]> = indices
+                .filter_map(|index| QueryFont::load(family, index, attributes, source_cache))
+                .collect();
             if fonts.is_empty() {
                 return &[];
             }
@@ -324,18 +342,12 @@ fn load_font<'a>(
             // the following code.
             *status = Entry::Error;
             let family_index = family.default_font_index();
-            let font_info = family.fonts().get(family_index)?;
-            let blob = font_info.load(Some(source_cache))?;
-            let blob_index = font_info.index();
-            let synthesis =
-                font_info.synthesis(attributes.width, attributes.style, attributes.weight);
-            *status = Entry::Ok(QueryFont {
-                family: (family.id(), family_index),
-                blob,
-                index: blob_index,
-                synthesis,
-                charmap_index: font_info.charmap_index(),
-            });
+            *status = Entry::Ok(QueryFont::load(
+                family,
+                family_index,
+                attributes,
+                source_cache,
+            )?);
             if let Entry::Ok(font) = status {
                 Some(font)
             } else {
@@ -374,4 +386,53 @@ enum Entry<T> {
     Ok(T),
     Vacant,
     Error,
+}
+
+#[cfg(test)]
+mod tests {
+    use alloc::vec::Vec;
+    use linebender_resource_handle::Blob;
+
+    use crate::{Collection, QueryStatus, SourceCache};
+
+    #[test]
+    fn unicode_range() {
+        use crate::{CollectionOptions, FontInfoOverride, UnicodeRangeSet};
+        use alloc::sync::Arc;
+
+        const ROBOTO: &[u8] =
+            include_bytes!("../../../parley_dev/assets/fonts/roboto_fonts/Roboto-Regular.ttf");
+
+        // One family of two fonts: an unrestricted one, and a later one for digits.
+        let mut collection = Collection::new(CollectionOptions {
+            shared: false,
+            system_fonts: false,
+        });
+        let digits = UnicodeRangeSet::new([0x35..=0x39, 0x30..=0x35, 0x32..=0x33, 0x660..=0x669]);
+        for unicode_range in [None, Some(&digits)] {
+            let info = FontInfoOverride {
+                family_name: Some("Composite"),
+                unicode_range,
+                ..Default::default()
+            };
+            collection.register_fonts(Blob::new(Arc::new(ROBOTO.to_vec())), Some(info));
+        }
+        let mut source_cache = SourceCache::default();
+        let mut query = collection.query(&mut source_cache);
+        query.set_families(["Composite"]);
+
+        // The later font is checked first.
+        let mut selected_unrestricted = Vec::new();
+        for ch in "a49 ".chars() {
+            query.matches_with(|font| {
+                if !font.in_unicode_range(ch) || font.charmap().unwrap().map(ch).is_none() {
+                    return QueryStatus::Continue;
+                }
+                selected_unrestricted.push(font.in_unicode_range('a'));
+                QueryStatus::Stop
+            });
+        }
+        assert_eq!(selected_unrestricted, [true, false, false, true]);
+        assert!(query.first_available_font().unwrap().in_unicode_range('a'));
+    }
 }

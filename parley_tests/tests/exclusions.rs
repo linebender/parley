@@ -24,9 +24,8 @@ mod circle {
 
         let mut layout = builder.build(text);
 
+        layout.set_alignment(Alignment::Justify, AlignmentOptions::default());
         apply_circle_breaking(&mut layout, diameter, line_height);
-
-        layout.align(Alignment::Justify, AlignmentOptions::default());
 
         env.rendering_config()
             .size
@@ -55,7 +54,7 @@ mod circle {
                     state.set_line_x(line_x);
                     state.set_line_max_advance(line_width.max(MIN_LINE_WIDTH));
                 }
-                YieldData::InlineBoxBreak(_) => {}
+                YieldData::FloatedBox(_) => {}
                 YieldData::MaxHeightExceeded(data) => {
                     panic!("Unexpected max-height break at {}", data.line_height);
                 }
@@ -111,9 +110,8 @@ mod waterfall {
 
             let mut layout = builder.build(text);
 
+            layout.set_alignment(alignment, AlignmentOptions::default());
             apply_waterfall_breaking(&mut layout, layout_width, line_width, step);
-
-            layout.align(alignment, AlignmentOptions::default());
 
             env.with_name(test_case_name).check_layout_snapshot(&layout);
         }
@@ -141,7 +139,7 @@ mod waterfall {
                     }
                     state.set_line_x(next_offset);
                 }
-                YieldData::InlineBoxBreak(_) | YieldData::MaxHeightExceeded(_) => {}
+                YieldData::FloatedBox(_) | YieldData::MaxHeightExceeded(_) => {}
             }
         }
     }
@@ -176,9 +174,8 @@ mod zigzag {
 
             let mut layout = builder.build(text);
 
+            layout.set_alignment(alignment, AlignmentOptions::default());
             apply_zigzag_breaking(&mut layout, width, offset);
-
-            layout.align(alignment, AlignmentOptions::default());
 
             env.with_name(test_case_name).check_layout_snapshot(&layout);
         }
@@ -203,7 +200,7 @@ mod zigzag {
                         state.set_line_x(0.0);
                     }
                 }
-                YieldData::InlineBoxBreak(_) | YieldData::MaxHeightExceeded(_) => {}
+                YieldData::FloatedBox(_) | YieldData::MaxHeightExceeded(_) => {}
             }
         }
     }

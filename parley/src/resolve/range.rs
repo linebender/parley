@@ -68,7 +68,10 @@ impl<B: Brush> RangedStyleBuilder<B> {
             "Internal error: Must call `begin` before setting properties on a `RangedStyleBuilder`."
         );
         let range = resolve_range(range, self.len);
-        self.properties.push(RangedProperty { property, range });
+        self.properties.push(RangedProperty {
+            property,
+            range: range.into(),
+        });
     }
 
     /// Computes style table + style runs for the ranged properties.
@@ -88,7 +91,7 @@ impl<B: Brush> RangedStyleBuilder<B> {
         let styles = &mut self.scratch_styles;
         styles.push(RangedStyle {
             style: self.root_style.clone(),
-            range: 0..self.len,
+            range: (0..self.len).into(),
         });
         for prop in &self.properties {
             if prop.range.start > prop.range.end {

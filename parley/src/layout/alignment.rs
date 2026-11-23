@@ -2,6 +2,7 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 use super::BreakReason;
+use super::spacing::{EffectiveSpacing, push_cluster_gaps};
 use crate::data::LayoutData;
 use crate::style::Brush;
 
@@ -34,7 +35,7 @@ pub enum Alignment {
 }
 
 /// Additional options to fine tune alignment
-#[derive(Debug, Clone, Copy)]
+#[derive(Debug, Clone, Copy, PartialEq, Eq)]
 pub struct AlignmentOptions {
     /// If set to `true`, "end" and "center" alignment will apply even if the line contents are
     /// wider than the alignment width. If it is set to `false`, all overflowing lines will be
@@ -44,11 +45,11 @@ pub struct AlignmentOptions {
     /// line that ends in an explicit line break. This corresponds to the CSS `text-align-last`
     /// property.
     ///
-    /// If set to `None`, those lines use the alignment passed to [`Layout::align`], except that
-    /// [`Alignment::Justify`] falls back to [`Alignment::Start`]. This is the behavior of
+    /// If set to `None`, those lines use the alignment passed to [`Layout::set_alignment`], except that
+    ///  [`Alignment::Justify`] falls back to [`Alignment::Start`]. This is the behavior of
     /// `text-align-last: auto`.
     ///
-    /// [`Layout::align`]: crate::Layout::align
+    /// [`Layout::set_alignment`]: crate::Layout::set_alignment
     pub last_line_alignment: Option<Alignment>,
 }
 
@@ -65,12 +66,13 @@ impl Default for AlignmentOptions {
     }
 }
 
-/// Align the layout.
-pub(crate) fn align<B: Brush>(
-    layout: &mut LayoutData<B>,
-    alignment: Alignment,
-    options: AlignmentOptions,
-) {
+/// Align the layout. This applies to the full layout at a time, because the alignment implicitly
+///  uses the widest width in the layout if no max advance was provided.
+///
+/// TODO: Evaluate whether aligning a line at a time might be faster (better cache locality?).
+pub(crate) fn align<B: Brush>(layout: &mut LayoutData<B>) {
+    let alignment = layout.alignment_setting;
+    let options = layout.alignment_options;
     layout.alignment = Some(alignment);
 
     let is_rtl = layout.base_level.is_rtl();
@@ -124,15 +126,10 @@ pub(crate) fn align<B: Brush>(
                 line.metrics.offset += free_space * 0.5;
             }
             (Alignment::Justify, _) => {
-                // Justified alignment doesn't have any effect if free_space is negative or zero
-                if free_space <= 0.0 {
-                    continue;
-                }
-
-                // Justified alignment doesn't apply if there are no whitespace gaps to adjust. In
-                // that case, start-align, i.e., left-align for LTR text and right-align for RTL
-                // text.
-                if line.num_justification_opportunities == 0 {
+                // Justified alignment doesn't apply if the line overflows or if there are no
+                // whitespace gaps to adjust. In that case, start-align, i.e., left-align for LTR
+                // text and right-align for RTL text.
+                if free_space <= 0.0 || line.num_justification_opportunities == 0 {
                     if is_rtl {
                         line.metrics.offset += free_space;
                     }
@@ -144,4 +141,29 @@ pub(crate) fn align<B: Brush>(
             }
         }
     }
+
+    let mut cluster_gaps = core::mem::take(&mut layout.cluster_gaps);
+    cluster_gaps.clear();
+    for line in &layout.lines {
+        if !line.has_spacing && line.justification.amount_per_opportunity == 0. {
+            continue;
+        }
+        for item_idx in line.item_range {
+            let item = &layout.line_items[item_idx];
+            let spacing =
+                EffectiveSpacing::new(layout.runs[item.index].spacing, line.justification);
+            let gaps_start = (!spacing.is_zero()).then(|| {
+                let gaps_start = cluster_gaps.len() as u32;
+                push_cluster_gaps(
+                    &mut cluster_gaps,
+                    item.slice(layout),
+                    spacing,
+                    item.is_rtl(),
+                );
+                gaps_start
+            });
+            layout.line_items[item_idx].gaps_start = gaps_start;
+        }
+    }
+    layout.cluster_gaps = cluster_gaps;
 }

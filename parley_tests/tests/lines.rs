@@ -10,8 +10,8 @@ use crate::test_name;
 use crate::util::{ColorBrush, TestEnv};
 use parley::VerticalAlign;
 use parley::{
-    Affinity, Alignment, AlignmentOptions, BoundingBox, Brush, Cursor, InlineBox, InlineBoxKind,
-    Layout, Line, LineHeight, Selection, StyleProperty,
+    Affinity, BoundingBox, Brush, Cursor, InlineBox, Layout, Line, LineHeight, Selection,
+    StyleProperty,
 };
 use peniko::kurbo::Size;
 
@@ -144,7 +144,6 @@ fn build_layout<A: Into<Option<f32>>>(
 
     builder.push_inline_box(InlineBox {
         id: 0,
-        kind: InlineBoxKind::InFlow,
         index: boxes.next().unwrap(),
         width: 50.0,
         height: 5.0,
@@ -153,7 +152,6 @@ fn build_layout<A: Into<Option<f32>>>(
     });
     builder.push_inline_box(InlineBox {
         id: 1,
-        kind: InlineBoxKind::InFlow,
         index: boxes.next().unwrap(),
         width: 50.0,
         height: 3.0,
@@ -532,7 +530,6 @@ fn lines_negative_leading_inline_box_grows_line_box() {
     builder.push_default(LineHeight::Absolute(line_height_px));
     builder.push_inline_box(InlineBox {
         id: 0,
-        kind: InlineBoxKind::InFlow,
         index: 5,
         width: 12.0,
         height: box_height,
@@ -667,7 +664,6 @@ fn lines_line_height_metrics_relative() {
     let mut layout = builder.build(TEXT);
 
     layout.break_all_lines(None);
-    layout.align(Alignment::Start, AlignmentOptions::default());
     env.check_layout_snapshot(&layout);
 }
 
@@ -681,7 +677,6 @@ fn lines_line_height_size_relative() {
     let mut layout = builder.build(TEXT);
 
     layout.break_all_lines(None);
-    layout.align(Alignment::Start, AlignmentOptions::default());
     env.check_layout_snapshot(&layout);
 }
 
@@ -695,7 +690,6 @@ fn lines_line_height_absolute() {
     let mut layout = builder.build(TEXT);
 
     layout.break_all_lines(None);
-    layout.align(Alignment::Start, AlignmentOptions::default());
     env.check_layout_snapshot(&layout);
 }
 
@@ -766,7 +760,6 @@ fn lines_revert_restores_line_height() {
     // "aaa B" fits, so the large glyphs are added to the first line before the line breaker
     // reverts to the break opportunity after the space.
     layout.break_all_lines(Some(95.0));
-    layout.align(Alignment::Start, AlignmentOptions::default());
 
     assert_eq!(layout.len(), 2);
     let heights: Vec<f32> = layout.lines().map(|l| l.metrics().line_height).collect();
@@ -786,7 +779,6 @@ fn lines_revert_restores_aligned_subtree_line_height() {
     let mut layout = builder.build(text);
 
     layout.break_all_lines(Some(95.0));
-    layout.align(Alignment::Start, AlignmentOptions::default());
 
     assert_eq!(layout.len(), 2);
     let heights: Vec<f32> = layout.lines().map(|l| l.metrics().line_height).collect();
@@ -828,7 +820,6 @@ fn lines_aligned_subtrees_grow_across_breaks() {
     }
     let (mut layout, _) = builder.build();
     layout.break_all_lines(Some(130.0));
-    layout.align(Alignment::Start, AlignmentOptions::default());
 
     let metrics: Vec<(f32, f32)> = layout
         .lines()

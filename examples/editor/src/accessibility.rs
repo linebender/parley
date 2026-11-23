@@ -125,6 +125,35 @@ impl LayoutAccessibility {
             }
             runs.sort_by_key(|(r, _)| r.text_range().start);
 
+            if layout.text_len() == 0 {
+                // The line of an empty layout has no runs, but AccessKit needs a text run to put
+                // the caret in.
+                if self.span_ids.is_empty() {
+                    self.span_ids.push(next_node_id());
+                }
+                let mut node = Node::new(Role::TextRun);
+                node.set_text_direction(if layout.is_rtl() {
+                    TextDirection::RightToLeft
+                } else {
+                    TextDirection::LeftToRight
+                });
+                finish_span(
+                    &mut node,
+                    x_offset,
+                    y_offset,
+                    metrics,
+                    metrics.offset,
+                    0.0,
+                    0.0,
+                    String::new(),
+                    Vec::new(),
+                    Vec::new(),
+                    Vec::new(),
+                    Vec::new(),
+                );
+                add_span(update, parent_node, self.span_ids[0], node);
+            }
+
             for (run, run_offset) in runs.drain(..) {
                 let mut span_path = run_start_path(line_index, &run);
                 let (mut id, mut node) = self.span_id_and_node(
@@ -290,12 +319,8 @@ impl LayoutAccessibility {
         if layout.text_len() == 0 {
             // If the text is empty, just return the first node with a
             // character index of 0.
-            let run = layout.get(0)?.runs().next()?;
-            let position = self
-                .span_positions_by_cluster_path
-                .get(&run_start_path(0, &run))?;
             return Some(TextPosition {
-                node: self.span_id(position.span_index)?,
+                node: self.span_id(0)?,
                 character_index: 0,
             });
         }

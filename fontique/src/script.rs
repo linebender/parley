@@ -28,13 +28,12 @@ impl ScriptExt for Script {
 
 #[test]
 fn assert_sorted() {
-    for w in SCRIPT_SAMPLES.windows(2) {
-        let &[prev, curr] = w else { unreachable!() };
+    for [prev, curr] in SCRIPT_SAMPLES.array_windows() {
         assert!(prev.0 < curr.0);
     }
 }
 
-pub const SCRIPT_SAMPLES: &[(Script, &str)] = &[
+const SCRIPT_SAMPLES: &[(Script, &str)] = &[
     (Script::from_bytes(*b"Adlm"), "𞤀𞤁𞤂𞤃𞤄𞤅𞤆𞤇𞤈𞤉𞤊𞤋𞤌𞤍𞤎𞤏"),
     (Script::from_bytes(*b"Aghb"), "𐔰𐔱𐔲𐔳𐔴𐔵𐔶𐔷𐔸𐔹𐔺𐔻𐔼𐔽𐔾𐔿"),
     (Script::from_bytes(*b"Ahom"), "𑜀𑜁𑜂𑜃𑜄𑜅𑜆𑜇𑜈𑜉𑜊𑜋𑜌𑜍𑜎𑜏"),

@@ -37,7 +37,6 @@ pub fn defaults() -> Vec<Benchmark> {
 
                             let mut layout: Layout<ColorBrush> = builder.build(text);
                             layout.break_all_lines(Some(MAX_ADVANCE));
-                            layout.align(Alignment::Start, AlignmentOptions::default());
 
                             black_box(layout);
                         });
@@ -78,7 +77,6 @@ pub fn spacing() -> Vec<Benchmark> {
 
                             let mut layout: Layout<ColorBrush> = builder.build(text);
                             layout.break_all_lines(Some(MAX_ADVANCE));
-                            layout.align(Alignment::Start, AlignmentOptions::default());
 
                             black_box(layout);
                         });
@@ -89,67 +87,12 @@ pub fn spacing() -> Vec<Benchmark> {
         .collect()
 }
 
-/// Benchmark repeatedly justifying an already line-broken layout.
-pub fn repeated_justification() -> [Benchmark; 1] {
-    const DISPLAY_SCALE: f32 = 1.0;
-    const QUANTIZE: bool = true;
-    const MAX_ADVANCE: f32 = 200.0 * DISPLAY_SCALE;
-
-    let sample = get_samples()
-        .iter()
-        .find(|sample| sample.name == "latin" && sample.modification == "8000 characters")
-        .expect("the Latin 8000-character benchmark sample should exist");
-
-    [benchmark_fn(
-        format!(
-            "Repeated Justification - {} {}",
-            sample.name, sample.modification
-        ),
-        move |b| {
-            let text = &sample.text;
-            let mut layout = with_contexts(|font_cx, layout_cx| {
-                let mut builder = layout_cx.ranged_builder(font_cx, text, DISPLAY_SCALE, QUANTIZE);
-                builder.push_default(FontFamily::from(FONT_FAMILY_LIST));
-
-                let mut layout: Layout<ColorBrush> = builder.build(text);
-                layout.break_all_lines(Some(MAX_ADVANCE));
-                layout
-            });
-
-            b.iter(move || {
-                layout.align(Alignment::Justify, AlignmentOptions::default());
-
-                // Pass to black box so the optimizer cannot optimize alignment away.
-                black_box(
-                    layout
-                        .lines()
-                        .flat_map(|line| line.runs())
-                        .map(|run| run.advance())
-                        .sum::<f32>(),
-                );
-                layout.align(Alignment::Start, AlignmentOptions::default());
-
-                // Pass to black box so the optimizer cannot optimize alignment away.
-                black_box(
-                    layout
-                        .lines()
-                        .flat_map(|line| line.runs())
-                        .map(|run| run.advance())
-                        .sum::<f32>(),
-                )
-            })
-        },
-    )]
-}
-
 /// Benchmark breaking a layout into lines.
 ///
 /// This is part of the work that'd be performed as, e.g., a window is being resized.
 pub fn line_breaking() -> Vec<Benchmark> {
     const NARROW_MAX_ADVANCE: f32 = 50.;
     const MAX_ADVANCE: f32 = 200.;
-    const WORD_SPACING: f32 = 2.;
-    const LETTER_SPACING: f32 = 1.;
 
     // The maximum advances to break at, with the name each is given in the benchmark name.
     const MAX_ADVANCES: [(&str, Option<f32>); 3] = [
@@ -197,14 +140,7 @@ pub fn line_breaking() -> Vec<Benchmark> {
                 sample.name, sample.modification
             ),
             |b| {
-                let text_range = 0..sample.text.len();
-                let mut layout = build_layout(
-                    &sample.text,
-                    [
-                        (StyleProperty::WordSpacing(WORD_SPACING), text_range.clone()),
-                        (StyleProperty::LetterSpacing(LETTER_SPACING), text_range),
-                    ],
-                );
+                let mut layout = build_layout(&sample.text, spacing_styles(0..sample.text.len()));
                 b.iter(move || break_lines(&mut layout, Some(MAX_ADVANCE)))
             },
         ));
@@ -249,6 +185,16 @@ fn styled_spans(
         })
 }
 
+fn spacing_styles(
+    range: Range<usize>,
+) -> impl Iterator<Item = (StyleProperty<'static, ColorBrush>, Range<usize>)> {
+    [
+        (StyleProperty::WordSpacing(2.), range.clone()),
+        (StyleProperty::LetterSpacing(1.), range),
+    ]
+    .into_iter()
+}
+
 /// Apply `style` to every other chunk of `chunk_char_len` characters of `text`.
 fn alternating_spans<'s>(
     text: &str,
@@ -260,14 +206,15 @@ fn alternating_spans<'s>(
         .map(move |range| (style.clone(), range))
 }
 
-/// Build a styled layout for `text`, changing style every few characters.
-fn build_styled_layout(text: &str) -> Layout<ColorBrush> {
-    const DISPLAY_SCALE: f32 = 1.0;
-    const MAX_ADVANCE: f32 = 200.0 * DISPLAY_SCALE;
-
-    let mut layout = build_layout(text, styled_spans(text));
-    layout.break_all_lines(Some(MAX_ADVANCE));
-    layout.align(Alignment::Start, AlignmentOptions::default());
+fn build_wrapped_layout<'a>(
+    text: &str,
+    styles: impl IntoIterator<Item = (StyleProperty<'a, ColorBrush>, Range<usize>)>,
+    alignment: Alignment,
+) -> Layout<ColorBrush> {
+    const WRAPPED_MAX_ADVANCE: f32 = 200.;
+    let mut layout = build_layout(text, styles);
+    layout.set_alignment(alignment, AlignmentOptions::default());
+    layout.break_all_lines(Some(WRAPPED_MAX_ADVANCE));
     layout
 }
 
@@ -282,7 +229,11 @@ pub fn styled() -> Vec<Benchmark> {
                 format!("Styled - {} {}", sample.name, sample.modification),
                 |b| {
                     b.iter(|| {
-                        black_box(build_styled_layout(&sample.text));
+                        black_box(build_wrapped_layout(
+                            &sample.text,
+                            styled_spans(&sample.text),
+                            Alignment::Start,
+                        ));
                     })
                 },
             )
@@ -297,15 +248,18 @@ pub fn styled() -> Vec<Benchmark> {
 ///
 /// - 8000 characters of Latin with a single style, without line wrapping, giving one shaped run per
 ///   paragraph.
+/// - 8000 characters of each script with various styling/alignment parameters, evaluating spaced performance.
 /// - 8000 characters of Latin with a style alternating every few characters, without line wrapping.
 ///   Glyph runs break wherever the style changes; some properties, such as bold, also split the
 ///   shaped run. This benches both cases.
-/// - Mixed styling of each script with line wrapping. This covers script, bidi and font fallback
-///   handling, and, being wrapped, the line-scoped runs a renderer normally walks.
 pub fn iterate_glyph_runs() -> Vec<Benchmark> {
-    let latin = get_samples()
-        .iter()
-        .find(|sample| sample.name == "latin" && sample.modification == "8000 characters")
+    let big_samples = || {
+        get_samples()
+            .iter()
+            .filter(|sample| sample.modification == "8000 characters")
+    };
+    let latin = big_samples()
+        .find(|sample| sample.name == "latin")
         .expect("the Latin 8000-character benchmark sample should exist");
 
     let mut benchmarks = vec![benchmark_fn(
@@ -341,20 +295,43 @@ pub fn iterate_glyph_runs() -> Vec<Benchmark> {
         ));
     }
 
-    for sample in get_samples()
-        .iter()
-        .filter(|sample| sample.modification == "8000 characters")
-    {
-        benchmarks.push(benchmark_fn(
-            format!(
-                "Glyph Runs - {} {}, mixed",
-                sample.name, sample.modification
-            ),
-            |b| {
-                let layout = build_styled_layout(&sample.text);
-                b.iter(move || black_box(walk_items(&layout)))
-            },
-        ));
+    for sample in big_samples() {
+        enum Styles {
+            Uniform,
+            Spacing,
+            Mixed,
+        }
+        for (label, case, alignment) in [
+            ("wrapped", Styles::Uniform, Alignment::Start),
+            // Note our Japanese sample doesn't have spaces, so in the Japanese case this
+            // is not really applying justification.
+            ("wrapped + justified", Styles::Uniform, Alignment::Justify),
+            ("wrapped + spacing", Styles::Spacing, Alignment::Start),
+            ("mixed", Styles::Mixed, Alignment::Start),
+        ] {
+            benchmarks.push(benchmark_fn(
+                format!(
+                    "Glyph Runs - {} {}, {label}",
+                    sample.name, sample.modification
+                ),
+                move |b| {
+                    let layout = match case {
+                        Styles::Uniform => build_wrapped_layout(&sample.text, [], alignment),
+                        Styles::Spacing => build_wrapped_layout(
+                            &sample.text,
+                            spacing_styles(0..sample.text.len()),
+                            alignment,
+                        ),
+                        Styles::Mixed => build_wrapped_layout(
+                            &sample.text,
+                            styled_spans(&sample.text),
+                            alignment,
+                        ),
+                    };
+                    b.iter(move || black_box(walk_items(&layout)))
+                },
+            ));
+        }
     }
 
     benchmarks
@@ -388,9 +365,6 @@ fn walk_items(layout: &Layout<ColorBrush>) -> (usize, f32) {
 /// sequencing that'll likely be used by clients (i.e., measure possible sizes, and later on line
 /// break once the target size is known).
 pub fn content_widths() -> Vec<Benchmark> {
-    const WORD_SPACING: f32 = 2.;
-    const LETTER_SPACING: f32 = 1.;
-
     let samples = get_samples();
 
     let mut benchmarks = Vec::new();
@@ -442,14 +416,7 @@ pub fn content_widths() -> Vec<Benchmark> {
             ),
             |b| {
                 let layouts = with_shuffled_text(sample, b.seed, |text| {
-                    let text_range = 0..text.len();
-                    build_layout(
-                        text,
-                        [
-                            (StyleProperty::WordSpacing(WORD_SPACING), text_range.clone()),
-                            (StyleProperty::LetterSpacing(LETTER_SPACING), text_range),
-                        ],
-                    )
+                    build_layout(text, spacing_styles(0..text.len()))
                 });
                 let mut i = 0;
                 b.iter(move || {
@@ -545,7 +512,6 @@ fn build_unwrapped_layout<'a>(
 ) -> Layout<ColorBrush> {
     let mut layout = build_layout(text, styles);
     layout.break_all_lines(None);
-    layout.align(Alignment::Start, AlignmentOptions::default());
     layout
 }
 
@@ -562,8 +528,8 @@ pub fn long_line() -> Vec<Benchmark> {
             builder.push_default(FontFamily::from(FONT_FAMILY_LIST));
 
             let mut layout: Layout<ColorBrush> = builder.build(text);
+            layout.set_alignment(alignment, AlignmentOptions::default());
             layout.break_all_lines(max_advance);
-            layout.align(alignment, AlignmentOptions::default());
 
             black_box(layout);
         });
@@ -617,7 +583,6 @@ pub fn page() -> Vec<Benchmark> {
             .iter_mut()
             .map(|layout| {
                 layout.break_all_lines(Some(max_advance));
-                layout.align(Alignment::Start, AlignmentOptions::default());
                 layout.len()
             })
             .sum()
