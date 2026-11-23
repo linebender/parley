@@ -754,9 +754,10 @@ impl Reshaper {
             };
             let (slot, advance) =
                 self.shape(text, shaped, FragmentCache::STARTS, fragment, [edit, None]);
-            // The fragment has no concat flag at its end, but if the fragment is safe to concat at
-            // a splice point before its end, we know the fragment and the source glyphs will match
-            // from that point on (we could in principle trim the fragment back to that point).
+            // Note that fragment's don't carry an unsafe-to-concat flag for their ends, but if the
+            // fragment is safe to concat at a splice point before its end, we know the fragment and
+            // the source glyphs will match from that point on (we could in principle trim the
+            // fragment back to that point).
             let fragment_clusters = self.cache.slots[slot]
                 .fragment
                 .run_slice(shaped, 0)
