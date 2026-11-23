@@ -15,6 +15,7 @@ pub fn font_dirs() -> impl Iterator<Item = PathBuf> {
         assets_dir.join("roboto_fonts"),
         assets_dir.join("noto_fonts"),
         assets_dir.join("noto_color_emoji"),
+        assets_dir.join("noto_emoji"),
     ]
     .into_iter()
 }

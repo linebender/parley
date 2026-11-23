@@ -56,6 +56,8 @@ impl ShapedClusterFlags {
     const SAFE_TO_CONCAT_BEFORE: u32 = 1 << 16;
     /// Whether the cluster's first character is default ignorable.
     const DEFAULT_IGNORABLE: u32 = 1 << 17;
+    /// Whether the cluster is justify expandable.
+    const JUSTIFY_EXPANDABLE: u32 = 1 << 18;
 
     #[inline(always)]
     pub(crate) const fn new(glyph_len: u8) -> Self {
@@ -100,9 +102,13 @@ impl ShapedClusterFlags {
         soft_wrap_opportunity: bool,
         whitespace: Whitespace,
         default_ignorable: bool,
+        justify_expandable: bool,
     ) -> Self {
         self.0 = self.0
-            & !(Self::SOFT_WRAP_BEFORE | Self::WHITESPACE_MASK | Self::DEFAULT_IGNORABLE)
+            & !(Self::SOFT_WRAP_BEFORE
+                | Self::WHITESPACE_MASK
+                | Self::DEFAULT_IGNORABLE
+                | Self::JUSTIFY_EXPANDABLE)
             | if soft_wrap_opportunity {
                 Self::SOFT_WRAP_BEFORE
             } else {
@@ -111,6 +117,11 @@ impl ShapedClusterFlags {
             | ((whitespace as u32) << Self::WHITESPACE_SHIFT)
             | if default_ignorable {
                 Self::DEFAULT_IGNORABLE
+            } else {
+                0
+            }
+            | if justify_expandable {
+                Self::JUSTIFY_EXPANDABLE
             } else {
                 0
             };
@@ -130,6 +141,11 @@ impl ShapedClusterFlags {
     #[inline(always)]
     const fn is_default_ignorable(self) -> bool {
         self.0 & Self::DEFAULT_IGNORABLE != 0
+    }
+
+    #[inline(always)]
+    const fn is_justify_expandable(self) -> bool {
+        self.0 & Self::JUSTIFY_EXPANDABLE != 0
     }
 
     #[inline(always)]
@@ -285,6 +301,19 @@ impl ShapedCluster {
         self.flags.is_default_ignorable()
     }
 
+    /// Whether this cluster provides a justification opportunity at its boundary with any other
+    /// cluster, i.e., without there being a word separator.
+    ///
+    /// That is the case if this cluster's first character is a [block script] character (see
+    /// [`CharacterFlags::is_block_script`]), or this cluster starts a grapheme which is presented
+    /// as an emoji (as emoji are laid out like the characters of the block scripts).
+    ///
+    /// [block script]: https://www.w3.org/TR/css-text-3/#block-scripts
+    #[inline(always)]
+    pub fn is_justify_expandable(self) -> bool {
+        self.flags.is_justify_expandable()
+    }
+
     /// Whether this cluster is an inline object.
     ///
     /// An inline object's cluster consists of just its U+FFFC OBJECT REPLACEMENT CHARACTER (see
@@ -337,6 +366,8 @@ impl CharacterFlags {
     const INLINE_OBJECT: u8 = 1 << 5;
     /// Whether the character has the `Default_Ignorable_Code_Point` unicode property.
     const DEFAULT_IGNORABLE: u8 = 1 << 6;
+    /// Whether the character belongs to a block script for the purposes of justification.
+    const BLOCK_SCRIPT: u8 = 1 << 7;
 
     #[inline(always)]
     pub(crate) fn new(
@@ -344,8 +375,11 @@ impl CharacterFlags {
         is_word_boundary: bool,
         is_soft_wrap_opportunity: bool,
         is_default_ignorable: bool,
+        is_block_script: bool,
     ) -> Self {
         // TODO: Defer to ICU4X properties (see: https://docs.rs/icu/latest/icu/properties/props/struct.Emoji.html).
+        // Ideally, this would be whether the character's grapheme is presented as an emoji, which
+        // the shaper already determines to compute `ShapedCluster::is_justify_expandable`.
         let is_emoji = matches!(source_char as u32, 0x1F600..=0x1F64F | 0x1F300..=0x1F5FF | 0x1F680..=0x1F6FF | 0x2600..=0x26FF | 0x2700..=0x27BF);
         #[expect(
             clippy::cast_possible_truncation,
@@ -367,6 +401,11 @@ impl CharacterFlags {
                 }
                 | if is_default_ignorable {
                     Self::DEFAULT_IGNORABLE
+                } else {
+                    0
+                }
+                | if is_block_script {
+                    Self::BLOCK_SCRIPT
                 } else {
                     0
                 },
@@ -404,6 +443,13 @@ impl CharacterFlags {
     #[inline(always)]
     pub fn is_default_ignorable(self) -> bool {
         self.0 & Self::DEFAULT_IGNORABLE != 0
+    }
+
+    /// Whether this character belongs to a block script for the purposes of justification (see
+    /// [`CharInfo::is_block_script`](crate::CharInfo::is_block_script)).
+    #[inline(always)]
+    pub fn is_block_script(self) -> bool {
+        self.0 & Self::BLOCK_SCRIPT != 0
     }
 
     /// Returns these flags, marking whether the character stands in for an inline object.
@@ -454,15 +500,17 @@ mod tests {
             ('\u{2600}', 3, true),
             ('\u{1F600}', 4, true),
         ] {
-            for bits in 0..8_u8 {
+            for bits in 0..16_u8 {
                 let is_word_boundary = bits & 1 != 0;
                 let is_soft_wrap_opportunity = bits & 2 != 0;
                 let is_default_ignorable = bits & 4 != 0;
+                let is_block_script = bits & 8 != 0;
                 let flags = CharacterFlags::new(
                     ch,
                     is_word_boundary,
                     is_soft_wrap_opportunity,
                     is_default_ignorable,
+                    is_block_script,
                 );
                 assert_eq!(flags.len_utf8(), len, "{ch:?}");
                 assert_eq!(flags.is_emoji(), emoji, "{ch:?}");
@@ -473,13 +521,14 @@ mod tests {
                     "{ch:?}"
                 );
                 assert_eq!(flags.is_default_ignorable(), is_default_ignorable, "{ch:?}");
+                assert_eq!(flags.is_block_script(), is_block_script, "{ch:?}");
             }
 
             let character = Character {
                 text_byte_start: 3,
                 style_index: 7,
                 whitespace: Whitespace::from_char(ch),
-                flags: CharacterFlags::new(ch, false, false, false),
+                flags: CharacterFlags::new(ch, false, false, false, false),
                 grapheme_start: true,
             };
             assert_eq!(character.text_byte_range(), 3..3 + len, "{ch:?}");
@@ -501,13 +550,21 @@ mod tests {
         ];
         for soft_wrap in soft_wraps {
             for whitespace in whitespaces {
-                for default_ignorable in [false, true] {
+                for (default_ignorable, justify_expandable) in
+                    [(false, false), (false, true), (true, false), (true, true)]
+                {
                     let flags = ShapedClusterFlags::new(3)
                         .with_grapheme_start(true)
-                        .with_first_char(soft_wrap, whitespace, default_ignorable);
+                        .with_first_char(
+                            soft_wrap,
+                            whitespace,
+                            default_ignorable,
+                            justify_expandable,
+                        );
                     assert_eq!(flags.is_soft_wrap_opportunity_before(), soft_wrap);
                     assert_eq!(flags.whitespace(), whitespace);
                     assert_eq!(flags.is_default_ignorable(), default_ignorable);
+                    assert_eq!(flags.is_justify_expandable(), justify_expandable);
                     assert_eq!(flags.glyph_len(), 3);
                     assert!(flags.is_grapheme_start());
                 }
