@@ -415,6 +415,11 @@ struct CachedFragment {
 /// "down-town" a lowercase form because of the "t" after it. A line ending in "down-" should keep
 /// that form because of the "n" before it, but measuring reshapes only the hyphen, which then takes
 /// its default form.
+///
+/// [`Self::make_exact`] can be slow. It cannot splice at points that shaping looked across, even if
+/// that changed nothing. In fonts that kern many characters, almost no point qualifies (e.g.,
+/// Roboto, which even kerns spaces). That may then require reshaping most of the line, with the
+/// result rarely differing from [`Self::line`].
 pub struct Reshaper {
     shape_data_cache: LruCache<cache::ShapeDataKey, harfrust::Font>,
     shape_plan_cache: LruCache<cache::ShapePlanId, harfrust::ShapePlan>,
