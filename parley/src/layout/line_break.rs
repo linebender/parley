@@ -11,6 +11,7 @@ use core_maths::CoreFloat;
 use parlance::BidiLevel;
 
 use crate::inline_box::{LayoutInlineBox, inline_object_box_index};
+use crate::layout::Style;
 use crate::layout::data::{AlignedSubtreeOffset, run_box_metrics};
 use crate::layout::spacing::{EffectiveSpacing, Justification, is_word_separator};
 use crate::layout::style_metrics::{BoxMetrics, StyleMetrics, inline_box_placement};
@@ -20,7 +21,7 @@ use crate::style::Brush;
 use crate::{BaselineShift, OverflowWrap, TextWrapMode, VerticalAlign, WhiteSpaceCollapse};
 
 use core::range::Range;
-use parley_engine::shape::{Character, ReshapedTextMark, Reshaper, Whitespace};
+use parley_engine::shape::{Character, ReshapedTextMark, Reshaper, ShapedCluster, Whitespace};
 use parley_engine::{Atom, ShapedText};
 use smallvec::SmallVec;
 
@@ -788,6 +789,41 @@ impl BreakerState {
         self.update_max_height_exceeded();
     }
 
+    /// Add a shaped cluster to the current line.
+    ///
+    /// `cluster_idx` is the index of `cluster`. Its characters are `characters`.
+    ///
+    /// The span boxes of the shaped cluster's styles (and those of their ancestors) are added to
+    /// the line too, as is the box of the shaped cluster's run, see [`LineBoxMetrics::add_text`].
+    /// `is_word_separator` should be `true` only for the first shaped cluster of an atom that is a
+    /// [word separator](`is_word_separator`), i.e., a justification opportunity.
+    #[inline(always)]
+    fn append_cluster_to_line<B: Brush>(
+        &mut self,
+        cluster: &ShapedCluster,
+        cluster_idx: u32,
+        next_x: f32,
+        characters: &[Character],
+        data: &LayoutData<B>,
+        is_word_separator: bool,
+    ) {
+        self.line.items.end = self.run_idx + 1;
+        self.line.chars.end = cluster.chars_range().end;
+        self.line.clusters.end = cluster_idx + 1;
+        self.cluster_idx = cluster_idx + 1;
+        self.line.x = next_x;
+        self.line.num_word_separators += u32::from(is_word_separator);
+        self.line.box_metrics.add_text(
+            self.run_idx,
+            cluster.style_index,
+            characters,
+            data,
+            &mut self.contributed,
+            &mut self.subtrees,
+        );
+        self.update_max_height_exceeded();
+    }
+
     /// Store the current iteration state so that we can revert to it if we later want to take
     /// the line breaking opportunity at this point.
     fn mark_line_break_opportunity(&mut self) {
@@ -1208,9 +1244,6 @@ impl<'a, B: Brush> BreakLines<'a, B> {
             let run = Run::new(self.layout, 0, 0, run_idx, None);
             let slice = run.line_slice();
 
-            // Additional spacing to apply between atoms.
-            let spacing = EffectiveSpacing::new(run.data.spacing, Justification::NONE);
-
             // The height to report if the maximum line height is exceeded.
             let mut line_height = run.data.line_height;
             // An inline object is a run of its own. It exceeds the maximum line height by
@@ -1234,78 +1267,100 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                 }
             }
 
-            // Iterate over the remaining atoms in the Run
-            for atom in slice.atoms_from(self.state.cluster_idx) {
-                // Retrieve metadata about the atom
-                let first_cluster = atom.shaped_clusters()[0];
+            // Iterate over the remaining shaped clusters in the run. An atom's first cluster takes
+            // the atom's line-breaking opportunities, style and spacing; a line never ends inside
+            // an atom, so its other clusters only add their advance.
+            let styles = &self.layout.data.styles;
+            let characters = self.layout.data.shaped_text.characters();
+            let run_spacing = run.data.spacing;
+            let is_spaced = !run_spacing.is_zero();
+            let first = self.state.cluster_idx;
+            let clusters = slice.shaped_clusters_in(first..slice.shaped_clusters_range().end);
+            // The breaker always resumes at the start of an atom.
+            let mut is_atom_start = true;
+            let mut max_height_exceeded = false;
+            for (cluster_idx, cluster) in (first..).zip(clusters) {
+                is_atom_start |= cluster.is_grapheme_start();
+                let mut advance = cluster.advance;
+                // Whether this cluster starts an atom that is a justification opportunity.
+                let mut is_separator = false;
 
-                // Yield floated boxes once the characters before them are on the line.
-                if atom.characters()[0].text_byte_start as usize >= floated_box_yield_index {
-                    return self.yield_floated_box();
-                }
-                let whitespace = first_cluster.whitespace();
-                let is_newline = whitespace == Whitespace::Newline;
-                // Whether this atom is a justification opportunity.
-                let is_separator = is_word_separator(whitespace);
-                let is_soft_wrap_opportunity = first_cluster.is_soft_wrap_opportunity_before();
-                let max_height_exceeded = self.state.line.max_height_exceeded;
-                let style_index = first_cluster.style_index;
-                let style = &self.layout.data.styles[style_index as usize];
+                if is_atom_start {
+                    is_atom_start = false;
+                    let first_character = &characters[cluster.chars_range().start as usize];
+                    // Yield floated boxes once the characters before them are on the line.
+                    if first_character.text_byte_start as usize >= floated_box_yield_index {
+                        return self.yield_floated_box();
+                    }
+                    let whitespace = cluster.whitespace();
+                    is_separator = is_word_separator(whitespace);
+                    max_height_exceeded = self.state.line.max_height_exceeded;
+                    let style = &styles[cluster.style_index as usize];
 
-                // Lag text_wrap_mode style by one atom
-                let text_wrap_mode = self.state.line.text_wrap_mode;
-                self.state.line.text_wrap_mode = style.text_wrap_mode;
+                    // Lag text_wrap_mode style by one atom
+                    let text_wrap_mode = self.state.line.text_wrap_mode;
+                    self.state.line.text_wrap_mode = style.text_wrap_mode;
 
-                // Take mandatory line breaks before checking for line wrapping.
-                if is_newline {
-                    if max_height_exceeded {
-                        return self.max_height_break_data(line_height);
+                    // Take mandatory line breaks before checking for line wrapping.
+                    if whitespace == Whitespace::Newline {
+                        if max_height_exceeded {
+                            return self.max_height_break_data(line_height);
+                        }
+                        // The whole atom goes on the line (e.g., both clusters of a CRLF).
+                        let atom = slice.atoms_from(cluster_idx).next().unwrap();
+                        self.state.append_atom_to_line(
+                            &atom,
+                            self.state.line.x,
+                            cluster.style_index,
+                            &self.layout.data,
+                            is_separator,
+                        );
+                        return self.start_new_line(
+                            BreakReason::Explicit,
+                            max_advance,
+                            line_indent,
+                        );
+                    } else if cluster.is_soft_wrap_opportunity_before()
+                        && text_wrap_mode == TextWrapMode::Wrap
+                    {
+                        // We don't record boundaries when the advance is 0. As we do not want overflowing content to cause extra consecutive
+                        // line breaks. We should accept the overflowing fragment in that scenario.
+                        if self.state.line.x != 0.0 {
+                            self.state.mark_line_break_opportunity();
+                        }
+                    } else if
+                    // This text can contribute "emergency" line breaks.
+                    style.overflow_wrap != OverflowWrap::Normal
+                        && text_wrap_mode == TextWrapMode::Wrap
+                        // If we're at the start of the line, this particular atom will never fit, so it's not a valid emergency break opportunity.
+                        && self.state.line.x != 0.0
+                    {
+                        self.state.mark_emergency_break_opportunity();
                     }
 
-                    self.state.append_atom_to_line(
-                        &atom,
-                        self.state.line.x,
-                        style_index,
-                        &self.layout.data,
-                        is_separator,
-                    );
-
-                    return self.start_new_line(BreakReason::Explicit, max_advance, line_indent);
-                } else if is_soft_wrap_opportunity && text_wrap_mode == TextWrapMode::Wrap {
-                    // We don't record boundaries when the advance is 0. As we do not want overflowing content to cause extra consecutive
-                    // line breaks. We should accept the overflowing fragment in that scenario.
-                    if self.state.line.x != 0.0 {
-                        self.state.mark_line_break_opportunity();
-                        // break_opportunity = true;
+                    // The atom's spacing is added along with its first cluster.
+                    if is_spaced {
+                        advance += run_spacing
+                            .gaps(whitespace, cluster.is_default_ignorable())
+                            .total();
                     }
-                } else if
-                // This text can contribute "emergency" line breaks.
-                style.overflow_wrap != OverflowWrap::Normal
-                && text_wrap_mode == TextWrapMode::Wrap
-                // If we're at the start of the line, this particular atom will never fit, so it's not a valid emergency break opportunity.
-                && self.state.line.x != 0.0
-                {
-                    self.state.mark_emergency_break_opportunity();
                 }
-
-                // Breaking an atom requires reshaping, which we don't do here, so it is
-                // consumed as a whole (this includes all clusters of a ligature).
-                let advance = spacing.atom_advance(&atom);
 
                 // Compute the x position of the content being currently processed
                 let next_x = self.state.line.x + advance;
 
                 // If the content fits (the x position does NOT exceed max_advance)
                 //
-                // We simply append the atom to the current line
+                // We simply append the cluster to the current line
                 if next_x <= fit_max_advance {
                     if max_height_exceeded {
                         return self.max_height_break_data(line_height);
                     }
-                    self.state.append_atom_to_line(
-                        &atom,
+                    self.state.append_cluster_to_line(
+                        cluster,
+                        cluster_idx,
                         next_x,
-                        style_index,
+                        slice.characters_in(cluster.chars_range()),
                         &self.layout.data,
                         is_separator,
                     );
@@ -1316,24 +1371,18 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                 // in the line. If there is no such line-breaking opportunity (such as if wrapping is disabled), then
                 // we fall back to appending the content to the line anyway.
                 else {
-                    // Case: the atom fits once its hanging whitespace is excluded.
+                    // Case: the shaped cluster is whitespace that hangs.
                     //
                     // We append it to the line, with the whitespace hanging past the end.
-                    let (hanging, all_hang) = atom_hanging_advance(
-                        slice,
-                        &atom,
-                        &self.layout.data.styles,
-                        spacing,
-                        run.is_rtl(),
-                    );
-                    if all_hang || next_x - hanging <= fit_max_advance {
+                    if hangs(slice.characters_in(cluster.chars_range()), styles) {
                         if max_height_exceeded {
                             return self.max_height_break_data(line_height);
                         }
-                        self.state.append_atom_to_line(
-                            &atom,
+                        self.state.append_cluster_to_line(
+                            cluster,
+                            cluster_idx,
                             next_x,
-                            style_index,
+                            slice.characters_in(cluster.chars_range()),
                             &self.layout.data,
                             is_separator,
                         );
@@ -1374,10 +1423,11 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         if max_height_exceeded {
                             return self.max_height_break_data(line_height);
                         }
-                        self.state.append_atom_to_line(
-                            &atom,
+                        self.state.append_cluster_to_line(
+                            cluster,
+                            cluster_idx,
                             next_x,
-                            style_index,
+                            slice.characters_in(cluster.chars_range()),
                             &self.layout.data,
                             is_separator,
                         );
@@ -1936,6 +1986,16 @@ fn commit_line<B: Brush>(
     // in line N+1. The item is later filtered out (see `continue` in loop above) if there are not
     // actually any clusters in line N+1.
     state.items.start = state.items.end.saturating_sub(1);
+}
+
+/// Whether a shaped cluster with the given `characters` is whitespace that hangs past the end of a
+/// line.
+///
+/// Cold and kept out-of-line, as this is called only for overflowing clusters.
+#[cold]
+#[inline(never)]
+fn hangs<B: Brush>(characters: &[Character], styles: &[Style<B>]) -> bool {
+    (characters.iter()).all(|c| whitespace_hangs(c.whitespace, &styles[c.style_index as usize]))
 }
 
 /// Whether a line edge at character index `char` needs reshaping. `cluster` is the first shaped
