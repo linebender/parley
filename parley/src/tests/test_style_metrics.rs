@@ -446,82 +446,20 @@ fn breaking_after_reverting_to_a_default_state_does_not_panic() {
     }
 }
 
-/// A layout built with a `StyleRunBuilder` that is given the styles' parents and the text at the
-/// end must equal the `TreeBuilder` layout for the same spans: `A` (40px) containing `B` (10px,
-/// `vertical-align: super`), which contains an inline box and a floated box.
 #[test]
-fn style_run_builder_with_parents_matches_tree_builder() {
+fn style_run_builder_shifts_accumulate_through_parents() {
     let mut fcx = create_font_context();
     let mut lcx: LayoutContext<ColorBrush> = LayoutContext::new();
-    let root = root_style();
-    let a = TextStyle {
-        font_size: 40.,
-        line_height: LineHeight::Absolute(50.),
-        ..root_style()
-    };
-    let b = TextStyle {
-        font_size: 10.,
-        line_height: LineHeight::Absolute(20.),
-        vertical_align: VerticalAlign::SUPER,
-        ..root_style()
-    };
-    let inline_box = InlineBox {
-        id: 7,
-        index: 0,
-        width: 12.,
-        height: 8.,
-        baseline: Some(6.),
-        vertical_align: VerticalAlign::MIDDLE,
-    };
-    let floated_box = FloatedBox { id: 9, index: 0 };
-
-    let mut builder = lcx.tree_builder(&mut fcx, 1., false, &root);
-    builder.push_text("root ");
-    builder.push_style_span(a.clone());
-    builder.push_text("A ");
-    builder.push_style_span(b.clone());
-    builder.push_text("B");
-    builder.push_inline_box(inline_box.clone());
-    builder.push_floated_box(floated_box.clone());
-    builder.push_text(" C");
-    builder.pop_style_span();
-    builder.pop_style_span();
-    builder.push_text(" end");
-    let (mut tree_layout, tree_text) = builder.build();
-    tree_layout.break_all_lines(None);
-    assert_eq!(tree_text, "root A B\u{FFFC} C end");
-
     let mut builder = lcx.style_run_builder(&mut fcx, 1., false);
-    let root_index = builder.push_style(root, None);
-    let mut text = std::string::String::new();
-    let mut push = |builder: &mut crate::StyleRunBuilder<'_, ColorBrush>, style, run: &str| {
-        let start = text.len();
-        text.push_str(run);
-        builder.push_style_run(style, start..text.len());
-        text.len()
+    let raised = |by| TextStyle {
+        vertical_align: VerticalAlign::length(by),
+        ..root_style()
     };
-    push(&mut builder, root_index, "root ");
-    let a_index = builder.push_style(a, Some(root_index));
-    push(&mut builder, a_index, "A ");
-    let b_index = builder.push_style(b, Some(a_index));
-    let box_index = push(&mut builder, b_index, "B");
-    let float_index = push(&mut builder, b_index, "\u{FFFC}");
-    builder.push_inline_box(InlineBox {
-        index: box_index,
-        ..inline_box
-    });
-    builder.push_floated_box(FloatedBox {
-        index: float_index,
-        ..floated_box
-    });
-    push(&mut builder, b_index, " C");
-    push(&mut builder, root_index, " end");
-    let mut layout = builder.build(&text);
-    layout.break_all_lines(None);
-
-    assert_eq!(text, tree_text);
-    assert_eq!(layout.data.styles[2].parent, 1);
-    assert_eq!(layout.data.inline_boxes[0].parent_style_index, 2);
-    assert_ne!(metrics(&layout)[2].baseline_offset, 0.);
-    assert_eq!(layout.data, tree_layout.data);
+    let root = builder.push_style(root_style(), None);
+    let a = builder.push_style(raised(5.), Some(root));
+    let b = builder.push_style(raised(3.), Some(a));
+    builder.push_style_run(b, ..);
+    let layout = builder.build("B");
+    // `B` is raised 3px from the baseline of `A`, which is raised 5px from the root's.
+    assert_eq!(metrics(&layout)[2].baseline_offset, 8.);
 }

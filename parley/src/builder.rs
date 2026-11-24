@@ -156,13 +156,12 @@ impl<'b, B: Brush> StyleRunBuilder<'b, B> {
         self.lcx.style_runs.reserve(additional_runs);
     }
 
-    /// Adds a fully-specified style to the shared style table and
-    /// returns its index.
+    /// Adds a style to the shared style table and returns its index.
     ///
-    /// If `parent` is `Some(parent_style_index)`, the style is nested inside that span (which
-    /// `vertical_align` resolves against, matching [`TreeBuilder`]). `parent_style_index` must
-    /// refer to a previously pushed style, keeping the style table ordered parent-first. When
-    /// `None`, the style's parent defaults to index `0` (the root strut).
+    /// The first style pushed (index `0`) is the root style. Lines are at least as tall as its line
+    /// height, and its [`TextStyle::vertical_align`] is ignored. Later styles are nested in
+    /// `parent`, which their `vertical_align` resolves against. If `parent` is `None`, the style is
+    /// nested in the root.
     ///
     /// # Panics
     ///
@@ -193,8 +192,8 @@ impl<'b, B: Brush> StyleRunBuilder<'b, B> {
     /// Adds a style derived from a previously pushed style `base_style_index` by applying
     /// `properties`, and returns its index.
     ///
-    /// The new style keeps `base_style_index`'s parent so it behaves as a variant of the same span
-    /// (for example, a wrappable variant of a `nowrap` span for a collapsed space). If none of the
+    /// The new style creates a new span with the same parent as `base_style_index` (for example,
+    /// a wrappable span for a collapsed space following a `nowrap` span). If none of the
     /// properties differ from `base_style_index`, `base_style_index` is returned without adding a
     /// duplicate entry. Use [`Self::push_style`] to nest a new span inside `base_style_index`.
     ///
