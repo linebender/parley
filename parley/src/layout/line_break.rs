@@ -970,8 +970,9 @@ impl<'a, B: Brush> BreakLines<'a, B> {
 
             let line = &this.state.line;
 
-            // A line that already doesn't fit as shaped originally only has trailing whitespace
-            // hanging past the end, which is fine.
+            // A line that already doesn't fit as originally shaped either only hangs whitespace
+            // (see the comment below), or was broken at its first opportunity, so there is no
+            // narrower break to step back to.
             if line.x + line.reshaped_start_advance_delta > max_advance {
                 return false;
             }
