@@ -142,24 +142,28 @@ pub(crate) fn align<B: Brush>(layout: &mut LayoutData<B>) {
         }
     }
 
-    layout.cluster_gaps.clear();
+    let mut cluster_gaps = core::mem::take(&mut layout.cluster_gaps);
+    cluster_gaps.clear();
     for line in &layout.lines {
         if !line.has_spacing && line.justification.amount_per_opportunity == 0. {
             continue;
         }
-        for item in &mut layout.line_items[line.item_range] {
-            item.gaps_start = None;
+        for item_idx in line.item_range {
+            let item = &layout.line_items[item_idx];
             let spacing =
                 EffectiveSpacing::new(layout.runs[item.index].spacing, line.justification);
-            if spacing.is_zero() {
-                continue;
-            }
-            let slice = layout
-                .shaped_text
-                .run_slice(item.index as u32)
-                .narrow(item.shaped_cluster_range.into());
-            item.gaps_start = Some(layout.cluster_gaps.len() as u32);
-            push_cluster_gaps(&mut layout.cluster_gaps, slice, spacing, item.is_rtl());
+            let gaps_start = (!spacing.is_zero()).then(|| {
+                let gaps_start = cluster_gaps.len() as u32;
+                push_cluster_gaps(
+                    &mut cluster_gaps,
+                    item.slice(layout),
+                    spacing,
+                    item.is_rtl(),
+                );
+                gaps_start
+            });
+            layout.line_items[item_idx].gaps_start = gaps_start;
         }
     }
+    layout.cluster_gaps = cluster_gaps;
 }

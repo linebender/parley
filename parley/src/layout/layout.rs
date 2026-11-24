@@ -32,7 +32,7 @@ impl<B: Brush> fmt::Debug for Layout<B> {
             f.debug_struct("Layout").field("data", &self.data).finish()
         } else {
             f.debug_struct("Layout")
-                .field("text_len", &self.data.text_len)
+                .field("text_len", &self.data.text.len())
                 .field("width", &self.data.width)
                 .field("height", &self.data.height)
                 .field("lines", &self.data.lines.len())
@@ -85,7 +85,7 @@ impl<B: Brush> Layout<B> {
 
     /// Returns the length of the source text, in bytes.
     pub fn text_len(&self) -> usize {
-        self.data.text_len
+        self.data.text.len()
     }
 
     /// Returns the alignment that was active when lines were most recently broken.
@@ -202,7 +202,7 @@ impl<B: Brush> Layout<B> {
     /// Returns `None` if the layout hasn't been broken into lines. See [`Self::break_lines`] and
     /// [`Self::break_all_lines`].
     pub fn primary_caret(&self, byte_index: usize) -> Option<(Line<'_, B>, f32)> {
-        let byte_index = byte_index.min(self.data.text_len);
+        let byte_index = byte_index.min(self.data.text.len());
 
         // The last line starting at or before `byte_index`.
         let index = self

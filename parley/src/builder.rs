@@ -548,7 +548,7 @@ fn build_into_layout<B: Brush>(
     layout.data.scale = options.scale;
     layout.data.quantize = options.quantize;
     layout.data.base_level = lcx.analysis.paragraph_level();
-    layout.data.text_len = text.len();
+    layout.data.text.push_str(text);
 
     lcx.char_style_indices.clear();
     lcx.char_style_indices
