@@ -1747,7 +1747,7 @@ fn commit_line<B: Brush>(
     let edge_is_unsafe_to_break = |cluster: u32| {
         (shaped_clusters.get(cluster as usize)).is_some_and(|c| !c.is_safe_to_break_before())
     };
-    // Reshape the line if it's edges fell at positions that are unsafe to break at.
+    // Reshape the line if its edges fell at positions that are unsafe to break at.
     let reshaped_line = (edge_is_unsafe_to_break(state.clusters.start)
         || edge_is_unsafe_to_break(state.clusters.end))
     .then(
