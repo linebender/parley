@@ -86,8 +86,8 @@ impl Cursor {
         loop {
             let next = step(current, layout);
             if next == current {
-                // Don't get stuck in an infinite loop.
-                return current;
+                // Ran out of text without leaving the removed whitespace, so don't move the cursor.
+                return self;
             }
             if !next.is_at_removed(layout) || next.geometry(layout, 0.) != origin {
                 return next;
