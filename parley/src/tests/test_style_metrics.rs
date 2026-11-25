@@ -463,3 +463,51 @@ fn style_run_builder_shifts_accumulate_through_parents() {
     // `B` is raised 3px from the baseline of `A`, which is raised 5px from the root's.
     assert_eq!(metrics(&layout)[2].baseline_offset, 8.);
 }
+
+#[test]
+fn style_run_builder_modified_style_vertical_align() {
+    let mut fcx = create_font_context();
+    let mut lcx: LayoutContext<ColorBrush> = LayoutContext::new();
+    let mut builder = lcx.style_run_builder(&mut fcx, 1., false);
+    let root = builder.push_style(root_style(), None);
+    let a = builder.push_style(
+        TextStyle {
+            vertical_align: VerticalAlign::length(5.),
+            ..root_style()
+        },
+        Some(root),
+    );
+    // Sibling of `a` (same parent `root`): keeps `a`'s 5px shift without compounding.
+    let sibling = builder.push_modified_style(a, Some(root), [StyleProperty::FontSize(10.)]);
+    // Nested inside `a` without overriding `vertical_align`: copies `a`'s 5px shift and resolves
+    // it against `a`, doubling the shift.
+    let nested_double = builder.push_modified_style(a, Some(a), [StyleProperty::FontSize(10.)]);
+    // Nested inside `a` with `VerticalAlign::BASELINE`: sits on `a`'s baseline.
+    let nested_baseline = builder.push_modified_style(
+        a,
+        Some(a),
+        [StyleProperty::VerticalAlign(VerticalAlign::BASELINE)],
+    );
+    // Nested inside `a` with its own shift: accumulates on top of `a`'s 5px shift.
+    let nested_shifted = builder.push_modified_style(
+        a,
+        Some(a),
+        [StyleProperty::VerticalAlign(VerticalAlign::length(3.))],
+    );
+    // Re-parented to the root (`None`): keeps `nested_shifted`'s 3px shift relative to root.
+    let reparented_root = builder.push_modified_style(nested_shifted, None, []);
+    builder.push_style_run(a, ..);
+    let layout = builder.build("A");
+    let m = metrics(&layout);
+    assert_eq!(m[usize::from(a)].baseline_offset, 5.);
+    assert_eq!(m[usize::from(sibling)].parent, root);
+    assert_eq!(m[usize::from(sibling)].baseline_offset, 5.);
+    assert_eq!(m[usize::from(nested_double)].parent, a);
+    assert_eq!(m[usize::from(nested_double)].baseline_offset, 10.);
+    assert_eq!(m[usize::from(nested_baseline)].parent, a);
+    assert_eq!(m[usize::from(nested_baseline)].baseline_offset, 5.);
+    assert_eq!(m[usize::from(nested_shifted)].parent, a);
+    assert_eq!(m[usize::from(nested_shifted)].baseline_offset, 8.);
+    assert_eq!(m[usize::from(reparented_root)].parent, root);
+    assert_eq!(m[usize::from(reparented_root)].baseline_offset, 3.);
+}

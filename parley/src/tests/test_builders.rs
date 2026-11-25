@@ -654,7 +654,7 @@ fn builders_newline_inside_complex_script_run_is_hard_break() {
 }
 
 #[test]
-fn style_runs_modified_style_preserves_parent_and_deduplicates_noop() {
+fn style_runs_modified_style_parent_and_deduplication() {
     let mut fcx = create_font_context();
     let mut lcx: LayoutContext<ColorBrush> = LayoutContext::new();
     let mut builder = lcx.style_run_builder(&mut fcx, 1., false);
@@ -668,16 +668,37 @@ fn style_runs_modified_style_preserves_parent_and_deduplicates_noop() {
         Some(parent),
     );
 
-    let same =
-        builder.push_modified_style(child, [StyleProperty::TextWrapMode(TextWrapMode::NoWrap)]);
+    // Same parent and no differing properties: deduplicates to `child`.
+    let same = builder.push_modified_style(
+        child,
+        Some(parent),
+        [StyleProperty::TextWrapMode(TextWrapMode::NoWrap)],
+    );
     assert_eq!(same, child);
 
-    let wrappable =
-        builder.push_modified_style(child, [StyleProperty::TextWrapMode(TextWrapMode::Wrap)]);
+    // Different parent (`None` means root, `Some(child)` nests in `child`): does not deduplicate
+    // even when no properties change.
+    let reparented_root = builder.push_modified_style(child, None, []);
+    assert_ne!(reparented_root, child);
+    let nested = builder.push_modified_style(child, Some(child), []);
+    assert_ne!(nested, child);
+
+    // Same parent with a modified property creates a sibling span.
+    let wrappable = builder.push_modified_style(
+        child,
+        Some(parent),
+        [StyleProperty::TextWrapMode(TextWrapMode::Wrap)],
+    );
     assert_ne!(wrappable, child);
+
     builder.push_style_run(child, 0..1);
     builder.push_style_run(wrappable, 1..2);
     let layout = builder.build("a ");
+    assert_eq!(
+        layout.data.styles[usize::from(reparented_root)].parent,
+        root
+    );
+    assert_eq!(layout.data.styles[usize::from(nested)].parent, child);
     assert_eq!(layout.data.styles[usize::from(wrappable)].parent, parent);
     assert_eq!(
         layout.data.styles[usize::from(wrappable)].text_wrap_mode,

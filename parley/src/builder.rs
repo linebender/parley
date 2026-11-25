@@ -192,25 +192,50 @@ impl<'b, B: Brush> StyleRunBuilder<'b, B> {
     /// Adds a style derived from a previously pushed style `base_style_index` by applying
     /// `properties`, and returns its index.
     ///
-    /// The new style creates a new span with the same parent as `base_style_index` (for example,
-    /// a wrappable span for a collapsed space following a `nowrap` span). If none of the
-    /// properties differ from `base_style_index`, `base_style_index` is returned without adding a
-    /// duplicate entry. Use [`Self::push_style`] to nest a new span inside `base_style_index`.
+    /// The new style starts as a copy of `base_style_index` (including its
+    /// [`TextStyle::vertical_align`]) and is nested in `parent`, which its `vertical_align`
+    /// resolves against (matching [`Self::push_style`]: `None` nests it in the root, `Some(i)`
+    /// nests it in style `i`). Pass `Some(base_style_index)` to nest inside `base_style_index`
+    /// (override [`StyleProperty::VerticalAlign`] to [`crate::VerticalAlign::BASELINE`] if you do
+    /// not want `base_style_index`'s shift to apply again), or pass `base_style_index`'s own parent
+    /// to create a sibling span (for example, a wrappable span for a collapsed space following a
+    /// `nowrap` span).
+    ///
+    /// If `parent` matches `base_style_index`'s parent and none of `properties` differ from
+    /// `base_style_index`, `base_style_index` is returned without adding a duplicate entry.
     ///
     /// # Panics
     ///
-    /// Panics if `base_style_index` is not the index of a previously pushed style, or if more
-    /// than `u16::MAX` styles have been pushed.
+    /// Panics if `base_style_index` or `parent` (when `Some`) is not the index of a previously
+    /// pushed style, or if more than `u16::MAX` styles have been pushed.
     pub fn push_modified_style<'a>(
         &mut self,
         base_style_index: u16,
+        parent: Option<u16>,
         properties: impl IntoIterator<Item = StyleProperty<'a, B>>,
     ) -> u16 {
         assert!(
             usize::from(base_style_index) < self.lcx.style_table.len(),
             "StyleRunBuilder expects a base style that was previously added"
         );
-        let mut modified = None;
+        let parent_style_index = match parent {
+            Some(parent_style_index) => {
+                assert!(
+                    usize::from(parent_style_index) < self.lcx.style_table.len(),
+                    "StyleRunBuilder expects a parent style that was previously added"
+                );
+                parent_style_index
+            }
+            None => 0,
+        };
+        let mut modified =
+            if self.lcx.style_table[usize::from(base_style_index)].parent != parent_style_index {
+                let mut cloned = self.lcx.style_table[usize::from(base_style_index)].clone();
+                cloned.parent = parent_style_index;
+                Some(cloned)
+            } else {
+                None
+            };
         for property in properties {
             let resolved_prop =
                 self.lcx
