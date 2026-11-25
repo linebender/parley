@@ -71,7 +71,7 @@ fn build_layout_with_style_runs(
     opts: &RangedOptions<'_>,
     with_builder: impl Fn(&mut StyleRunBuilder<'_, ColorBrush>),
 ) -> Layout<ColorBrush> {
-    let mut rb = lcx.style_run_builder(fcx, opts.text, opts.scale, opts.quantize);
+    let mut rb = lcx.style_run_builder(fcx, opts.scale, opts.quantize);
     with_builder(&mut rb);
     let mut layout = rb.build(opts.text);
     layout.break_all_lines(opts.max_advance);
@@ -115,9 +115,9 @@ fn builders_apply_base_direction() {
         "tree base direction",
     );
 
-    let mut style_runs = lcx.style_run_builder(&mut fcx, text, 1.0, true);
+    let mut style_runs = lcx.style_run_builder(&mut fcx, 1.0, true);
     style_runs.set_base_direction(BaseDirection::Rtl);
-    let style = style_runs.push_style(root_style);
+    let style = style_runs.push_style(root_style, None);
     style_runs.push_style_run(style, ..);
     let mut style_run_layout = style_runs.build(text);
     style_run_layout.break_all_lines(None);
@@ -362,8 +362,8 @@ fn builders_style_runs_match_ranged() {
             ..modified_style.clone()
         };
 
-        let root_index = rb.push_style(root_run);
-        let modified_index = rb.push_style(modified_run);
+        let root_index = rb.push_style(root_run, None);
+        let modified_index = rb.push_style(modified_run, None);
         rb.push_style_run(root_index, 0..split);
         rb.push_style_run(modified_index, split..text.len());
     });
@@ -413,8 +413,8 @@ fn style_runs_first_run_can_use_nonzero_style_index() {
             ..modified_style.clone()
         };
 
-        let _root_index = rb.push_style(root_run);
-        let modified_index = rb.push_style(modified_run);
+        let _root_index = rb.push_style(root_run, None);
+        let modified_index = rb.push_style(modified_run, None);
         rb.push_style_run(modified_index, 0..text.len());
     });
 
@@ -651,4 +651,57 @@ fn builders_newline_inside_complex_script_run_is_hard_break() {
             "{text:?} should produce exactly two lines with an explicit break",
         );
     }
+}
+
+#[test]
+fn style_runs_modified_style_parent_and_deduplication() {
+    let mut fcx = create_font_context();
+    let mut lcx: LayoutContext<ColorBrush> = LayoutContext::new();
+    let mut builder = lcx.style_run_builder(&mut fcx, 1., false);
+    let root = builder.push_style(create_root_style(), None);
+    let parent = builder.push_style(create_root_style(), Some(root));
+    let child = builder.push_style(
+        TextStyle {
+            text_wrap_mode: TextWrapMode::NoWrap,
+            ..create_root_style()
+        },
+        Some(parent),
+    );
+
+    // Same parent and no differing properties: deduplicates to `child`.
+    let same = builder.push_modified_style(
+        child,
+        Some(parent),
+        [StyleProperty::TextWrapMode(TextWrapMode::NoWrap)],
+    );
+    assert_eq!(same, child);
+
+    // Different parent (`None` means root, `Some(child)` nests in `child`): does not deduplicate
+    // even when no properties change.
+    let reparented_root = builder.push_modified_style(child, None, []);
+    assert_ne!(reparented_root, child);
+    let nested = builder.push_modified_style(child, Some(child), []);
+    assert_ne!(nested, child);
+
+    // Same parent with a modified property creates a sibling span.
+    let wrappable = builder.push_modified_style(
+        child,
+        Some(parent),
+        [StyleProperty::TextWrapMode(TextWrapMode::Wrap)],
+    );
+    assert_ne!(wrappable, child);
+
+    builder.push_style_run(child, 0..1);
+    builder.push_style_run(wrappable, 1..2);
+    let layout = builder.build("a ");
+    assert_eq!(
+        layout.data.styles[usize::from(reparented_root)].parent,
+        root
+    );
+    assert_eq!(layout.data.styles[usize::from(nested)].parent, child);
+    assert_eq!(layout.data.styles[usize::from(wrappable)].parent, parent);
+    assert_eq!(
+        layout.data.styles[usize::from(wrappable)].text_wrap_mode,
+        TextWrapMode::Wrap
+    );
 }

@@ -157,7 +157,6 @@ impl<'b, B: Brush> RangedBuilder<'b, B> {
 #[must_use]
 pub struct StyleRunBuilder<'a, B: Brush> {
     pub(crate) options: BuilderOptions<'a>,
-    pub(crate) len: usize,
     pub(crate) lcx: &'a mut LayoutContext<B>,
     pub(crate) fcx: &'a mut FontContext,
     pub(crate) cursor: usize,
@@ -174,16 +173,105 @@ impl<'b, B: Brush> StyleRunBuilder<'b, B> {
         self.lcx.style_runs.reserve(additional_runs);
     }
 
-    /// Adds a fully-specified style to the shared style table and
-    /// returns its index.
+    /// Adds a style to the shared style table and returns its index.
+    ///
+    /// The first style pushed (index `0`) is the root style. Lines are at least as tall as its line
+    /// height, and its [`TextStyle::vertical_align`] is ignored. Later styles are nested in
+    /// `parent`, which their `vertical_align` resolves against. If `parent` is `None`, the style is
+    /// nested in the root.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `parent` is `Some(i)` where `i` is not the index of a previously pushed style,
+    /// or if more than `u16::MAX` styles have been pushed.
     pub fn push_style<'family, 'settings>(
         &mut self,
         style: TextStyle<'family, 'settings, B>,
+        parent: Option<u16>,
     ) -> u16 {
-        let resolved = self
-            .lcx
-            .rcx
-            .resolve_entire_style_set(self.fcx, &style, self.options.scale);
+        let mut resolved =
+            self.lcx
+                .rcx
+                .resolve_entire_style_set(self.fcx, &style, self.options.scale);
+        if let Some(parent_style_index) = parent {
+            assert!(
+                usize::from(parent_style_index) < self.lcx.style_table.len(),
+                "StyleRunBuilder expects a parent style that was previously added"
+            );
+            resolved.parent = parent_style_index;
+        }
+        let style_index = self.lcx.style_table.len();
+        assert!(style_index <= u16::MAX as usize, "too many styles");
+        self.lcx.style_table.push(resolved);
+        style_index as u16
+    }
+
+    /// Adds a style derived from a previously pushed style `base_style_index` by applying
+    /// `properties`, and returns its index.
+    ///
+    /// The new style starts as a copy of `base_style_index` (including its
+    /// [`TextStyle::vertical_align`]) and is nested in `parent`, which its `vertical_align`
+    /// resolves against (matching [`Self::push_style`]: `None` nests it in the root, `Some(i)`
+    /// nests it in style `i`). Pass `Some(base_style_index)` to nest inside `base_style_index`
+    /// (override [`StyleProperty::VerticalAlign`] to [`crate::VerticalAlign::BASELINE`] if you do
+    /// not want `base_style_index`'s shift to apply again), or pass `base_style_index`'s own parent
+    /// to create a sibling span (for example, a wrappable span for a collapsed space following a
+    /// `nowrap` span).
+    ///
+    /// If `parent` matches `base_style_index`'s parent and none of `properties` differ from
+    /// `base_style_index`, `base_style_index` is returned without adding a duplicate entry.
+    ///
+    /// # Panics
+    ///
+    /// Panics if `base_style_index` or `parent` (when `Some`) is not the index of a previously
+    /// pushed style, or if more than `u16::MAX` styles have been pushed.
+    pub fn push_modified_style<'a>(
+        &mut self,
+        base_style_index: u16,
+        parent: Option<u16>,
+        properties: impl IntoIterator<Item = StyleProperty<'a, B>>,
+    ) -> u16 {
+        assert!(
+            usize::from(base_style_index) < self.lcx.style_table.len(),
+            "StyleRunBuilder expects a base style that was previously added"
+        );
+        let parent_style_index = match parent {
+            Some(parent_style_index) => {
+                assert!(
+                    usize::from(parent_style_index) < self.lcx.style_table.len(),
+                    "StyleRunBuilder expects a parent style that was previously added"
+                );
+                parent_style_index
+            }
+            None => 0,
+        };
+        let mut modified =
+            if self.lcx.style_table[usize::from(base_style_index)].parent != parent_style_index {
+                let mut cloned = self.lcx.style_table[usize::from(base_style_index)].clone();
+                cloned.parent = parent_style_index;
+                Some(cloned)
+            } else {
+                None
+            };
+        for property in properties {
+            let resolved_prop =
+                self.lcx
+                    .rcx
+                    .resolve_property(self.fcx, &property, self.options.scale);
+            let current = modified
+                .as_ref()
+                .unwrap_or(&self.lcx.style_table[usize::from(base_style_index)]);
+            if !current.check(&resolved_prop) {
+                modified
+                    .get_or_insert_with(|| {
+                        self.lcx.style_table[usize::from(base_style_index)].clone()
+                    })
+                    .apply(resolved_prop);
+            }
+        }
+        let Some(resolved) = modified else {
+            return base_style_index;
+        };
         let style_index = self.lcx.style_table.len();
         assert!(style_index <= u16::MAX as usize, "too many styles");
         self.lcx.style_table.push(resolved);
@@ -195,7 +283,7 @@ impl<'b, B: Brush> StyleRunBuilder<'b, B> {
     /// Runs must be contiguous and non-overlapping, and must cover
     /// `0..text.len()` once all runs have been added.
     pub fn push_style_run(&mut self, style_index: u16, range: impl RangeBounds<usize>) {
-        let range = resolve_range(range, self.len);
+        let range = resolve_range(range, usize::MAX);
         assert!(
             range.start == self.cursor,
             "StyleRunBuilder expects contiguous non-overlapping runs"
@@ -277,9 +365,19 @@ impl<'b, B: Brush> StyleRunBuilder<'b, B> {
         self.options.dictionary_provider = provider;
     }
 
-    pub fn build_into(self, layout: &mut Layout<B>, text: impl AsRef<str>) {
+    pub fn build_into(mut self, layout: &mut Layout<B>, text: impl AsRef<str>) {
+        let text = text.as_ref();
+        if self.cursor == usize::MAX {
+            let last = self.lcx.style_runs.last_mut().unwrap();
+            assert!(
+                last.range.start <= text.len(),
+                "StyleRunBuilder requires runs that cover the full text"
+            );
+            last.range.end = text.len();
+            self.cursor = text.len();
+        }
         assert!(
-            self.cursor == self.len,
+            self.cursor == text.len(),
             "StyleRunBuilder requires runs that cover the full text"
         );
         if self.lcx.style_runs.is_empty() {
@@ -298,7 +396,7 @@ impl<'b, B: Brush> StyleRunBuilder<'b, B> {
                 range: (0..0).into(),
             });
         }
-        build_into_layout(layout, text.as_ref(), self.lcx, self.fcx, self.options);
+        build_into_layout(layout, text, self.lcx, self.fcx, self.options);
     }
 
     pub fn build(self, text: impl AsRef<str>) -> Layout<B> {
