@@ -12,7 +12,10 @@ use crate::{
     test_name,
     util::{ColorBrush, CursorTest, TestEnv, env::create_font_context},
 };
-use parley::{Affinity, BaseDirection, Cluster, ClusterPath, Cursor, LayoutContext, Selection};
+use parley::{
+    Affinity, BaseDirection, Cluster, ClusterPath, Cursor, LayoutContext, Selection, StyleProperty,
+    WhiteSpaceCollapse,
+};
 
 #[test]
 fn cursor_previous_visual() {
@@ -202,4 +205,94 @@ fn primary_caret_position() {
         layout.primary_caret(6).unwrap().1,
         space.visual_offset().unwrap()
     );
+}
+
+fn collapsed_cursor_test(
+    env: &mut TestEnv,
+    text: &str,
+    direction: BaseDirection,
+    wrap_after: Option<&str>,
+) -> CursorTest {
+    let max_advance = wrap_after.map(|prefix| {
+        let mut measure = env.ranged_builder(prefix).build(prefix);
+        measure.break_all_lines(None);
+        measure.full_width() + 0.5
+    });
+    let mut builder = env.ranged_builder(text);
+    builder.set_base_direction(direction);
+    builder.push_default(StyleProperty::WhiteSpaceCollapse(
+        WhiteSpaceCollapse::Collapse,
+    ));
+    let mut layout = builder.build(text);
+    layout.break_all_lines(max_advance);
+    CursorTest::from_layout(text, layout)
+}
+
+#[test]
+fn cursor_skips_removed_space_at_line_ends() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    // Soft wrap: removed space at end of line 0 is not a separate caret stop.
+    let test = collapsed_cursor_test(&mut env, "one two", BaseDirection::Ltr, Some("one"));
+    let before_space = test.cursor_after("one");
+    let line1_start = before_space.next_visual(test.layout());
+    test.assert_cursor_is_before("two", line1_start);
+
+    let line0_end = line1_start.previous_visual(test.layout());
+    // For all intents and purposes, this is the same place as after `one` (so long as you're not editing,
+    // which you probably shouldn't be with WhitespaceCollapse set!)
+    test.assert_cursor_is_after("one ", line0_end);
+    assert_eq!(
+        line0_end.geometry(test.layout(), 1.),
+        before_space.geometry(test.layout(), 1.)
+    );
+    test.assert_cursor_is_before("two", line0_end.next_visual(test.layout()));
+    test.assert_cursor_is_before("e two", line0_end.previous_visual(test.layout()));
+
+    // Hard break: removed space before '\n' is skipped in both directions.
+    let test = collapsed_cursor_test(&mut env, "one \ntwo", BaseDirection::Ltr, None);
+    let line1_start = test.cursor_after("one").next_visual(test.layout());
+    test.assert_cursor_is_after("one \n", line1_start);
+    let before_newline = line1_start.previous_visual(test.layout());
+    test.assert_cursor_is_before("\ntwo", before_newline);
+    test.assert_cursor_is_before("e \ntwo", before_newline.previous_visual(test.layout()));
+
+    // Layout end: stepping left from EOF skips the removed space and crosses 'e', while stepping
+    // right from before the removed space stays put rather than silently crossing it.
+    let test = collapsed_cursor_test(&mut env, "one ", BaseDirection::Ltr, None);
+    let eof = test.cursor_after("one ");
+    test.assert_cursor_is_before("e ", eof.previous_visual(test.layout()));
+    let before_space = test.cursor_after("one");
+    test.assert_cursor_is(before_space, before_space.next_visual(test.layout()));
+}
+
+#[test]
+fn cursor_keeps_zero_width_space_before_removed_space() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    // The ZWSP isn't removed so it keeps its caret stop in both directions, while the removed
+    // space immediately after it is skipped.
+    let test = collapsed_cursor_test(&mut env, "one\u{200B} two", BaseDirection::Ltr, Some("one"));
+    let after_zwsp = test.cursor_after("one").next_visual(test.layout());
+    test.assert_cursor_is_after("one\u{200B}", after_zwsp);
+    test.assert_cursor_is_before("two", after_zwsp.next_visual(test.layout()));
+
+    let line0_end = test.cursor_before("two").previous_visual(test.layout());
+    test.assert_cursor_is_after("one\u{200B} ", line0_end);
+    let before_zwsp = line0_end.previous_visual(test.layout());
+    test.assert_cursor_is_before("\u{200B}", before_zwsp);
+    test.assert_cursor_is_before("e\u{200B}", before_zwsp.previous_visual(test.layout()));
+}
+
+#[test]
+fn cursor_skips_removed_space_rtl() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    // RTL paragraph with an LTR word and a removed RTL space at a soft wrap.
+    // Visual line 0: [removed ' '][a][b] — the removed space is at the visual start of the layout.
+    let test = collapsed_cursor_test(&mut env, "ab גד", BaseDirection::Rtl, Some("ab"));
+    for at_removed in [test.cursor_before(" גד"), test.cursor_after("ab ")] {
+        test.assert_cursor_is(at_removed, at_removed.previous_visual(test.layout()));
+        test.assert_cursor_is_after("a", at_removed.next_visual(test.layout()));
+    }
 }

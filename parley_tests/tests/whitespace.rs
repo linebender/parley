@@ -6,9 +6,163 @@ use crate::{
     util::{ColorBrush, TestEnv},
 };
 use parley::{
-    Alignment, AlignmentOptions, BaseDirection, BreakReason, FloatedBox, InlineBox, Layout,
-    OverflowWrap, StyleProperty, TextWrapMode, VerticalAlign, WhiteSpaceCollapse, WordBreak,
+    Alignment, AlignmentOptions, BaseDirection, BreakReason, Cluster, Cursor, FloatedBox,
+    InlineBox, Layout, Line, OverflowWrap, PositionedLayoutItem, StyleProperty, TextWrapMode,
+    VerticalAlign, WhiteSpaceCollapse, WordBreak,
 };
+
+/// Formats `line`'s runs in visual order, wrapping contiguous removed runs in `[...]`.
+fn removed_markup(line: &Line<'_, ColorBrush>, text: &str) -> String {
+    let mut out = String::new();
+    let mut in_removed = false;
+    for run in line.runs() {
+        if run.is_removed() != in_removed {
+            out.push(if run.is_removed() { '[' } else { ']' });
+            in_removed = run.is_removed();
+        }
+        out.push_str(&text[run.text_range()]);
+    }
+    if in_removed {
+        out.push(']');
+    }
+    out
+}
+
+#[test]
+fn removed_space_metrics_items_and_rewrap() {
+    let mut env = TestEnv::new(test_name!(), None);
+    let text = "one two";
+    let width = advance(&mut env, "one");
+    let mut layout = build(
+        &mut env,
+        text,
+        WhiteSpaceCollapse::Collapse,
+        TextWrapMode::Wrap,
+    );
+    layout.break_all_lines(Some(width));
+
+    let line = layout.get(0).unwrap();
+    assert_eq!(removed_markup(&line, text), "one[ ]");
+    nearly_eq(line.metrics().advance, width);
+    nearly_eq(line.metrics().hanging_advance, 0.);
+
+    // Removed runs and clusters report zero advance and yield no glyphs.
+    let space = Cluster::from_byte_index(&layout, "one".len()).unwrap();
+    nearly_eq(space.run().advance(), 0.);
+    nearly_eq(space.advance(), 0.);
+    assert_eq!(space.glyphs().count(), 0);
+
+    // Paintable items omit the removed run.
+    let items: Vec<_> = line.items().collect();
+    let [PositionedLayoutItem::GlyphRun(ink)] = items.as_slice() else {
+        panic!("expected only 'one'");
+    };
+    nearly_eq(ink.advance(), width);
+
+    // Re-breaking wider restores the space without needing to reshape.
+    layout.break_all_lines(None);
+    assert_eq!(removed_markup(&layout.get(0).unwrap(), text), "one two");
+    let space = Cluster::from_byte_index(&layout, "one".len()).unwrap();
+    assert!(space.advance() > 0.);
+    assert_eq!(space.glyphs().count(), 1);
+}
+
+#[test]
+fn removed_space_hit_testing() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    // Clicking past a soft-wrapped line lands on the last visible run, not the removed space.
+    let text = "one two";
+    let width = advance(&mut env, "one");
+    let mut layout = build(
+        &mut env,
+        text,
+        WhiteSpaceCollapse::Collapse,
+        TextWrapMode::Wrap,
+    );
+    layout.break_all_lines(Some(width));
+    let baseline = layout.get(0).unwrap().metrics().baseline;
+    assert_eq!(Cursor::from_point(&layout, width + 5., baseline).index(), 3);
+
+    // A line of only removed runs misses exact hit-testing and falls back to line end.
+    let text = "  ";
+    let mut builder = env.ranged_builder(text);
+    builder.push_default(StyleProperty::WhiteSpaceCollapse(
+        WhiteSpaceCollapse::Collapse,
+    ));
+    builder.push(StyleProperty::FontSize(30.), 1..2);
+    let mut layout = builder.build(text);
+    layout.break_all_lines(None);
+    let line = layout.get(0).unwrap();
+    assert_eq!(removed_markup(&line, text), "[  ]");
+    assert_eq!(line.metrics().advance, 0.);
+    assert!(Cluster::from_point_exact(&layout, 0., line.metrics().baseline).is_none());
+    assert_eq!(
+        Cursor::from_point(&layout, 10., line.metrics().baseline).index(),
+        text.len()
+    );
+}
+
+#[test]
+fn removed_space_spacing_and_justify() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    // Letter/word spacing on a removed trailing space must not leak into line advance.
+    let text = "one ";
+    let mut builder = env.ranged_builder(text);
+    builder.push_default(StyleProperty::WhiteSpaceCollapse(
+        WhiteSpaceCollapse::Collapse,
+    ));
+    builder.push_default(StyleProperty::LetterSpacing(2.));
+    builder.push_default(StyleProperty::WordSpacing(3.));
+    let mut layout = builder.build(text);
+    layout.break_all_lines(None);
+    let line = layout.get(0).unwrap();
+    assert_eq!(removed_markup(&line, text), "one[ ]");
+    nearly_eq(
+        line.metrics().advance,
+        line.runs().map(|r| r.advance()).sum(),
+    );
+
+    // Justifying a line with a removed trailing space stretches only the interior space.
+    let text = "alpha beta gamma";
+    let max = advance(&mut env, "alpha beta") + 20.;
+    let mut layout = build(
+        &mut env,
+        text,
+        WhiteSpaceCollapse::Collapse,
+        TextWrapMode::Wrap,
+    );
+    layout.set_alignment(Alignment::Justify, AlignmentOptions::default());
+    layout.break_all_lines(Some(max));
+    assert_eq!(layout.len(), 2);
+    let line = layout.get(0).unwrap();
+    assert_eq!(removed_markup(&line, text), "alpha beta[ ]");
+    nearly_eq(line.runs().map(|r| r.advance()).sum(), max);
+}
+
+#[test]
+fn removed_space_preserves_vertical_metrics() {
+    let mut env = TestEnv::new(test_name!(), None);
+    let text = "a ";
+    let mut build_tall_space = |collapse| {
+        let mut builder = env.ranged_builder(text);
+        builder.push_default(StyleProperty::WhiteSpaceCollapse(collapse));
+        builder.push(StyleProperty::FontSize(80.), 1..2);
+        let mut layout = builder.build(text);
+        layout.break_all_lines(None);
+        layout
+    };
+    let collapsed = build_tall_space(WhiteSpaceCollapse::Collapse);
+    let preserved = build_tall_space(WhiteSpaceCollapse::Preserve);
+    let c = collapsed.get(0).unwrap();
+    let p = preserved.get(0).unwrap();
+    assert_eq!(removed_markup(&c, text), "a[ ]");
+    assert_eq!(
+        (c.metrics().line_height, c.metrics().baseline),
+        (p.metrics().line_height, p.metrics().baseline)
+    );
+}
 
 fn nearly_eq(actual: f32, expected: f32) {
     assert!((actual - expected).abs() < 1e-3, "{actual} != {expected}");
@@ -97,53 +251,66 @@ fn hanging_across_collapse_mode_boundary() {
 }
 
 #[test]
-fn removed_advance() {
+fn removed_trailing_whitespace() {
     let mut env = TestEnv::new(test_name!(), None);
 
-    // Collapsible whitespace at the end of a line is reported as removed, separately from the other
-    // whitespace hanging there: preserved whitespace and the ideographic space (which never
-    // collapses) hang too, but aren't removed. Only the collapsible whitespace directly at the
-    // line's end counts, though a forced break may follow it.
+    // Collapsible whitespace at the end of a line is removed rather than hanging, whereas
+    // preserved whitespace and the ideographic space (which never collapses) hang instead.
+    // Only the collapsible whitespace directly at the line's end is removed, though a forced
+    // break may follow it.
     let word = advance(&mut env, "X");
     let space = advance(&mut env, " ");
     let ideographic_space = advance(&mut env, "\u{3000}");
-    for (text, default, collapse_range, hanging, removed) in [
-        ("X X", WhiteSpaceCollapse::Collapse, None, space, space),
+    for (text, default, collapse_range, expected_markup, expected_hanging) in [
+        ("X X", WhiteSpaceCollapse::Collapse, None, "X[ ]", 0.),
+        (
+            "X \nX",
+            WhiteSpaceCollapse::PreserveBreaks,
+            None,
+            "X[ ]\n",
+            0.,
+        ),
         (
             "X\u{3000} X",
             WhiteSpaceCollapse::Collapse,
             None,
-            ideographic_space + space,
-            space,
+            "X\u{3000}[ ]",
+            ideographic_space,
         ),
         (
             "X \u{3000}X",
             WhiteSpaceCollapse::Collapse,
             None,
+            "X \u{3000}",
             space + ideographic_space,
-            0.,
         ),
-        ("X  X", WhiteSpaceCollapse::Preserve, None, 2. * space, 0.),
+        (
+            "X  X",
+            WhiteSpaceCollapse::Preserve,
+            None,
+            "X  ",
+            2. * space,
+        ),
         (
             "X  X",
             WhiteSpaceCollapse::Preserve,
             Some(2..3),
-            2. * space,
+            "X [ ]",
             space,
         ),
         (
             "X  X",
             WhiteSpaceCollapse::Preserve,
             Some(1..2),
+            "X  ",
             2. * space,
-            0.,
         ),
         (
             "X\u{3000} \nX",
             WhiteSpaceCollapse::Preserve,
             Some(4..5),
-            ideographic_space + space,
-            space,
+            "X\u{3000}[ ]\n",
+            ideographic_space,
         ),
     ] {
         let mut builder = env.ranged_builder(text);
@@ -157,13 +324,20 @@ fn removed_advance() {
         let mut layout: Layout<ColorBrush> = builder.build(text);
         layout.break_all_lines(Some(word + 0.5));
         assert_eq!(layout.len(), 2, "{text:?} {collapse_range:?}");
-        let metrics = *layout.get(0).unwrap().metrics();
-        nearly_eq(metrics.hanging_advance, hanging);
-        nearly_eq(metrics.removed_advance, removed);
+
+        let line0 = layout.get(0).unwrap();
+        assert_eq!(
+            removed_markup(&line0, text),
+            expected_markup,
+            "{text:?} {collapse_range:?}"
+        );
+        nearly_eq(line0.metrics().hanging_advance, expected_hanging);
+        nearly_eq(line0.metrics().advance, word + expected_hanging);
+
         // The last line has no trailing whitespace.
-        let metrics = *layout.get(1).unwrap().metrics();
-        nearly_eq(metrics.hanging_advance, 0.);
-        nearly_eq(metrics.removed_advance, 0.);
+        let line1 = layout.get(1).unwrap();
+        assert_eq!(removed_markup(&line1, text), "X");
+        nearly_eq(line1.metrics().hanging_advance, 0.);
     }
 }
 

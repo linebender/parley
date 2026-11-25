@@ -57,6 +57,11 @@ impl CursorTest {
         // NOTE: If we want to handle more special cases, we may want to use a monospace
         // font and use the glyph advance values to calculate the cursor position.
 
+        Self::from_layout(text, layout)
+    }
+
+    /// Creates a [`CursorTest`] from an existing text and broken layout.
+    pub(crate) fn from_layout(text: &str, layout: Layout<ColorBrush>) -> Self {
         Self {
             text: text.to_string(),
             layout,

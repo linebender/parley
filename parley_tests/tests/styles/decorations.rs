@@ -76,6 +76,29 @@ fn style_underline_across_line_break() {
 }
 
 #[test]
+fn style_underline_trailing_space_at_soft_wrap() {
+    use parley::WhiteSpaceCollapse;
+
+    let mut env = TestEnv::new(test_name!(), None);
+    let text = "one two";
+    for (mode, name) in [
+        (WhiteSpaceCollapse::Collapse, "removed"),
+        (WhiteSpaceCollapse::Preserve, "hanging"),
+    ] {
+        let mut builder = env.ranged_builder(text);
+        builder.push_default(StyleProperty::FontSize(24.));
+        builder.push_default(StyleProperty::Underline(true));
+        builder.push_default(StyleProperty::WhiteSpaceCollapse(mode));
+        let mut layout = builder.build(text);
+        layout.break_all_lines(Some(60.));
+
+        // Both lines break after "one "; only the hanging space extends the underline.
+        assert_eq!(layout.get(0).unwrap().text_range(), 0..4);
+        env.with_name(name).check_layout_snapshot(&layout);
+    }
+}
+
+#[test]
 fn style_underline_partial_text() {
     let mut env = TestEnv::new(test_name!(), None);
     let text = "Hello World Test";
