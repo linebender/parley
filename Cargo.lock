@@ -1054,7 +1054,7 @@ dependencies = [
  "clipboard-rs",
  "parley",
  "peniko",
- "skrifa 0.49.0",
+ "skrifa 0.50.0",
  "softbuffer",
  "ui-events",
  "ui-events-winit",
@@ -1267,7 +1267,7 @@ dependencies = [
  "objc2-core-text",
  "objc2-foundation 0.3.2",
  "parlance",
- "read-fonts 0.46.0",
+ "read-fonts 0.47.0",
  "roxmltree",
  "smallvec",
  "windows 0.62.2",
@@ -1476,14 +1476,14 @@ dependencies = [
 
 [[package]]
 name = "harfrust"
-version = "0.15.0"
+version = "0.16.1"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "865dcc4105d51c323d8fedbb2d75b5e9c8ecddf5613f74c82f851d0afbc97114"
+checksum = "0690f8c81dfeca8987d8518cf1c861d7b58d43ad0cedae9184d41af236effb9c"
 dependencies = [
  "bitflags 2.13.0",
  "bytemuck",
  "core_maths",
- "read-fonts 0.46.0",
+ "read-fonts 0.47.0",
  "smallvec",
  "spin",
  "yoke",
@@ -3227,9 +3227,9 @@ dependencies = [
 
 [[package]]
 name = "read-fonts"
-version = "0.46.0"
+version = "0.47.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "bdaa4fffe9ff3ca2c353fa9729792805b9b3e324695ff5a081f860612e81b330"
+checksum = "a39d2f8f681030a7bcbbcf3e8568775ac2393afd51401a2e2133ee89e3953897"
 dependencies = [
  "bytemuck",
  "core_maths",
@@ -3518,13 +3518,13 @@ dependencies = [
 
 [[package]]
 name = "skrifa"
-version = "0.49.0"
+version = "0.50.0"
 source = "registry+https://github.com/rust-lang/crates.io-index"
-checksum = "a7459fb60888ad9a5f367dd293fa2fb9df142cb451aa6bfd6cd66a7d6a9b739d"
+checksum = "e85ba678a6023a063d0a78c8770f1c166674ef46af13523d05eff67430f79dfe"
 dependencies = [
  "bytemuck",
  "once_cell",
- "read-fonts 0.46.0",
+ "read-fonts 0.47.0",
  "smallvec",
  "yoke",
 ]
@@ -3682,7 +3682,7 @@ version = "0.1.0"
 dependencies = [
  "image",
  "parley",
- "skrifa 0.49.0",
+ "skrifa 0.50.0",
  "swash",
 ]
 
@@ -3896,7 +3896,7 @@ version = "0.1.0"
 dependencies = [
  "bytemuck",
  "parley",
- "skrifa 0.49.0",
+ "skrifa 0.50.0",
  "tiny-skia",
 ]
 
