@@ -156,12 +156,10 @@ fn reshaped_lines_measure_as_shaped_alone() {
     };
     let expected: Vec<_> = (0..5).map(|i| (i..i + 1, round([a, v][i % 2]))).collect();
     assert_eq!(lines(&layout), expected);
-    // The reshaped pieces address the source text and its graphemes like the original runs.
-    let runs = || layout.lines().flat_map(|line| line.runs());
+    // The reshaped pieces' clusters address the source text like the original runs.
     let graphemes: Vec<_> = (0..5).map(|i| i..i + 1).collect();
-    let cluster_ranges: Vec<_> = runs().map(|run| run.cluster_range()).collect();
-    assert_eq!(cluster_ranges, graphemes);
-    let clusters = runs().flat_map(|run| run.clusters());
+    let runs = layout.lines().flat_map(|line| line.runs());
+    let clusters = runs.flat_map(|run| run.clusters());
     let text_ranges: Vec<_> = clusters.map(|c| c.text_range()).collect();
     assert_eq!(text_ranges, graphemes);
 

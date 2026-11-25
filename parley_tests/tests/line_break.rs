@@ -28,11 +28,11 @@ fn break_by_length_basic() {
     breaker.finish();
 
     assert_eq!(layout.len(), 3, "Expected 3 lines");
-    let cluster_ranges: Vec<_> = layout
+    let text_ranges: Vec<_> = layout
         .lines()
-        .flat_map(|line| line.runs().map(|run| run.cluster_range()))
+        .flat_map(|line| line.runs().map(|run| run.text_range()))
         .collect();
-    assert_eq!(cluster_ranges, vec![0..2, 2..4, 4..6]);
+    assert_eq!(text_ranges, vec![0..2, 2..4, 4..6]);
     env.check_layout_snapshot(&layout);
 }
 
@@ -366,20 +366,6 @@ fn break_by_length_matches_max_advance_with_letter_spacing() {
             line_a.text_range(),
             line_b.text_range(),
             "Line {i} text_range mismatch"
-        );
-    }
-
-    // Compare run cluster ranges between the two layouts
-    for (i, (run_a, run_b)) in layout_max_advance
-        .lines()
-        .flat_map(|line| line.runs())
-        .zip(layout_by_length.lines().flat_map(|line| line.runs()))
-        .enumerate()
-    {
-        assert_eq!(
-            run_a.cluster_range(),
-            run_b.cluster_range(),
-            "Run {i} cluster_range mismatch"
         );
     }
 

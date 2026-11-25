@@ -10,7 +10,6 @@ use crate::style::Brush;
 
 use core::ops::Range;
 use fontique::Synthesis;
-use parley_engine::shape::Character;
 use parley_engine::{
     Atom, Atoms, FontMetrics, Glyph, Graphemes, NormalizedCoord, ShapedClusterGlyphs, ShapedRun,
     ShapedSlice,
@@ -165,38 +164,19 @@ impl<'a, B: Brush> Run<'a, B> {
         self.shaped.bidi_level.is_rtl()
     }
 
-    /// Returns the cluster range for the run.
-    ///
-    /// The indices are grapheme cluster indices, relative to the shaped run this [`Run`] belongs
-    /// to: for a run scoped to a line, this is the sub-range of the shaped run's clusters that fall
-    /// on that line; otherwise it covers all of the shaped run's clusters.
-    ///
-    /// Note this counts the shaped run's clusters, so the cost is linear in the shaped run's
-    /// length.
-    pub fn cluster_range(&self) -> Range<usize> {
-        let start = match self.line_data {
-            Some(_) => {
-                // Count the number of graphemes before the run's first character.
-                let slice = self.line_slice();
-                let start_char = if slice.shaped_clusters_range().is_empty() {
-                    self.shaped.characters_range.end
-                } else {
-                    slice.char_range().start
-                };
-                let chars = self.shaped.characters_range.start as usize..start_char as usize;
-                count_graphemes(&self.layout.data.shaped_text.characters()[chars])
-            }
-            None => 0,
-        };
-        start..start + self.len()
-    }
-
     /// Returns the number of clusters in the run.
     ///
     /// Note this counts the run's clusters, so the cost is linear in the run's length. To check
     /// whether the run has any clusters, use [`Self::is_empty`].
     pub fn len(&self) -> usize {
-        count_graphemes(self.line_slice().characters())
+        let slice = self.line_slice();
+        slice
+            .characters()
+            .iter()
+            .filter(|character| character.grapheme_start)
+            .count()
+            // If the run starts inside a grapheme, we also count it, as it is its own `Cluster`.
+            + usize::from(slice.grapheme_continues_before())
     }
 
     /// Returns `true` if the run is empty.
@@ -436,17 +416,4 @@ impl<'a, B: Brush> Iterator for Clusters<'a, B> {
             grapheme,
         })
     }
-}
-
-/// The number of graphemes in `characters`, also counting a grapheme `characters` starts inside of.
-///
-/// This effectively counts the number of [`Cluster`]s a slice of `characters` would produce.
-///
-/// This is `O(n)` in the number of characters.
-fn count_graphemes(characters: &[Character]) -> usize {
-    characters
-        .iter()
-        .filter(|character| character.grapheme_start)
-        .count()
-        + usize::from(characters.first().is_some_and(|c| !c.grapheme_start))
 }
