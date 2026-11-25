@@ -12,8 +12,10 @@ use super::layout::Layout;
 use alloc::string::String;
 use core::ops::RangeBounds;
 use parlance::BaseDirection;
+#[cfg(feature = "unstable-dictionary-provider")]
+use parley_engine::DictionaryProvider;
 use parley_engine::break_overrides::LineBreakOverrideFn;
-use parley_engine::{AnalysisDataSources, DictionaryProvider, InlineObject};
+use parley_engine::{AnalysisDataSources, InlineObject};
 
 use crate::inline_box::{FloatedBox, InlineBox, LayoutInlineBox};
 use crate::resolve::{ResolvedStyle, StyleRun};
@@ -25,6 +27,7 @@ pub(crate) struct BuilderOptions<'a> {
     quantize: bool,
     base_direction: BaseDirection,
     line_break_override: Option<&'a LineBreakOverrideFn>,
+    #[cfg(feature = "unstable-dictionary-provider")]
     dictionary_provider: Option<&'a dyn DictionaryProvider>,
 }
 
@@ -35,6 +38,7 @@ impl BuilderOptions<'_> {
             quantize,
             base_direction: BaseDirection::Auto,
             line_break_override: None,
+            #[cfg(feature = "unstable-dictionary-provider")]
             dictionary_provider: None,
         }
     }
@@ -129,6 +133,7 @@ impl<'b, B: Brush> RangedBuilder<'b, B> {
     /// # Panics
     ///
     /// Building this layout may panic if the provider returns an error other than `IdentifierNotFound`.
+    #[cfg(feature = "unstable-dictionary-provider")]
     pub fn set_dictionary_provider(&mut self, provider: Option<&'b dyn DictionaryProvider>) {
         self.options.dictionary_provider = provider;
     }
@@ -273,6 +278,7 @@ impl<'b, B: Brush> StyleRunBuilder<'b, B> {
     /// # Panics
     ///
     /// Building this layout may panic if the provider returns an error other than `IdentifierNotFound`.
+    #[cfg(feature = "unstable-dictionary-provider")]
     pub fn set_dictionary_provider(&mut self, provider: Option<&'b dyn DictionaryProvider>) {
         self.options.dictionary_provider = provider;
     }
@@ -435,6 +441,7 @@ impl<'b, B: Brush> TreeBuilder<'b, B> {
     /// # Panics
     ///
     /// Building this layout may panic if the provider returns an error other than `IdentifierNotFound`.
+    #[cfg(feature = "unstable-dictionary-provider")]
     pub fn set_dictionary_provider(&mut self, provider: Option<&'b dyn DictionaryProvider>) {
         self.options.dictionary_provider = provider;
     }
@@ -534,7 +541,10 @@ fn build_into_layout<B: Brush>(
         index != 0 && index != text.len()
     });
 
+    #[cfg(feature = "unstable-dictionary-provider")]
     let data_sources = AnalysisDataSources::new(options.dictionary_provider);
+    #[cfg(not(feature = "unstable-dictionary-provider"))]
+    let data_sources = AnalysisDataSources::default();
 
     crate::analysis::analyze_text(
         lcx,

@@ -8,7 +8,9 @@
 
 use alloc::vec::Vec;
 use core::ops::Range;
+#[cfg(feature = "unstable-dictionary-provider")]
 use icu_provider::DataProvider;
+#[cfg(feature = "unstable-dictionary-provider")]
 use icu_segmenter::provider::{SegmenterDictionaryAutoV1, SegmenterDictionaryExtendedV1};
 
 use icu_locale_core::{LanguageIdentifier, langid};
@@ -107,12 +109,15 @@ impl Analysis {
 ///
 /// # Using the trait
 ///
+/// This trait is only available with the `unstable-dictionary-provider` cargo feature.
 /// If you're using Parley, this can be used through layout builder's `set_dictionary_provider` method.
 ///
 /// This trait is implemented for each type which has the [`icu_provider::DataProvider`] implementations needed
 /// for word and line segmentation. We do not export this trait ourselves; you must instead depend on `icu_provider` directly.
-/// You must also depend directly on `icu_segmenter`; Parley depends on a specific minor version of `icu_segmenter`, which your
-/// dependency specification must be compatible with Parley's:
+///
+/// The data markers in these bounds are exempt from semver in `icu_segmenter`, and may change in minor releases.
+/// Parley doesn't pin `icu_segmenter`, so that users who don't enable this feature can update ICU4X freely.
+/// When you enable this feature, you must pin `icu_segmenter` to the minor version Parley supports:
 ///
 /// ```toml
 /// icu_segmenter = "~2.3.0"
@@ -135,11 +140,13 @@ impl Analysis {
 /// for determining these boundaries. Parley doesn't currently support using these, but might in a future release.
 /// If we do, your use of this trait may need to change; this would be in a breaking release of Parley. This is another
 /// reason we recommend using `complex-scripts` instead, if your use case allows it.
+#[cfg(feature = "unstable-dictionary-provider")]
 pub trait DictionaryProvider:
     DataProvider<SegmenterDictionaryAutoV1> + DataProvider<SegmenterDictionaryExtendedV1>
 {
 }
 
+#[cfg(feature = "unstable-dictionary-provider")]
 impl<P: ?Sized> DictionaryProvider for P where
     P: DataProvider<SegmenterDictionaryAutoV1> + DataProvider<SegmenterDictionaryExtendedV1>
 {
@@ -147,16 +154,20 @@ impl<P: ?Sized> DictionaryProvider for P where
 
 /// Provides runtime data needed for text analysis.
 ///
-/// Currently, this only includes an optional [`DictionaryProvider`]
+/// Currently, this only includes an optional `DictionaryProvider`, available with the
+/// `unstable-dictionary-provider` cargo feature.
 #[derive(Default)]
 pub struct AnalysisDataSources<'a> {
+    #[cfg(feature = "unstable-dictionary-provider")]
     provider: Option<&'a dyn DictionaryProvider>,
+    #[cfg(not(feature = "unstable-dictionary-provider"))]
+    _marker: core::marker::PhantomData<&'a ()>,
 }
 
 impl core::fmt::Debug for AnalysisDataSources<'_> {
     fn fmt(&self, f: &mut core::fmt::Formatter<'_>) -> core::fmt::Result {
         f.debug_struct("AnalysisDataSources")
-            .field("external_dictionaries", &self.provider.is_some())
+            .field("external_dictionaries", &self.has_provider())
             .finish()
     }
 }
@@ -166,8 +177,21 @@ impl<'a> AnalysisDataSources<'a> {
     /// If not provided, the data compiled into the binary will be used instead (if present).
     ///
     /// See [`DictionaryProvider`] for full details.
+    #[cfg(feature = "unstable-dictionary-provider")]
     pub const fn new(provider: Option<&'a dyn DictionaryProvider>) -> Self {
         Self { provider }
+    }
+
+    #[inline(always)]
+    fn has_provider(&self) -> bool {
+        #[cfg(feature = "unstable-dictionary-provider")]
+        {
+            self.provider.is_some()
+        }
+        #[cfg(not(feature = "unstable-dictionary-provider"))]
+        {
+            false
+        }
     }
 
     /// Whether ICU4X has a word-segmentation dictionary for this script.
@@ -183,7 +207,7 @@ impl<'a> AnalysisDataSources<'a> {
     #[inline(always)]
     fn has_word_dictionary(&self, script: Script) -> bool {
         // We assume that if external dictionaries are provided, they cover this set of scripts.
-        (self.provider.is_some() || cfg!(feature = "complex-scripts"))
+        (self.has_provider() || cfg!(feature = "complex-scripts"))
             && matches!(
                 script,
                 Script::Han
@@ -207,6 +231,7 @@ impl<'a> AnalysisDataSources<'a> {
 
     #[inline]
     fn word_segmenter(&self) -> WordSegmenter {
+        #[cfg(feature = "unstable-dictionary-provider")]
         if let Some(provider) = self.provider {
             let mut segmenter =
                 WordSegmenter::new_for_non_complex_scripts(WordBreakInvariantOptions::default())
@@ -228,16 +253,15 @@ impl<'a> AnalysisDataSources<'a> {
     #[inline]
     fn line_segmenter(&self, key: SegmenterKey) -> LineSegmenter {
         let options = Self::line_break_options(key);
-        match self.provider {
-            Some(provider) => {
-                let mut segmenter =
-                    LineSegmenter::new_for_non_complex_scripts(options).static_to_owned();
-                segmenter.load_dictionary_unstable(provider).unwrap();
-                segmenter
-            }
-            // `static_to_owned` only wraps the static references, so this does not allocate.
-            None => line_segmenter_impl(options).static_to_owned(),
+        #[cfg(feature = "unstable-dictionary-provider")]
+        if let Some(provider) = self.provider {
+            let mut segmenter =
+                LineSegmenter::new_for_non_complex_scripts(options).static_to_owned();
+            segmenter.load_dictionary_unstable(provider).unwrap();
+            return segmenter;
         }
+        // `static_to_owned` only wraps the static references, so this does not allocate.
+        line_segmenter_impl(options).static_to_owned()
     }
 
     fn line_break_options(key: SegmenterKey) -> LineBreakOptions<'static> {

@@ -30,6 +30,10 @@ system = ["std", "fontique/system"]
 # Enable dictionary-based line and word breaking for complex scripts (CJK, Thai, Khmer, Lao, Myanmar).
 # When disabled, a lightweight segmenter is used that falls back to character-level breaks for those scripts.
 complex-scripts = ["parley_engine/complex-scripts"]
+# Enable `DictionaryProvider`, which loads the dictionaries for complex scripts at runtime.
+# It relies on `icu_segmenter` APIs that may break in minor releases, so you must pin `icu_segmenter = "~2.3.0"` yourself.
+# See `DictionaryProvider` for more details.
+unstable-dictionary-provider = ["parley_engine/unstable-dictionary-provider"]
 
 [dependencies]
 smallvec = { workspace = true }
