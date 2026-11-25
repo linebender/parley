@@ -8,7 +8,6 @@ use crate::{
 use alloc::{vec, vec::Vec};
 use fontique::FontWeight;
 use icu_properties::props::Script;
-use icu_segmenter::{LineSegmenter, options::LineBreakOptions};
 
 /// Whether we have complex script dictionaries compiled-in, which ICU4X then uses for segmentation.
 const HAS_DICTIONARIES: bool = cfg!(feature = "complex-scripts");
@@ -266,21 +265,11 @@ fn test_paragraph_separator_is_hard_break() {
         .expect_contributes_to_shaping_list(vec![true, false, true]);
 }
 
-/// ICU4X emits a soft break opportunity at the end of a complex-script run even
-/// when it is directly followed by a mandatory break character (violating UAX #14
-/// LB6). That opportunity must be dropped so the newline is not treated as a
-/// regular wrap opportunity. See <https://github.com/linebender/parley/issues/768>.
+/// A complex-script run directly followed by a mandatory break character must not get a soft
+/// wrap opportunity before the break (UAX #14 LB6).
+/// See <https://github.com/linebender/parley/issues/768>.
 #[test]
 fn test_mandatory_break_after_complex_script_run() {
-    // Check that the ICU4X bug still reproduces: a break opportunity is reported at byte 6, between
-    // the second Thai character and the `\n`. Once this assertion fails, ICU4X has been fixed and
-    // this test as well as `builders_newline_inside_complex_script_run_is_hard_break` can be
-    // dropped.
-    let icu_breaks: Vec<usize> = LineSegmenter::new_dictionary(LineBreakOptions::default())
-        .segment_str("กก\nกก")
-        .collect();
-    assert_eq!(icu_breaks, vec![0, 6, 7, 13]);
-
     // Orthogonal to this test, but without a dictionary, UAX #29 WB999 gives a word boundary at
     // every grapheme.
     let inner = !HAS_DICTIONARIES;

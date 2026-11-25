@@ -615,9 +615,8 @@ fn builders_crlf_counts_as_single_line_break() {
     );
 }
 
-/// ICU4X's line segmenter emits a soft break opportunity at the end of a
-/// complex-script (Thai, Khmer, Lao, ...) run even when the next character is a
-/// mandatory break, which must not shadow the hard break.
+/// A mandatory break directly after a complex-script (Thai, Khmer, Lao, ...) run
+/// must be an explicit break, not shadowed by a soft break opportunity.
 /// See <https://github.com/linebender/parley/issues/768>.
 #[test]
 fn builders_newline_inside_complex_script_run_is_hard_break() {

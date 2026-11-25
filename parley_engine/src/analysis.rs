@@ -9,7 +9,7 @@
 use alloc::vec::Vec;
 use core::ops::Range;
 use icu_provider::DataProvider;
-use icu_segmenter::provider::{SegmenterDictionaryAutoV1, SegmenterDictionaryExtendedV1};
+use icu_segmenter::provider::{SegmenterDictionaryAutoV2, SegmenterDictionaryExtendedV2};
 
 use icu_locale_core::{LanguageIdentifier, langid};
 use icu_properties::props::{BidiMirroringGlyph, GeneralCategory, GraphemeClusterBreak, Script};
@@ -115,8 +115,8 @@ impl Analysis {
 /// dependency specification must be compatible with Parley's:
 ///
 /// ```toml
-/// icu_segmenter = "~2.3.0"
-/// icu_provider = "2.3.0"
+/// icu_segmenter = "~2.4.0"
+/// icu_provider = "2.4.0"
 /// ```
 ///
 /// Additionally, you should avoid the use of [`DeserializingBufferProvider`](https://docs.rs/icu_provider/latest/icu_provider/buf/struct.DeserializingBufferProvider.html),
@@ -131,17 +131,17 @@ impl Analysis {
 ///
 /// # Note on LSTMs
 ///
-/// `icu_segmenter` also supports using [LSTM models](https://docs.rs/icu_segmenter/2.3.0/icu_segmenter/struct.LineSegmenter.html#method.new_lstm)
+/// `icu_segmenter` also supports using [LSTM models](https://docs.rs/icu_segmenter/2.4.0/icu_segmenter/struct.LineSegmenter.html#method.new_lstm)
 /// for determining these boundaries. Parley doesn't currently support using these, but might in a future release.
 /// If we do, your use of this trait may need to change; this would be in a breaking release of Parley. This is another
 /// reason we recommend using `complex-scripts` instead, if your use case allows it.
 pub trait DictionaryProvider:
-    DataProvider<SegmenterDictionaryAutoV1> + DataProvider<SegmenterDictionaryExtendedV1>
+    DataProvider<SegmenterDictionaryAutoV2> + DataProvider<SegmenterDictionaryExtendedV2>
 {
 }
 
 impl<P: ?Sized> DictionaryProvider for P where
-    P: DataProvider<SegmenterDictionaryAutoV1> + DataProvider<SegmenterDictionaryExtendedV1>
+    P: DataProvider<SegmenterDictionaryAutoV2> + DataProvider<SegmenterDictionaryExtendedV2>
 {
 }
 
