@@ -945,6 +945,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
             state.line.reshaped_start_advance_delta = self
                 .reshaper
                 .measure_start(&data.text, &data.shaped_text, line_start_char, None)
+                .0
                 .advance_delta();
         }
     }
@@ -997,7 +998,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                 return false;
             }
             let reshaper = &mut this.reshaper;
-            let start = reshaper.measure_start(text, shaped_text, line_start_char, None);
+            let (start, _) = reshaper.measure_start(text, shaped_text, line_start_char, None);
             let end = reshaper.measure_end(text, shaped_text, line_end_char, None);
             let delta = reshaper
                 .line(text, shaped_text, &start, &end)
@@ -1755,7 +1756,7 @@ fn commit_line<B: Brush>(
         #[inline(never)]
         || {
             let text = &layout.data.text;
-            let start =
+            let (start, _) =
                 reshaper.measure_start(text, shaped_text, char_at(state.clusters.start), None);
             let end = reshaper.measure_end(text, shaped_text, char_at(state.clusters.end), None);
             let line = reshaper.line(text, shaped_text, &start, &end);

@@ -465,19 +465,31 @@ impl Reshaper {
     /// Measure the effect of starting a line at character index `line_start_char` with the given
     /// `edit`.
     ///
+    /// This also returns the reshaped clusters starting the line, or `None` if the line's start
+    /// needed no reshaping. Note this slice's shaped cluster indices index only into this slice
+    /// itself (and in particular, they don't index into `shaped`).
+    ///
     /// # Panics
     ///
     /// Panics if `edit` replaces characters past the end of the [`ShapedRun`] at the line's edge.
     #[inline]
-    pub fn measure_start<'e>(
-        &mut self,
+    pub fn measure_start<'a, 'e>(
+        &'a mut self,
         text: &str,
-        shaped: &ShapedText,
+        shaped: &'a ShapedText,
         line_start_char: u32,
         edit: Option<Edit<'e>>,
-    ) -> LineStart<'e> {
-        self.reshape_line_start(text, shaped, line_start_char, edit, SpliceMode::Fast, None)
-            .unwrap()
+    ) -> (LineStart<'e>, Option<ShapedSlice<'a>>) {
+        let start = self
+            .reshape_line_start(text, shaped, line_start_char, edit, SpliceMode::Fast, None)
+            .unwrap();
+        let cache = &self.cache;
+        let slice = start.start_fragment.map(|fragment| {
+            let slot = (cache.find(fragment.chars, [edit, None]))
+                .expect("measuring the start just reshaped its fragment");
+            cache.slots[slot].fragment.run_slice(shaped, 0)
+        });
+        (start, slice)
     }
 
     /// Measure the effect of ending a line at character index `line_end_char` with the given
@@ -1373,7 +1385,17 @@ mod tests {
                             continue;
                         }
                         let whole = reshape_whole(text, &shaped, p..q, equivalent_edits);
-                        let start = reshaper.measure_start(text, &shaped, p, edits[0]);
+                        let (start, start_slice) =
+                            reshaper.measure_start(text, &shaped, p, edits[0]);
+                        let splice = (shaped.shaped_clusters())
+                            .get(start.source_clusters_start as usize)
+                            .map_or(len, |c| c.chars_range().start);
+                        assert_eq!(start_slice.map_or(p..p, |s| s.char_range()), p..splice);
+                        if let Some(slice) = start_slice {
+                            let edits = [equivalent_edits[0], None];
+                            let whole = reshape_whole(text, &shaped, slice.char_range(), edits);
+                            assert_eq!(clusters(slice).collect::<Vec<_>>(), whole);
+                        }
                         let end = reshaper.measure_end(text, &shaped, q, edits[1]);
                         let fast = reshaper.line(text, &shaped, &start, &end);
                         for (line, exact) in [
