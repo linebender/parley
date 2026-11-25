@@ -13,7 +13,7 @@ use harfrust::ShapeOptions as HarfShapeOptions;
 use crate::{
     Glyph, ShapedRun, ShapedSlice, ShapedText,
     itemize::TextRange,
-    lru_cache::LruCache,
+    lru_cache::{LruCache, LruStore},
     shape::{
         ShapedCluster, cache,
         shaped_text::push_glyph_buffer,
@@ -422,7 +422,7 @@ struct CachedFragment {
 /// result rarely differing from [`Self::line`].
 pub struct Reshaper {
     shape_data_cache: LruCache<cache::ShapeDataKey, harfrust::Font>,
-    shape_plan_cache: LruCache<cache::ShapePlanId, harfrust::ShapePlan>,
+    shape_plan_cache: LruStore<(cache::ShapeDataKey, harfrust::ShapePlan)>,
 
     buffer: harfrust::Buffer,
     features: Vec<harfrust::Feature>,
@@ -435,7 +435,7 @@ impl Default for Reshaper {
         const MAX_ENTRIES: usize = 16;
         Self {
             shape_data_cache: LruCache::new(MAX_ENTRIES),
-            shape_plan_cache: LruCache::new(MAX_ENTRIES),
+            shape_plan_cache: LruStore::new(MAX_ENTRIES),
 
             buffer: harfrust::Buffer::new(),
             features: Vec::new(),
@@ -1160,14 +1160,12 @@ impl Reshaper {
     /// Returns the font unit scale.
     fn shape_like_run(&mut self, shaped: &ShapedText, run: &ShapedRun) -> f32 {
         let font = &shaped.fonts()[run.font_index];
-        let base_font = self.shape_data_cache.entry(
-            cache::ShapeDataKey::new(font.font.data.id(), font.font.index),
-            || {
-                let (data, _) = font.font.data.clone().into_raw_parts();
-                // TODO: How do we want to handle errors like this?
-                harfrust::Font::new(data, font.font.index).unwrap()
-            },
-        );
+        let face = cache::ShapeDataKey::new(font.font.data.id(), font.font.index);
+        let base_font = self.shape_data_cache.entry(face, || {
+            let (data, _) = font.font.data.clone().into_raw_parts();
+            // TODO: How do we want to handle errors like this?
+            harfrust::Font::new(data, font.font.index).unwrap()
+        });
         // The run's coordinates already include the synthesis's and the item's variations.
         let instance = base_font
             .instance_builder()
@@ -1186,26 +1184,23 @@ impl Reshaper {
         let hb_script = script_to_harfrust(run.script);
         let language = language_to_harfrust(run.language.as_ref());
         features_to_harfrust(&shaped.features()[run.features_range], &mut self.features);
-        let shaper_plan = self.shape_plan_cache.entry(
-            cache::ShapePlanKey::new(
-                font.font.data.id(),
-                font.font.index,
-                direction,
-                hb_script,
-                language.clone(),
-                &self.features,
-                instance.normalized_coords(),
-            ),
-            || {
-                harfrust::ShapePlan::new(
+        // Ensure that this logic is the same as in parley_engine/src/shape/shaper.rs
+        let plan_key = harfrust::ShapePlanKey::new(&instance, Some(hb_script), direction)
+            .language(language.as_ref())
+            .features(&self.features);
+        let (_, shaper_plan) = self
+            .shape_plan_cache
+            .entry(|(cached_face, plan)| face == *cached_face && plan_key.matches(plan))
+            .or_insert_with(|| {
+                let plan = harfrust::ShapePlan::new(
                     &instance,
                     direction,
                     Some(hb_script),
                     language.as_ref(),
                     &self.features,
-                )
-            },
-        );
+                );
+                (face, plan)
+            });
 
         let buffer = &mut self.buffer;
         buffer.set_cluster_level(harfrust::ClusterLevel::MonotoneCharacters);
