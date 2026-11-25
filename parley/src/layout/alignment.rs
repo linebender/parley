@@ -149,6 +149,9 @@ pub(crate) fn align<B: Brush>(layout: &mut LayoutData<B>) {
         }
         for item in &mut layout.line_items[line.item_range] {
             item.gaps_start = None;
+            if item.removed {
+                continue;
+            }
             let spacing =
                 EffectiveSpacing::new(layout.runs[item.index].spacing, line.justification);
             if spacing.is_zero() {

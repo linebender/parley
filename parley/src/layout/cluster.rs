@@ -85,8 +85,21 @@ impl<'a, B: Brush> Cluster<'a, B> {
         if let Some((index, line)) = layout.line_for_offset(y) {
             line_index = index;
             let mut offset = line.metrics().offset + line.metrics().inline_min_coord;
-            let last_run_index = line.len().saturating_sub(1);
+            let last_visible = layout.data.line_items[line.data.item_range]
+                .iter()
+                .rposition(|item| !item.removed);
+            let last_run_index = last_visible.unwrap_or_else(|| line.len().saturating_sub(1));
             for run in line.runs() {
+                if run.is_removed() {
+                    if exact {
+                        continue;
+                    }
+                    // The only circumstances where we want the cursor to be on a removed
+                    // run is if there aren't any non-removed runs on the line.
+                    if last_visible.is_some() {
+                        continue;
+                    }
+                }
                 let is_last_run = run.index as usize == last_run_index;
                 let run_advance = run.advance();
                 if x > offset + run_advance && (exact || !is_last_run) {
@@ -180,6 +193,9 @@ impl<'a, B: Brush> Cluster<'a, B> {
     /// [`Self::is_ligature_continuation`]), the shaped cluster's advance is split evenly over the
     /// clusters it overlaps.
     pub fn advance(&self) -> f32 {
+        if self.run.is_removed() {
+            return 0.;
+        }
         let gaps = self
             .run
             .gaps()
@@ -248,8 +264,7 @@ impl<'a, B: Brush> Cluster<'a, B> {
     /// cluster: for a ligature, the ligature start yields all of the ligature's glyphs and the
     /// continuations yield none.
     pub fn glyphs(&self) -> impl Iterator<Item = Glyph> + Clone + use<'a, B> {
-        self.grapheme
-            .is_atom_start()
+        (!self.run.is_removed() && self.grapheme.is_atom_start())
             .then(|| self.run.glyphs_in(self.atom.shaped_clusters_range()))
             .into_iter()
             .flatten()

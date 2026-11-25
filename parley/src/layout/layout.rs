@@ -106,7 +106,7 @@ impl<B: Brush> Layout<B> {
         self.data.width
     }
 
-    /// Returns the computed width of the layout including the width of trailing whitespace.
+    /// Returns the computed width of the layout including the width of hanging whitespace.
     pub fn full_width(&self) -> f32 {
         self.data.full_width
     }

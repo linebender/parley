@@ -149,6 +149,8 @@ impl LineData {
 
 #[derive(Debug, Clone, PartialEq)]
 pub(crate) struct LineItemData {
+    /// If this item consists entirely of whitespace which was removed at the end of the line.
+    pub(crate) removed: bool,
     /// The index of the run in the runs vec
     pub(crate) index: usize,
     /// Bidi level for the item (used for reordering)

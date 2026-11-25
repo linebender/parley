@@ -72,6 +72,37 @@ impl Cursor {
         )
     }
 
+    /// Steps with `step`, stepping through [removed](crate::layout::Run::is_removed) whitespace.
+    fn step_skipping_removed<B: Brush>(
+        self,
+        layout: &Layout<B>,
+        step: impl Fn(Self, &Layout<B>) -> Self,
+    ) -> Self {
+        if !self.is_at_removed(layout) {
+            return step(self, layout);
+        }
+        let origin = self.geometry(layout, 0.);
+        let mut current = self;
+        loop {
+            let next = step(current, layout);
+            if next == current {
+                // Don't get stuck in an infinite loop.
+                return current;
+            }
+            if !next.is_at_removed(layout) || next.geometry(layout, 0.) != origin {
+                return next;
+            }
+            current = next;
+        }
+    }
+
+    fn is_at_removed<B: Brush>(self, layout: &Layout<B>) -> bool {
+        self.visual_clusters(layout)
+            .iter()
+            .flatten()
+            .any(|cluster| cluster.run().is_removed())
+    }
+
     /// Returns the logical text index of the cursor.
     pub fn index(&self) -> usize {
         self.index
@@ -96,6 +127,10 @@ impl Cursor {
     /// in visual order.
     #[must_use]
     pub fn previous_visual<B: Brush>(&self, layout: &Layout<B>) -> Self {
+        self.step_skipping_removed(layout, Self::step_previous_visual)
+    }
+
+    fn step_previous_visual<B: Brush>(self, layout: &Layout<B>) -> Self {
         let [left, right] = self.visual_clusters(layout);
         if let (Some(left), Some(right)) = (&left, &right)
             && left.is_soft_line_break()
@@ -124,13 +159,17 @@ impl Cursor {
             };
             return Self::from_byte_index(layout, index, affinity_for_dir(left.is_rtl(), false));
         }
-        *self
+        self
     }
 
     /// Returns a new cursor that is positioned at the next cluster boundary
     /// in visual order.
     #[must_use]
     pub fn next_visual<B: Brush>(&self, layout: &Layout<B>) -> Self {
+        self.step_skipping_removed(layout, Self::step_next_visual)
+    }
+
+    fn step_next_visual<B: Brush>(self, layout: &Layout<B>) -> Self {
         let [left, right] = self.visual_clusters(layout);
         if let (Some(left), Some(right)) = (&left, &right) {
             if left.is_soft_line_break() {
@@ -165,7 +204,7 @@ impl Cursor {
             };
             return Self::from_byte_index(layout, index, affinity_for_dir(right.is_rtl(), true));
         }
-        *self
+        self
     }
 
     /// Returns a new cursor that is positioned at the next word boundary

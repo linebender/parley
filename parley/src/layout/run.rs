@@ -138,12 +138,21 @@ impl<'a, B: Brush> Run<'a, B> {
         ))
     }
 
+    /// If true, this run's content is whitespace removed at the line end.
+    /// It has no advance or glyphs, and its clusters can't be selected in most circumstances.
+    pub fn is_removed(&self) -> bool {
+        self.line_data.is_some_and(|item| item.removed)
+    }
+
     /// Returns the advance for the run.
     ///
     /// This includes the additional advances inserted for word spacing, letter spacing, and, if the
     /// layout has been [aligned](Layout::set_alignment) with [`Justify`](crate::Alignment::Justify), the
     /// justification.
     pub fn advance(&self) -> f32 {
+        if self.is_removed() {
+            return 0.;
+        }
         let slice = self.line_slice();
         match self.gaps() {
             Some(gaps) => gaps

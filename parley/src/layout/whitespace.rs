@@ -35,7 +35,10 @@ use crate::style::Brush;
 use crate::{TextWrapMode, WhiteSpaceCollapse};
 
 impl WhiteSpaceCollapse {
-    /// Whether `c` is whitespace that this mode collapses.
+    /// Whether `c` is whitespace that this mode collapses during Phase I white space processing
+    /// ([CSS Text 4 § 4.3.1][css-phase-1]).
+    ///
+    /// [css-phase-1]: https://www.w3.org/TR/css-text-4/#white-space-phase-1
     pub(crate) fn is_collapsible(self, c: char) -> bool {
         match self {
             Self::Collapse => c.is_ascii_whitespace(),
@@ -44,17 +47,18 @@ impl WhiteSpaceCollapse {
         }
     }
 
-    /// Whether this mode collapses whitespace of the given kind.
+    /// Whether trailing whitespace of the given kind is removed at the end of a line under this
+    /// mode ([CSS Text 4 § 4.3.2][css-phase-2], Phase II).
     ///
-    /// This is [`Self::is_collapsible`] in terms of a shaped character's [`Whitespace`].
-    pub(crate) fn collapses(self, whitespace: Whitespace) -> bool {
+    /// [css-phase-2]: https://www.w3.org/TR/css-text-4/#white-space-phase-2
+    // TODO: Remove U+1680 OGHAM SPACE MARK in collapsing modes as well.
+    #[inline(always)]
+    pub(crate) fn removes_at_line_end(self, whitespace: Whitespace) -> bool {
         match self {
-            Self::Collapse => matches!(
-                whitespace,
-                Whitespace::Space | Whitespace::Tab | Whitespace::Newline
-            ),
+            Self::Collapse | Self::PreserveBreaks => {
+                matches!(whitespace, Whitespace::Space | Whitespace::Tab)
+            }
             Self::Preserve | Self::BreakSpaces => false,
-            Self::PreserveBreaks => matches!(whitespace, Whitespace::Space | Whitespace::Tab),
         }
     }
 }

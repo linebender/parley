@@ -20,8 +20,8 @@ use crate::style::Brush;
 use crate::{BaselineShift, OverflowWrap, TextWrapMode, VerticalAlign, WhiteSpaceCollapse};
 
 use core::range::Range;
-use parley_engine::Atom;
 use parley_engine::shape::{Character, Whitespace};
+use parley_engine::{Atom, ShapedText};
 use smallvec::SmallVec;
 
 #[derive(Default)]
@@ -1448,6 +1448,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                     shaped_cluster_range: Range::from(cluster..cluster),
                     text_range: Range::from(text..text),
                     gaps_start: None,
+                    removed: false,
                 });
                 line.item_range = Range::from(run_index..run_index + 1);
             }
@@ -1670,10 +1671,9 @@ fn commit_line<B: Brush>(
             shaped_cluster_range: cluster_range,
             text_range: Range::from(item_text_range),
             gaps_start: None,
+            removed: false,
         });
     }
-    // let end_run_idx = lines.line_items.last().map(|item| item.index).unwrap_or(0);
-    let end_item_idx = lines.line_items.len();
 
     // Trailing whitespace under `WhiteSpaceCollapse::Preserve` directly preceding a forced break
     // hangs conditionally (CSS Text 4 § 4.3.2): only the part that doesn't fit hangs. Whitespace
@@ -1690,14 +1690,36 @@ fn commit_line<B: Brush>(
     };
     let HangingWhitespace {
         advance: hanging_advance,
-        removed_advance,
+        removal,
         justification_end_cluster,
         opportunities: hanging_opportunities,
-    } = hanging_whitespace(
-        layout,
-        &lines.line_items[start_item_idx..end_item_idx],
-        overflow,
-    );
+    } = hanging_whitespace(layout, &lines.line_items[start_item_idx..], overflow);
+    let removed_advance = if let Some(removal) = removal {
+        let items = &mut lines.line_items;
+        let mut item_range =
+            start_item_idx + removal.items.start..start_item_idx + removal.items.end;
+        let first = item_range.start;
+        if removal.clusters.start > items[first].shaped_cluster_range.start {
+            let tail = split_line_item_at(shaped_text, &mut items[first], removal.clusters.start);
+            items.insert(first + 1, tail);
+            item_range.start += 1;
+            item_range.end += 1;
+        }
+        let last = item_range.end - 1;
+        if removal.clusters.end < items[last].shaped_cluster_range.end {
+            let tail = split_line_item_at(shaped_text, &mut items[last], removal.clusters.end);
+            items.insert(item_range.end, tail);
+        }
+        for item in &mut items[item_range] {
+            if !item.shaped_cluster_range.is_empty() {
+                item.removed = true;
+            }
+        }
+        removal.advance
+    } else {
+        0.
+    };
+    let end_item_idx = lines.line_items.len();
     // The word separators counted as the line was built include the line's hanging whitespace, and
     // hanging whitespace is not stretched by justification.
     let num_justification_opportunities = state.num_word_separators - hanging_opportunities;
@@ -1721,9 +1743,8 @@ fn commit_line<B: Brush>(
         has_spacing,
         metrics: LineMetrics {
             indent: line_indent,
-            advance: state.x,
+            advance: state.x - removed_advance,
             hanging_advance,
-            removed_advance,
             ..Default::default()
         },
         aligned_subtree_offsets: Range::default(),
@@ -1741,13 +1762,35 @@ fn commit_line<B: Brush>(
     state.items.start = state.items.end.saturating_sub(1);
 }
 
-/// The whitespace hanging past the end of a line, as computed by [`hanging_whitespace`].
-struct HangingWhitespace {
-    /// The advance of the hanging whitespace.
+/// Make a line item contain only the clusters before `at`, returning the line item containing the remainder.
+fn split_line_item_at(shaped_text: &ShapedText, item: &mut LineItemData, at: u32) -> LineItemData {
+    debug_assert!(item.shaped_cluster_range.start < at && at < item.shaped_cluster_range.end);
+    let char_idx = shaped_text.shaped_clusters()[at as usize]
+        .chars_range()
+        .start;
+    let byte = shaped_text.characters()[char_idx as usize].text_byte_start as usize;
+    let mut tail = item.clone();
+    tail.shaped_cluster_range.start = at;
+    tail.text_range.start = byte;
+    item.shaped_cluster_range.end = at;
+    item.text_range.end = byte;
+    tail
+}
+
+struct RemovedWhitespace {
+    /// The advance the now removed whitespace was originally laid out with.
     advance: f32,
-    /// The portion of `advance` that is the line's trailing collapsible whitespace, which CSS
-    /// removes rather than hangs (see [`LineMetrics::removed_advance`]).
-    removed_advance: f32,
+    clusters: core::ops::Range<u32>,
+    /// Line-relative range from the first affected item through the last.
+    items: core::ops::Range<usize>,
+}
+
+/// The whitespace hanging past or removed at the end of a line, as computed by [`hanging_whitespace`].
+struct HangingWhitespace {
+    /// The advance of the non-removed hanging whitespace (see [`LineMetrics::hanging_advance`]).
+    advance: f32,
+    /// Whitespace removed following <https://www.w3.org/TR/css-text-4/#white-space-phase-2>.
+    removal: Option<RemovedWhitespace>,
     /// The index one past the line's logically last shaped cluster that's eligible for
     /// justification (see [`Justification::justification_end_cluster`]).
     justification_end_cluster: u32,
@@ -1782,7 +1825,13 @@ fn hanging_whitespace<B: Brush>(
     let mut hanging_whitespace_advance = 0.;
     // Collapsible whitespace can't be conditionally hanging, so this is unaffected by `overflow`.
     let mut removed_advance = 0.;
-    let mut in_removed_suffix = true;
+    let mut removed_clusters = {
+        let line_end = line_items
+            .last()
+            .map_or(0, |item| item.shaped_cluster_range.end);
+        line_end..line_end
+    };
+    let mut removed_items = line_items.len()..line_items.len();
     // Atoms with shaped clusters before this index may be stretched by justification.
     let mut justification_end_cluster = u32::MAX;
     let mut hanging_opportunities = 0;
@@ -1798,7 +1847,7 @@ fn hanging_whitespace<B: Brush>(
     let mut in_conditional_suffix = true;
     let mut conditional_advance: Option<f32> = None;
 
-    'items: for line_item in line_items.iter().rev() {
+    'items: for (item_idx, line_item) in line_items.iter().enumerate().rev() {
         // Trailing whitespace can only hang if it ends up at the line's end edge after bidi
         // reordering. We don't currently apply UAX #9 L1 (resetting trailing whitespace to
         // paragraph level), so only logically-last items that match the paragraph level are
@@ -1846,20 +1895,31 @@ fn hanging_whitespace<B: Brush>(
                     }
                 }
             }
-            hanging_whitespace_advance += hanging;
+            let clusters = atom.shaped_clusters_range();
+            let mut removed = false;
             // A forced break doesn't separate collapsible whitespace from the line's end.
-            if in_removed_suffix && whitespace != Whitespace::Newline {
-                if all_hang
-                    && atom.characters().iter().all(|character| {
-                        layout.data.styles[character.style_index as usize]
-                            .white_space_collapse
-                            .collapses(character.whitespace)
-                    })
-                {
-                    removed_advance += hanging;
-                } else {
-                    in_removed_suffix = false;
+            if whitespace == Whitespace::Newline {
+                if removed_clusters.is_empty() && clusters.end == removed_clusters.start {
+                    removed_clusters = clusters.start..clusters.start;
                 }
+            } else if clusters.end == removed_clusters.start
+                && all_hang
+                && atom.characters().iter().all(|character| {
+                    layout.data.styles[character.style_index as usize]
+                        .white_space_collapse
+                        .removes_at_line_end(character.whitespace)
+                })
+            {
+                if removed_clusters.is_empty() {
+                    removed_items.end = item_idx + 1;
+                }
+                removed_items.start = item_idx;
+                removed_clusters.start = clusters.start;
+                removed_advance += hanging;
+                removed = true;
+            }
+            if !removed {
+                hanging_whitespace_advance += hanging;
             }
             // Justification can't stretch within an atom, so it stops at the start of the
             // last atom that hangs in its entirety or only partially.
@@ -1879,7 +1939,11 @@ fn hanging_whitespace<B: Brush>(
 
     HangingWhitespace {
         advance: hanging_whitespace_advance,
-        removed_advance,
+        removal: (!removed_clusters.is_empty()).then_some(RemovedWhitespace {
+            advance: removed_advance,
+            clusters: removed_clusters,
+            items: removed_items,
+        }),
         justification_end_cluster,
         opportunities: hanging_opportunities,
     }

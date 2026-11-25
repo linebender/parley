@@ -29,15 +29,20 @@ use crate::util::nearly_eq;
 ///
 /// Note: Currently only the [`TreeBuilder`](crate::TreeBuilder) collapses white space. The
 /// [`RangedBuilder`](crate::RangedBuilder) and [`StyleRunBuilder`](crate::StyleRunBuilder)
-/// builders expect already-transformed text and use this property only to influence whitespace hanging behaviour.
+/// builders expect already-transformed text and use this property to influence whitespace hanging behaviour.
 #[derive(Debug, Default, Clone, Copy, PartialEq, Eq)]
 pub enum WhiteSpaceCollapse {
     /// Collapse whitespace, including ASCII segment breaks, to a space.
+    ///
+    /// Spaces and tabs with this property at line ends are removed as described in
+    /// [CSS Text 4](https://www.w3.org/TR/css-text-4/#white-space-phase-2).
     Collapse,
     /// Preserve spaces, tabs, and segment breaks.
     #[default]
     Preserve,
     /// Collapse spaces and tabs while preserving segment breaks.
+    ///
+    /// Same line-end behaviour as [`Collapse`](Self::Collapse).
     PreserveBreaks,
     /// Preserve whitespace without hanging, allowing wrapping after each space or tab.
     BreakSpaces,
