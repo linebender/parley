@@ -2193,7 +2193,6 @@ fn hanging_whitespace<B: Brush>(
                 &atom,
                 &layout.data.styles,
                 effective_spacing,
-                line_item.is_rtl(),
             );
             let whitespace = atom.shaped_clusters()[0].whitespace();
             if in_conditional_suffix && whitespace != Whitespace::Newline {

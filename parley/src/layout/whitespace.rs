@@ -77,23 +77,14 @@ pub(crate) fn whitespace_hangs<B: Brush>(whitespace: Whitespace, style: &Style<B
 ///
 /// An atom can hang partially: e.g., a prepend character followed by a space is a single atom (as
 /// it's a grapheme), but may consist of multiple shaped clusters, of which the spaces can hang.
-/// The atom's spacing at its logical end hangs along with the clusters, and if the atom hangs in
-/// its entirety does its spacing at its logical start hang as well.
+/// The atom's spacing hangs only if the atom hangs in its entirety.
 #[inline(always)]
 pub(crate) fn atom_hanging_advance<B: Brush>(
     slice: ShapedSlice<'_>,
     atom: &Atom<'_>,
     styles: &[Style<B>],
     spacing: EffectiveSpacing,
-    is_rtl: bool,
 ) -> (f32, bool) {
-    let gaps = spacing.gaps(atom);
-    let (gap_start, gap_end) = if is_rtl {
-        (gaps.after, gaps.before)
-    } else {
-        (gaps.before, gaps.after)
-    };
-    let mut last_cluster = true;
     let mut all_hang = true;
     let mut hanging = 0.;
     for cluster in atom.shaped_clusters().iter().rev() {
@@ -110,18 +101,12 @@ pub(crate) fn atom_hanging_advance<B: Brush>(
             all_hang = false;
             break;
         }
-        if last_cluster {
-            hanging += gap_end;
-            last_cluster = false;
-        }
         hanging += cluster.advance;
     }
 
-    let hanging = if all_hang {
-        hanging + gap_start
-    } else {
-        hanging
-    };
+    if all_hang {
+        hanging += spacing.gaps(atom).total();
+    }
 
     (hanging, all_hang)
 }
