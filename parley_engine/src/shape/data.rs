@@ -47,15 +47,17 @@ impl ShapedClusterFlags {
     const GRAPHEME_START: u32 = 1 << 9;
     /// Whether a soft wrap opportunity exists before the cluster's first character.
     const SOFT_WRAP_BEFORE: u32 = 1 << 10;
+    /// Whether there's a soft wrap opportunity at any of the cluster's characters except its first.
+    const INTERNAL_SOFT_WRAP: u32 = 1 << 11;
     /// [`Whitespace`] class of the cluster's first character (3 bits).
-    const WHITESPACE_SHIFT: u32 = 11;
+    const WHITESPACE_SHIFT: u32 = 12;
     const WHITESPACE_MASK: u32 = 0b111 << Self::WHITESPACE_SHIFT;
     /// Whether the cluster is an inline object.
-    const INLINE_OBJECT: u32 = 1 << 14;
-    const SAFE_TO_BREAK_BEFORE: u32 = 1 << 15;
-    const SAFE_TO_CONCAT_BEFORE: u32 = 1 << 16;
+    const INLINE_OBJECT: u32 = 1 << 15;
+    const SAFE_TO_BREAK_BEFORE: u32 = 1 << 16;
+    const SAFE_TO_CONCAT_BEFORE: u32 = 1 << 17;
     /// Whether the cluster's first character is default ignorable.
-    const DEFAULT_IGNORABLE: u32 = 1 << 17;
+    const DEFAULT_IGNORABLE: u32 = 1 << 18;
 
     #[inline(always)]
     pub(crate) const fn new(glyph_len: u8) -> Self {
@@ -118,8 +120,20 @@ impl ShapedClusterFlags {
     }
 
     #[inline(always)]
+    pub(crate) const fn with_internal_soft_wrap_opportunity(mut self, set: bool) -> Self {
+        self.0 =
+            self.0 & !Self::INTERNAL_SOFT_WRAP | if set { Self::INTERNAL_SOFT_WRAP } else { 0 };
+        self
+    }
+
+    #[inline(always)]
     const fn is_soft_wrap_opportunity_before(self) -> bool {
         self.0 & Self::SOFT_WRAP_BEFORE != 0
+    }
+
+    #[inline(always)]
+    const fn has_internal_soft_wrap_opportunity(self) -> bool {
+        self.0 & Self::INTERNAL_SOFT_WRAP != 0
     }
 
     #[inline(always)]
@@ -267,6 +281,17 @@ impl ShapedCluster {
     #[inline(always)]
     pub fn is_soft_wrap_opportunity_before(self) -> bool {
         self.flags.is_soft_wrap_opportunity_before()
+    }
+
+    /// Whether there's a soft wrap opportunity at any of the cluster's characters except its first,
+    /// such as between the letters of a ligature.
+    ///
+    /// This is [`Character::flags`]' soft-wrap bit of those characters, cached here so that if
+    /// you're breaking lines by walking shaped clusters, you only need to look for such
+    /// opportunities in clusters that have them.
+    #[inline(always)]
+    pub fn has_internal_soft_wrap_opportunity(self) -> bool {
+        self.flags.has_internal_soft_wrap_opportunity()
     }
 
     /// The [`Whitespace`] class of this cluster's first character.
@@ -504,8 +529,10 @@ mod tests {
                 for default_ignorable in [false, true] {
                     let flags = ShapedClusterFlags::new(3)
                         .with_grapheme_start(true)
+                        .with_internal_soft_wrap_opportunity(!soft_wrap)
                         .with_first_char(soft_wrap, whitespace, default_ignorable);
                     assert_eq!(flags.is_soft_wrap_opportunity_before(), soft_wrap);
+                    assert_eq!(flags.has_internal_soft_wrap_opportunity(), !soft_wrap);
                     assert_eq!(flags.whitespace(), whitespace);
                     assert_eq!(flags.is_default_ignorable(), default_ignorable);
                     assert_eq!(flags.glyph_len(), 3);

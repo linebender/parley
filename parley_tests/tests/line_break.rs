@@ -10,7 +10,9 @@ use crate::test_name;
 use crate::util::{ColorBrush, TestEnv};
 use parley::VerticalAlign;
 use parley::style::FontFamily;
-use parley::{Alignment, AlignmentOptions, InlineBox, Layout, StyleProperty, YieldData};
+use parley::{
+    Alignment, AlignmentOptions, InlineBox, Layout, LineHeight, StyleProperty, YieldData,
+};
 
 #[test]
 fn break_by_length_basic() {
@@ -149,14 +151,18 @@ fn break_by_length_multiple_inline_boxes() {
     env.check_layout_snapshot(&layout);
 }
 
-/// This test verifies that a line can end inside a ligature, which is then reshaped.
+/// This test verifies that a line can end inside a ligature, which is then reshaped. Each line is
+/// only as tall as the letters on it.
 #[test]
 fn break_by_length_with_ligature() {
     let mut env = TestEnv::new(test_name!(), None);
 
-    // The font shapes the "fi" of "abfi" into a single ligature glyph.
+    // The font shapes the "fi" of "abfi" into a single ligature glyph. Only the "i" has the bigger
+    // line height.
     let text = "abfi";
-    let builder = env.ranged_builder(text);
+    let mut builder = env.ranged_builder(text);
+    builder.push_default(LineHeight::Absolute(20.));
+    builder.push(LineHeight::Absolute(40.), 3..4);
     let mut layout = builder.build(text);
     layout.break_all_lines(None);
     let glyph_count = |layout: &Layout<ColorBrush>| -> usize {

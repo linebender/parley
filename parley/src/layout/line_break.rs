@@ -556,6 +556,13 @@ struct PrevBoundaryState {
     cluster_idx: u32,
     floated_box_idx: usize,
     state: LineState,
+    /// The advance at which the line ends if this opportunity is taken (without taking further
+    /// reshaping into account). This decides whether the opportunity fits.
+    ///
+    /// For opportunities inside shaped clusters this is an estimate. `state.x` will include the
+    /// advance of that whole cluster, which is what the reshaped line's advance delta is relative
+    /// to (see [`Reshaper`](Reshaper#advances)).
+    position: f32,
     /// Length of [`BreakerState::contributed`] at this opportunity.
     contributed_len: usize,
     /// Length of [`BreakerState::subtrees`] at this opportunity, as [saved](SubtreeHistory::save).
@@ -830,6 +837,90 @@ impl BreakerState {
         }
     }
 
+    /// Mark the last line-breaking opportunities inside `cluster` that fits.
+    ///
+    /// These are its internal soft wrap opportunities, or (with `emergency`) the emergency
+    /// opportunities at its grapheme boundaries. For example, an "ffi" ligature will have an
+    /// emergency opportunity before each character.
+    ///
+    /// `cluster` is the shaped cluster about to be added to the line, with the arguments it
+    /// would be [added](Self::append_shaped_cluster_to_line) with. A line ending inside it takes
+    /// the cluster's characters before that point, and the next line starts with the rest. Both
+    /// are reshaped, so the advance the line ends at is only known once the opportunity is taken
+    /// (see [`PrevBoundaryState::position`]). Until then, the cluster's advance is taken to be
+    /// divided evenly over its graphemes.
+    #[cold]
+    #[inline(never)]
+    fn mark_break_opportunity_inside_shaped_cluster<B: Brush>(
+        &mut self,
+        emergency: bool,
+        cluster: &ShapedCluster,
+        cluster_idx: u32,
+        advance: f32,
+        characters: &[Character],
+        data: &LayoutData<B>,
+        is_word_separator: bool,
+        fit_max_advance: f32,
+    ) {
+        let style = &data.styles[cluster.style_index as usize];
+        if self.line.text_wrap_mode != TextWrapMode::Wrap
+            || (emergency && style.overflow_wrap == OverflowWrap::Normal)
+        {
+            return;
+        }
+        let is_grapheme_start = |character: &&Character| character.grapheme_start;
+        let graphemes = 1 + characters[1..].iter().filter(is_grapheme_start).count();
+        // The number of the cluster's graphemes that end at or before the current character.
+        let mut grapheme = 0;
+        for (i, character) in characters.iter().enumerate().skip(1) {
+            grapheme += usize::from(character.grapheme_start);
+            let is_opportunity = if emergency {
+                character.grapheme_start
+            } else {
+                character.flags.is_soft_wrap_opportunity()
+            };
+            if !is_opportunity {
+                continue;
+            }
+            let position = self.line.x + advance * grapheme as f32 / graphemes as f32;
+            // A line's first grapheme stays on the line whether or not it fits, as for whole
+            // clusters.
+            if position > fit_max_advance && (self.line.x != 0. || grapheme > 1) {
+                break;
+            }
+
+            // The line then holds the characters before this one.
+            self.line.box_metrics.add_text(
+                self.run_idx,
+                cluster.style_index,
+                &characters[..i],
+                data,
+                &mut self.contributed,
+                &mut self.subtrees,
+            );
+            let mut state = self.line.clone();
+            state.items.end = self.run_idx + 1;
+            state.chars.end = cluster.chars_range().start + i as u32;
+            state.clusters.end = cluster_idx + 1;
+            state.x += advance;
+            state.num_word_separators += u32::from(is_word_separator);
+            let boundary = Some(PrevBoundaryState {
+                run_idx: self.run_idx,
+                cluster_idx: cluster_idx + 1,
+                floated_box_idx: self.floated_box_idx,
+                state,
+                position,
+                contributed_len: self.contributed.len(),
+                subtrees_len: self.subtrees.save(),
+            });
+            if emergency {
+                self.emergency_boundary = boundary;
+            } else {
+                self.prev_boundary = boundary;
+            }
+        }
+    }
+
     /// Store the current iteration state so that we can revert to it if we later want to take
     /// the line breaking opportunity at this point.
     fn mark_line_break_opportunity(&mut self) {
@@ -838,6 +929,7 @@ impl BreakerState {
             cluster_idx: self.cluster_idx,
             floated_box_idx: self.floated_box_idx,
             state: self.line.clone(),
+            position: self.line.x,
             contributed_len: self.contributed.len(),
             subtrees_len: self.subtrees.save(),
         });
@@ -851,6 +943,7 @@ impl BreakerState {
             cluster_idx: self.cluster_idx,
             floated_box_idx: self.floated_box_idx,
             state: self.line.clone(),
+            position: self.line.x,
             contributed_len: self.contributed.len(),
             subtrees_len: self.subtrees.save(),
         });
@@ -953,7 +1046,7 @@ pub struct BreakLines<'a, B: Brush> {
     prev_state: Option<BreakerState>,
     /// Reshaping a line at a break can cause it to overflow `max_advance`. When that happens, we
     /// break the line again (see [`Self::break_line_again`]), this time with a `max_advance` just
-    /// below the line's advance at the failed break.
+    /// below the [position](PrevBoundaryState::position) of the failed break.
     ///
     /// This is `f32::INFINITY` if we're breaking the line for the first time.
     step_back_max_advance: f32,
@@ -1012,10 +1105,11 @@ impl<'a, B: Brush> BreakLines<'a, B> {
     }
 
     /// Returns whether the line ended at the current position would no longer fit once reshaped.
+    /// `position` is the [position](PrevBoundaryState::position) of the opportunity taken.
     ///
     /// See also [`Self::break_line_again`].
     #[inline(always)]
-    fn overflows_once_reshaped(&mut self, max_advance: f32) -> bool {
+    fn overflows_once_reshaped(&mut self, max_advance: f32, position: f32) -> bool {
         /// Usually the break positions we try will be safe to break. Marking this path as cold and
         /// ensuring it's not inlined keeps that expected common path faster.
         ///
@@ -1023,7 +1117,11 @@ impl<'a, B: Brush> BreakLines<'a, B> {
         /// be tiny compared to the cost of reshaping.
         #[cold]
         #[inline(never)]
-        fn overflows<B: Brush>(this: &mut BreakLines<'_, B>, max_advance: f32) -> bool {
+        fn overflows<B: Brush>(
+            this: &mut BreakLines<'_, B>,
+            max_advance: f32,
+            position: f32,
+        ) -> bool {
             if this.step_back_max_advance.is_finite() {
                 // We already stepped back once, so let's just accept this line. There's technically
                 // a small chance it may overflow again, but that should be quite unlikely.
@@ -1035,7 +1133,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
             // A line that already doesn't fit before its end is reshaped either only hangs
             // whitespace (see the comment below), or was broken at its first opportunity, so there
             // is no narrower break to step back to.
-            if line.x > max_advance {
+            if position > max_advance {
                 return false;
             }
 
@@ -1068,10 +1166,11 @@ impl<'a, B: Brush> BreakLines<'a, B> {
 
         // Note that, if the end needs no reshaping, reshaping changes only the line's start. We
         // already took that into account when fitting the line.
-        end_is_unsafe_to_break && overflows(self, max_advance)
+        end_is_unsafe_to_break && overflows(self, max_advance, position)
     }
 
-    /// Attempt breaking the line again, this time fitting it to less than its current advance.
+    /// Attempt breaking the line again, this time ending it before the opportunity at `position`
+    /// (see [`PrevBoundaryState::position`]).
     ///
     /// To be used when reshaping a line caused it to overflow. Using this only once should *almost
     /// always* be enough, as taking away a character normally takes away more advance than e.g. a
@@ -1080,8 +1179,8 @@ impl<'a, B: Brush> BreakLines<'a, B> {
     /// This retries from where the call to [`Self::break_next`] started.
     #[cold]
     #[inline(never)]
-    fn break_line_again(&mut self) -> Option<YieldData> {
-        self.step_back_max_advance = self.state.line.x.next_down();
+    fn break_line_again(&mut self, position: f32) -> Option<YieldData> {
+        self.step_back_max_advance = position.next_down();
         let start = self.prev_state.as_ref().expect("saved by `break_next`");
         self.state.clone_from(start);
         self.break_next()
@@ -1302,16 +1401,18 @@ impl<'a, B: Brush> BreakLines<'a, B> {
 
             // Iterate over the remaining shaped clusters in the run.
             //
-            // Note we are moving to breaking at character or grapheme granularity, but for now we
-            // still break only at atom granularity. We use the atom's first shaped cluster's
-            // line-break opportunity, style and spacing.
+            // A line can end at any character that is a soft wrap opportunity or starts a grapheme,
+            // and in particular that means it can end inside a source shaped cluster.
+            //
+            // We use the atom's first shaped cluster's wrapping style and spacing.
             let styles = &self.layout.data.styles;
             let characters = self.layout.data.shaped_text.characters();
             let run_spacing = run.data.spacing;
             let is_spaced = !run_spacing.is_zero();
             let first = self.state.cluster_idx;
             let clusters = slice.shaped_clusters_in(first..slice.shaped_clusters_range().end);
-            // The breaker always resumes at the start of an atom.
+            // We treat the first shaped cluster of the line as an atom for layout purposes, even if
+            // it isn't the start of a grapheme. This can happen if we broke inside a grapheme.
             let mut is_atom_start = true;
             let mut max_height_exceeded = false;
             for (cluster_idx, cluster) in (first..).zip(clusters) {
@@ -1376,6 +1477,28 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                             .gaps(whitespace, cluster.is_default_ignorable())
                             .total();
                     }
+                } else if cluster.is_soft_wrap_opportunity_before()
+                    && self.state.line.text_wrap_mode == TextWrapMode::Wrap
+                    && self.state.line.x != 0.0
+                {
+                    // This is a soft wrap opportunity inside a grapheme. This can happen as
+                    // Unicode's line segmenter has some opportunities inside extended graphemes
+                    // clusters, like between a space and a combining mark that follows it
+                    // (SPACE + U+0301, say).
+                    self.state.mark_line_break_opportunity();
+                }
+
+                if cluster.has_internal_soft_wrap_opportunity() {
+                    self.state.mark_break_opportunity_inside_shaped_cluster(
+                        false,
+                        cluster,
+                        cluster_idx,
+                        advance,
+                        slice.characters_in(cluster.chars_range()),
+                        &self.layout.data,
+                        is_separator,
+                        fit_max_advance,
+                    );
                 }
 
                 // Compute the x position of the content being currently processed
@@ -1403,6 +1526,21 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                 // in the line. If there is no such line-breaking opportunity (such as if wrapping is disabled), then
                 // we fall back to appending the content to the line anyway.
                 else {
+                    // Without a regular line-breaking opportunity to take, the line can end inside
+                    // this cluster as an emergency.
+                    if cluster.char_len() > 1 && self.state.prev_boundary.is_none() {
+                        self.state.mark_break_opportunity_inside_shaped_cluster(
+                            true,
+                            cluster,
+                            cluster_idx,
+                            advance,
+                            slice.characters_in(cluster.chars_range()),
+                            &self.layout.data,
+                            is_separator,
+                            fit_max_advance,
+                        );
+                    }
+
                     // Case: the shaped cluster is whitespace that hangs.
                     //
                     // We append it to the line, with the whitespace hanging past the end.
@@ -1424,9 +1562,10 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                     // We "take" the line-breaking opportunity by starting a new line and resetting our
                     // item/run/cluster iteration state back to how it was when the line-breaking opportunity was encountered
                     else if let Some(prev) = self.state.prev_boundary.take() {
+                        let position = prev.position;
                         self.state.reset_to(prev);
-                        if self.overflows_once_reshaped(max_advance) {
-                            return self.break_line_again();
+                        if self.overflows_once_reshaped(max_advance, position) {
+                            return self.break_line_again(position);
                         }
                         return self.start_new_line(BreakReason::Regular, max_advance, line_indent);
                     }
@@ -1435,9 +1574,10 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                     // We "take" the line-breaking opportunity by starting a new line and resetting our
                     // item/run/cluster iteration state back to how it was when the line-breaking opportunity was encountered
                     else if let Some(prev_emergency) = self.state.emergency_boundary.take() {
+                        let position = prev_emergency.position;
                         self.state.reset_to(prev_emergency);
-                        if self.overflows_once_reshaped(max_advance) {
-                            return self.break_line_again();
+                        if self.overflows_once_reshaped(max_advance, position) {
+                            return self.break_line_again(position);
                         }
                         return self.start_new_line(
                             BreakReason::Emergency,
