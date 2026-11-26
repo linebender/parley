@@ -534,12 +534,7 @@ impl ContentWidthsMeasurer {
                     can_hang,
                 );
             } else {
-                self.measure_text_run::<B, true>(
-                    &layout_data.styles,
-                    slice,
-                    run_spacing,
-                    can_hang,
-                );
+                self.measure_text_run::<B, true>(&layout_data.styles, slice, run_spacing, can_hang);
             }
         }
 

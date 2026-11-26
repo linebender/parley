@@ -2188,12 +2188,8 @@ fn hanging_whitespace<B: Brush>(
         let slice = line_item.slice(&layout.data);
 
         for atom in slice.atoms_end().rev() {
-            let (hanging, all_hang) = atom_hanging_advance(
-                slice,
-                &atom,
-                &layout.data.styles,
-                effective_spacing,
-            );
+            let (hanging, all_hang) =
+                atom_hanging_advance(slice, &atom, &layout.data.styles, effective_spacing);
             let whitespace = atom.shaped_clusters()[0].whitespace();
             if in_conditional_suffix && whitespace != Whitespace::Newline {
                 // The atom hangs from its logical end, so use the last cluster's style to
