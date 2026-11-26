@@ -557,6 +557,11 @@ fn process_shaped_clusters<'a>(
                 .with_safe_to_concat_before(cluster.safe_to_concat_before)
                 .with_inline_glyph(inline_glyph)
                 .with_inline_object(is_inline_object)
+                .with_internal_soft_wrap_opportunity(
+                    characters[cluster.characters_start + 1..char_end]
+                        .iter()
+                        .any(|character| character.flags.is_soft_wrap_opportunity()),
+                )
                 .with_first_char(
                     first_character.flags.is_soft_wrap_opportunity(),
                     first_character.whitespace,
