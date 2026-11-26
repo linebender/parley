@@ -1538,7 +1538,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                 let data = &self.layout.data;
                 let start = self.state.line.chars.start;
                 slice = reshaped_start(&mut self.reshaper, &data.text, &data.shaped_text, start)
-                    .unwrap()
+                    .unwrap();
             }
 
             for atom in slice.atoms_from(self.state.cluster_idx) {
