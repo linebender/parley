@@ -11,7 +11,7 @@ use parlance::{FontFeature, FontVariation, Language};
 use crate::{
     Analysis, CharInfo, FontMetrics, ShapedText,
     itemize::{Item, Segment, TextRange},
-    lru_cache::LruCache,
+    lru_cache::{LruCache, LruStore},
     shape::{CharCluster, cache},
 };
 
@@ -93,7 +93,7 @@ impl From<FontInstanceRef<'_>> for FontInstance {
 pub struct Shaper {
     shape_data_cache: LruCache<cache::ShapeDataKey, harfrust::Font>,
     shape_instance_cache: LruCache<cache::ShapeInstanceId, harfrust::Font>,
-    shape_plan_cache: LruCache<cache::ShapePlanId, harfrust::ShapePlan>,
+    shape_plan_cache: LruStore<(cache::ShapeDataKey, harfrust::ShapePlan)>,
     buffer: harfrust::Buffer,
     features: Vec<harfrust::Feature>,
     char_cluster: CharCluster,
@@ -105,7 +105,7 @@ impl Default for Shaper {
         Self {
             shape_data_cache: LruCache::new(MAX_ENTRIES),
             shape_instance_cache: LruCache::new(MAX_ENTRIES),
-            shape_plan_cache: LruCache::new(MAX_ENTRIES),
+            shape_plan_cache: LruStore::new(MAX_ENTRIES),
             buffer: harfrust::Buffer::new(),
             features: Vec::new(),
             char_cluster: CharCluster::default(),
@@ -323,15 +323,13 @@ fn shape_segment(
 
     // Shape a run of the segment with a single font, appending it to `shaped_text`.
     let mut shape_run = |font: &FontInstance, range: TextRange| {
+        let face = cache::ShapeDataKey::new(font.font.data.id(), font.font.index);
         // Create harfrust font instance
-        let base_font = scx.shape_data_cache.entry(
-            cache::ShapeDataKey::new(font.font.data.id(), font.font.index),
-            || {
-                let (data, _) = font.font.data.clone().into_raw_parts();
-                // TODO: How do we want to handle errors like this?
-                harfrust::Font::new(data, font.font.index).unwrap()
-            },
-        );
+        let base_font = scx.shape_data_cache.entry(face, || {
+            let (data, _) = font.font.data.clone().into_raw_parts();
+            // TODO: How do we want to handle errors like this?
+            harfrust::Font::new(data, font.font.index).unwrap()
+        });
         let instance = scx.shape_instance_cache.entry(
             cache::ShapeInstanceKey::new(
                 font.font.data.id(),
@@ -347,26 +345,23 @@ fn shape_segment(
             },
         );
 
-        let shaper_plan = scx.shape_plan_cache.entry(
-            cache::ShapePlanKey::new(
-                font.font.data.id(),
-                font.font.index,
-                direction,
-                hb_script,
-                language.clone(),
-                &scx.features,
-                instance.normalized_coords(),
-            ),
-            || {
-                harfrust::ShapePlan::new(
+        let plan_key = harfrust::ShapePlanKey::new(instance, Some(hb_script), direction)
+            .language(language.as_ref())
+            .features(&scx.features);
+        let (_, shaper_plan) = scx
+            .shape_plan_cache
+            // ShapePlanKey does not check that the right face is used.
+            .entry(|(cached_face, plan)| face == *cached_face && plan_key.matches(plan))
+            .or_insert_with(|| {
+                let plan = harfrust::ShapePlan::new(
                     instance,
                     direction,
                     Some(hb_script),
                     language.as_ref(),
                     &scx.features,
-                )
-            },
-        );
+                );
+                (face, plan)
+            });
 
         // Prepare harfrust buffer
         let buffer = &mut scx.buffer;

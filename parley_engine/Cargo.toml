@@ -34,7 +34,6 @@ parley_data = { workspace = true }
 parley_emoji = { workspace = true }
 
 harfrust = { workspace = true }
-hashbrown = { workspace = true }
 icu_locale_core = { workspace = true }
 icu_normalizer = { workspace = true, features = ["compiled_data"] }
 icu_properties = { workspace = true, features = ["compiled_data"] }

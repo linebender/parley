@@ -2795,7 +2795,6 @@ name = "parley_engine"
 version = "0.13.0"
 dependencies = [
  "harfrust",
- "hashbrown",
  "icu_locale_core",
  "icu_normalizer",
  "icu_properties",

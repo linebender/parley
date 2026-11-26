@@ -2,10 +2,9 @@
 // SPDX-License-Identifier: Apache-2.0 OR MIT
 
 use alloc::boxed::Box;
-use hashbrown::Equivalent;
 use parlance::FontVariation;
 
-#[derive(PartialEq, Copy, Clone)]
+#[derive(PartialEq, Eq, Copy, Clone)]
 pub(crate) struct ShapeDataKey {
     /// The font collection's blob ID.
     font_blob_id: u64,
@@ -19,20 +18,6 @@ impl ShapeDataKey {
             font_blob_id,
             font_index,
         }
-    }
-}
-
-impl Equivalent<Self> for ShapeDataKey {
-    #[inline(always)]
-    fn equivalent(&self, key: &Self) -> bool {
-        self == key
-    }
-}
-
-impl From<&Self> for ShapeDataKey {
-    #[inline(always)]
-    fn from(key: &Self) -> Self {
-        *key
     }
 }
 
@@ -70,9 +55,9 @@ impl<'a> ShapeInstanceKey<'a> {
     }
 }
 
-impl<'a> Equivalent<ShapeInstanceId> for ShapeInstanceKey<'a> {
+impl PartialEq<ShapeInstanceId> for ShapeInstanceKey<'_> {
     #[inline(always)]
-    fn equivalent(&self, key: &ShapeInstanceId) -> bool {
+    fn eq(&self, key: &ShapeInstanceId) -> bool {
         self.font_blob_id == key.font_blob_id
             && self.font_index == key.font_index
             && *self.synthesis == key.synthesis
@@ -88,85 +73,6 @@ impl<'a> From<ShapeInstanceKey<'a>> for ShapeInstanceId {
             font_index: key.font_index,
             synthesis: *key.synthesis,
             variations: key.variations.map(|v| v.to_vec().into()),
-        }
-    }
-}
-
-pub(crate) struct ShapePlanId {
-    /// The font collection's blob ID.
-    font_blob_id: u64,
-    /// The font's index in the font collection.
-    font_index: u32,
-    direction: harfrust::Direction,
-    script: harfrust::Script,
-    language: Option<harfrust::Language>,
-    features: Box<[harfrust::Feature]>,
-    normalized_coords: Box<[harfrust::font::NormalizedCoord]>,
-}
-
-pub(crate) struct ShapePlanKey<'a> {
-    /// The font collection's blob ID.
-    font_blob_id: u64,
-    /// The font's index in the font collection.
-    font_index: u32,
-    direction: harfrust::Direction,
-    script: harfrust::Script,
-    language: Option<harfrust::Language>,
-    features: &'a [harfrust::Feature],
-    normalized_coords: &'a [harfrust::font::NormalizedCoord],
-}
-
-impl<'a> ShapePlanKey<'a> {
-    pub(crate) const fn new(
-        font_blob_id: u64,
-        font_index: u32,
-        direction: harfrust::Direction,
-        script: harfrust::Script,
-        language: Option<harfrust::Language>,
-        features: &'a [harfrust::Feature],
-        normalized_coords: &'a [harfrust::font::NormalizedCoord],
-    ) -> Self {
-        Self {
-            font_blob_id,
-            font_index,
-            direction,
-            script,
-            language,
-            features,
-            normalized_coords,
-        }
-    }
-}
-
-impl<'a> Equivalent<ShapePlanId> for ShapePlanKey<'a> {
-    #[inline(always)]
-    fn equivalent(&self, key: &ShapePlanId) -> bool {
-        self.font_blob_id == key.font_blob_id
-            && self.font_index == key.font_index
-            && self.direction == key.direction
-            && self.script == key.script
-            && self.language == key.language
-            && self.features.len() == key.features.len()
-            && *self.normalized_coords == *key.normalized_coords
-            && self
-                .features
-                .iter()
-                .zip(key.features.iter())
-                .all(|(a, b)| a == b)
-    }
-}
-
-impl<'a> From<ShapePlanKey<'a>> for ShapePlanId {
-    #[inline(always)]
-    fn from(key: ShapePlanKey<'a>) -> Self {
-        Self {
-            font_blob_id: key.font_blob_id,
-            font_index: key.font_index,
-            direction: key.direction,
-            script: key.script,
-            language: key.language,
-            features: key.features.to_vec().into(),
-            normalized_coords: key.normalized_coords.into(),
         }
     }
 }
