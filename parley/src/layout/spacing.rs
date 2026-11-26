@@ -206,12 +206,6 @@ impl EffectiveSpacing {
 
         gaps
     }
-
-    /// The total advance of `atom`, i.e., the sum of the shaped advance and gaps.
-    #[inline(always)]
-    pub(crate) fn atom_advance(self, atom: &Atom<'_>) -> f32 {
-        atom.advance() + self.gaps(atom).total()
-    }
 }
 
 /// Write the [`Gaps`] for the shaped clusters in `slice` into `cluster_gaps`,

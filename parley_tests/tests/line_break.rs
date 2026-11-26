@@ -7,10 +7,10 @@
 //! rather than advance width.
 
 use crate::test_name;
-use crate::util::TestEnv;
+use crate::util::{ColorBrush, TestEnv};
 use parley::VerticalAlign;
 use parley::style::FontFamily;
-use parley::{Alignment, AlignmentOptions, InlineBox, StyleProperty, YieldData};
+use parley::{Alignment, AlignmentOptions, InlineBox, Layout, StyleProperty, YieldData};
 
 #[test]
 fn break_by_length_basic() {
@@ -149,39 +149,33 @@ fn break_by_length_multiple_inline_boxes() {
     env.check_layout_snapshot(&layout);
 }
 
-/// This test verifies that a ligature is never split across lines.
-///
-/// A ligature is a single unbreakable atom: splitting it would require re-shaping, which parley
-/// does not currently support. When the character limit is reached inside the "fi" ligature of
-/// "abfi", the whole ligature is placed on the line before breaking.
+/// This test verifies that a line can end inside a ligature, which is then reshaped.
 #[test]
 fn break_by_length_with_ligature() {
     let mut env = TestEnv::new(test_name!(), None);
 
-    // "abfi" has ligature "fi", which forms a single unbreakable atom
+    // The font shapes the "fi" of "abfi" into a single ligature glyph.
     let text = "abfi";
     let builder = env.ranged_builder(text);
     let mut layout = builder.build(text);
+    layout.break_all_lines(None);
+    let glyph_count = |layout: &Layout<ColorBrush>| -> usize {
+        let runs = layout.lines().flat_map(|line| line.runs());
+        runs.flat_map(|run| run.clusters())
+            .map(|cluster| cluster.glyphs().count())
+            .sum()
+    };
+    assert_eq!(glyph_count(&layout), 3, "expected an 'fi' ligature");
 
-    // Attempt to break at 3 characters: "abf" on the first line", "i" on the second
+    // Break at 3 characters: "abf" on the first line, "i" on the second
     let mut breaker = layout.break_lines();
     breaker.break_next_with_length(3);
     breaker.break_next_with_length(10);
     breaker.finish();
 
-    assert_eq!(layout.len(), 1, "Expected a single line");
-
-    // The glyphs of the ligature stay together: "a", "b" and the "fi" all render on the first line
-    let line = layout.get(0).expect("Expected line 1 to exist");
-    let glyph_count: usize = line
-        .runs()
-        .flat_map(|run| run.clusters())
-        .map(|cluster| cluster.glyphs().count())
-        .sum();
-    assert!(
-        glyph_count >= 3,
-        "expected glyphs for 'a', 'b' and the 'fi' ligature"
-    );
+    let text_ranges: Vec<_> = layout.lines().map(|line| line.text_range()).collect();
+    assert_eq!(text_ranges, [0..3, 3..4]);
+    assert_eq!(glyph_count(&layout), 4, "expected the ligature broken up");
 
     env.check_layout_snapshot(&layout);
 }
