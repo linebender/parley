@@ -61,9 +61,9 @@ struct LineState {
     items: Range<usize>,
     /// The line's characters, as a range into [`ShapedText::characters`].
     ///
-    /// Line edges can be at any character, including inside source shaped clusters. As the line
-    /// gets reshaped if necessary, the committed line's (re)shaped clusters start and end at its
-    /// edges.
+    /// Line edges can be at any character boundary, including inside source shaped clusters. As the
+    /// line gets reshaped if necessary, the committed line's (re)shaped clusters start and end at
+    /// its edges.
     chars: Range<u32>,
     /// The source shaped clusters whose first character is on this line, as a range into
     /// [`ShapedText::shaped_clusters`]. These make up the line's
