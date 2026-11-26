@@ -1305,16 +1305,15 @@ impl<'a, B: Brush> BreakLines<'a, B> {
 
             // Iterate over the remaining shaped clusters in the run.
             //
-            // Note we are moving to breaking at character or grapheme granularity, but for now we
-            // still break only at atom granularity. We use the atom's first shaped cluster's
-            // line-break opportunity, style and spacing.
+            // We use the atom's first shaped cluster's wrapping style and spacing.
             let styles = &self.layout.data.styles;
             let characters = self.layout.data.shaped_text.characters();
             let run_spacing = run.data.spacing;
             let is_spaced = !run_spacing.is_zero();
             let first = self.state.cluster_idx;
             let clusters = slice.shaped_clusters_in(first..slice.shaped_clusters_range().end);
-            // The breaker always resumes at the start of an atom.
+            // We treat the first shaped cluster of the line as an atom for layout purposes, even if
+            // it isn't the start of a grapheme. This can happen if we broke inside a grapheme.
             let mut is_atom_start = true;
             let mut max_height_exceeded = false;
             for (cluster_idx, cluster) in (first..).zip(clusters) {
@@ -1382,6 +1381,15 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                             .gaps(whitespace, cluster.is_default_ignorable())
                             .total();
                     }
+                } else if cluster.is_soft_wrap_opportunity_before()
+                    && self.state.line.text_wrap_mode == TextWrapMode::Wrap
+                    && self.state.line.x != 0.0
+                {
+                    // This is a soft wrap opportunity inside a grapheme. This can happen as
+                    // Unicode's line segmenter has some opportunities inside extended graphemes
+                    // clusters, like between a space and a combining mark that follows it 
+                    // (SPACE + U+0301, say).
+                    self.state.mark_line_break_opportunity();
                 }
 
                 // Compute the x position of the content being currently processed

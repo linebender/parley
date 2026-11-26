@@ -173,6 +173,22 @@ fn reshaped_lines_measure_as_shaped_alone() {
     assert_eq!(lines(&layout), expected);
 }
 
+/// We also take soft wrap opportunities if they fall inside graphemes.
+///
+/// Compare in a browser:
+///
+/// ```
+/// <div style="width: 1px; font: 16px Roboto; background: #eee;">foo &#x0301;bar</div>
+/// ```
+#[test]
+fn wrap_between_space_and_combining_mark() {
+    let mut env = TestEnv::new(test_name!(), None);
+    let text = "foo \u{301}bar";
+    let mut layout = env.ranged_builder(text).build(text);
+    layout.break_all_lines(Some(1.));
+    env.check_layout_snapshot(&layout);
+}
+
 #[test]
 fn lines_overflowing_once_reshaped_end_earlier() {
     let mut env = TestEnv::new(test_name!(), None);
