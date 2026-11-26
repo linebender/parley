@@ -642,8 +642,9 @@ pub struct BreakerState {
     run_idx: usize,
     /// Iteration state: the current shaped cluster.
     ///
-    /// This indexes into [`parley_engine::ShapedText::shaped_clusters`]. It's atom-aligned, pointing
-    /// at the start of the next atom to consume.
+    /// This indexes into [`parley_engine::ShapedText::shaped_clusters`], or into the line's
+    /// reshaped start clusters while the breaker is walking that (see
+    /// [`LineState::in_reshaped_start`]).
     //
     // TODO: rename this `shaped_cluster_idx`
     cluster_idx: u32,
