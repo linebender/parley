@@ -123,6 +123,38 @@ fn overflowing_whitespace_hangs_without_adding_a_break_opportunity() {
 }
 
 #[test]
+fn letter_spacing_after_last_word_does_not_hang() {
+    let mut env = TestEnv::new(test_name!(), None);
+
+    // Letter-spacing after a line's last word has to fit on the line, also if the word's last
+    // character forms a grapheme with the space (the `U+0D4E` below is a prepend character).
+    //
+    // TODO: this test exists so we don't accidentally change this behavior, but that behavior may
+    // be a bit ephemeral: it matches behavior of Blink and Gecko, but doesn't follow
+    // CSS Text 4 § 8.2, <https://www.w3.org/TR/css-text-4/#letter-spacing-property>, which says
+    // that letter-spacing should not apply at line edges.
+    //
+    // Compare with the following HTML.
+    //
+    // ```html
+    // <p style="font: 16px Roboto; letter-spacing: 40px; width: 170px; background: #eee;">b a&#x0D4E; cc</p>
+    // <p style="font: 16px Roboto; letter-spacing: 40px; width: 210px; background: #eee;">b a&#x0D4E; cc</p>
+    // ```
+    let text = "b a\u{0D4E} cc";
+    for (name, max_advance) in [("narrow", 170.), ("wide", 210.)] {
+        let mut builder = env.ranged_builder(text);
+        builder.push_default(StyleProperty::LetterSpacing(40.));
+        let mut layout = builder.build(text);
+        layout.break_all_lines(Some(max_advance));
+        env.with_name(name).check_layout_snapshot(&layout);
+
+        // Of the line ending in the grapheme, only the space hangs, and not the letter-spacing.
+        let line = layout.get(layout.len() - 2).unwrap();
+        assert!(line.metrics().hanging_advance < 40.);
+    }
+}
+
+#[test]
 fn break_spaces_preserves_source_across_spans() {
     let mut env = TestEnv::new(test_name!(), None);
     let source = " \ta  \r\n b\u{2028} \u{3000}";

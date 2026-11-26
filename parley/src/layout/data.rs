@@ -525,7 +525,6 @@ impl ContentWidthsMeasurer {
             // whitespace to paragraph level), so only logically-last items that match the
             // paragraph level are guaranteed to be at that edge.
             let can_hang = bidi_level == layout_data.base_level;
-            let is_rtl = bidi_level.is_rtl();
 
             if run_spacing.is_zero() {
                 self.measure_text_run::<B, false>(
@@ -533,16 +532,9 @@ impl ContentWidthsMeasurer {
                     slice,
                     run_spacing,
                     can_hang,
-                    is_rtl,
                 );
             } else {
-                self.measure_text_run::<B, true>(
-                    &layout_data.styles,
-                    slice,
-                    run_spacing,
-                    can_hang,
-                    is_rtl,
-                );
+                self.measure_text_run::<B, true>(&layout_data.styles, slice, run_spacing, can_hang);
             }
         }
 
@@ -572,9 +564,8 @@ impl ContentWidthsMeasurer {
     /// "hangs entirely / hangs partially from the logical end" rule of
     /// [`atom_hanging_advance`](crate::layout::whitespace::atom_hanging_advance).
     ///
-    /// With `SPACED`, each atom's spacing gap is added to the cluster on its visual end, i.e., its
-    /// logically last cluster for LTR and its logically first cluster for RTL. The gap then hangs
-    /// with that cluster, as in `atom_hanging_advance`. Without `SPACED`, `spacing` is ignored.
+    /// With `SPACED`, each atom's spacing gap is added along with its first cluster, as in the line
+    /// breaker. Without `SPACED`, `spacing` is ignored.
     #[inline(always)]
     fn measure_text_run<B: Brush, const SPACED: bool>(
         &mut self,
@@ -582,14 +573,11 @@ impl ContentWidthsMeasurer {
         slice: ShapedSlice<'_>,
         spacing: Spacing,
         can_hang: bool,
-        is_rtl: bool,
     ) {
         let clusters = slice.shaped_clusters();
         // The cluster index at which nothing has been placed on the current line yet, if any.
         let mut empty_at = if self.line_has_content { usize::MAX } else { 0 };
 
-        // The spacing gap of the current atom.
-        let mut gap = 0.;
         let mut skip_atom = false;
         for (i, cluster) in clusters.iter().enumerate() {
             let whitespace = cluster.whitespace();
@@ -613,11 +601,6 @@ impl ContentWidthsMeasurer {
                     skip_atom = true;
                     continue;
                 }
-                if SPACED {
-                    gap = spacing
-                        .gaps(whitespace, cluster.is_default_ignorable())
-                        .after;
-                }
             } else if skip_atom {
                 // The next line starts after the whole newline atom.
                 empty_at = i + 1;
@@ -625,17 +608,10 @@ impl ContentWidthsMeasurer {
             }
 
             let mut advance = cluster.advance;
-            if SPACED {
-                let owns_gap = if is_rtl {
-                    is_atom_start
-                } else {
-                    clusters
-                        .get(i + 1)
-                        .is_none_or(|next| next.is_grapheme_start())
-                };
-                if owns_gap {
-                    advance += gap;
-                }
+            if SPACED && is_atom_start {
+                advance += spacing
+                    .gaps(whitespace, cluster.is_default_ignorable())
+                    .total();
             }
             self.running_min_width += advance;
             self.running_max_width += advance;
