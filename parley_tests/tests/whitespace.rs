@@ -147,6 +147,10 @@ fn letter_spacing_after_last_word_does_not_hang() {
         let mut layout = builder.build(text);
         layout.break_all_lines(Some(max_advance));
         env.with_name(name).check_layout_snapshot(&layout);
+
+        // Of the line ending in the grapheme, only the space hangs, and not the letter-spacing.
+        let line = layout.get(layout.len() - 2).unwrap();
+        assert!(line.metrics().hanging_advance < 40.);
     }
 }
 
