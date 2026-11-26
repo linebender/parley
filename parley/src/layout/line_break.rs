@@ -1234,19 +1234,6 @@ impl<'a, B: Brush> BreakLines<'a, B> {
     /// Computes the next line in the paragraph. Returns the advance and size
     /// (width and height for horizontal layouts) of the line.
     pub fn break_next(&mut self) -> Option<YieldData> {
-        if self.state.line.in_reshaped_start {
-            self.break_next_impl::<true>()
-        } else {
-            self.break_next_impl::<false>()
-        }
-    }
-
-    /// This implements [`Self::break_next`], with `IN_RESHAPED_START` being the line's
-    /// [`LineState::in_reshaped_start`] on entry.
-    ///
-    /// Having this const-generic allows some optimizations for the common case where we don't start
-    /// in a line's reshaped start.
-    fn break_next_impl<const IN_RESHAPED_START: bool>(&mut self) -> Option<YieldData> {
         assert!(
             self.state.layout_max_advance == f32::INFINITY
                 || self.state.line_max_advance - self.state.layout_max_advance < 1.0
@@ -1306,7 +1293,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
 
             // If the line's start was reshaped, we first walk those reshaped clusters, then come
             // back for the rest of the run.
-            let in_reshaped_start = IN_RESHAPED_START && self.state.line.in_reshaped_start;
+            let in_reshaped_start = self.state.line.in_reshaped_start;
             let slice = if in_reshaped_start {
                 let data = &self.layout.data;
                 let start = self.state.line.chars.start;
