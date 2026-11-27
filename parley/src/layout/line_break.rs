@@ -1387,7 +1387,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                 {
                     // This is a soft wrap opportunity inside a grapheme. This can happen as
                     // Unicode's line segmenter has some opportunities inside extended graphemes
-                    // clusters, like between a space and a combining mark that follows it 
+                    // clusters, like between a space and a combining mark that follows it
                     // (SPACE + U+0301, say).
                     self.state.mark_line_break_opportunity();
                 }
