@@ -25,8 +25,11 @@ libm = ["harfrust/libm"]
 bytemuck = ["parlance/bytemuck"]
 # Enable dictionary-based line and word breaking for complex scripts (CJK, Thai, Khmer, Lao, Myanmar).
 # When disabled, a lightweight segmenter is used that falls back to character-level breaks for those scripts.
-# See `DictionaryProvider` for more details.
 complex-scripts = []
+# Enable `DictionaryProvider`, which loads the dictionaries for complex scripts at runtime.
+# It relies on `icu_segmenter` APIs that may break in minor releases, so you must pin `icu_segmenter = "~2.3.0"` yourself.
+# See `DictionaryProvider` for more details.
+unstable-dictionary-provider = ["dep:icu_provider"]
 
 [dependencies]
 parlance = { workspace = true }
@@ -37,7 +40,7 @@ harfrust = { workspace = true }
 icu_locale_core = { workspace = true }
 icu_normalizer = { workspace = true, features = ["compiled_data"] }
 icu_properties = { workspace = true, features = ["compiled_data"] }
-icu_provider = { workspace = true }
+icu_provider = { workspace = true, optional = true }
 icu_segmenter = { workspace = true, features = ["compiled_data"] }
 linebender_resource_handle = { workspace = true }
 

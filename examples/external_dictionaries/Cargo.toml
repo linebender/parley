@@ -10,10 +10,11 @@ default-run = "external_dictionaries"
 generate = ["icu_segmenter/datagen", "icu_provider_blob/export"]
 
 [dependencies]
-parley = { workspace = true, features = ["system"] }
+parley = { workspace = true, features = ["system", "unstable-dictionary-provider"] }
 icu_provider = { workspace = true, features = ["sync", "deserialize_postcard_1"] }
 icu_provider_blob = { workspace = true, features = ["alloc"] }
-icu_segmenter = { workspace = true, features = ["serde"] }
+# `DictionaryProvider` requires pinning `icu_segmenter` to the minor version Parley supports.
+icu_segmenter = { version = "~2.3.0", default-features = false, features = ["serde"] }
 
 [lints]
 workspace = true

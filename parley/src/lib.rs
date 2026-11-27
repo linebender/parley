@@ -92,6 +92,8 @@
 //!   This also enables `std`.
 //! - `complex-scripts`: Enable dictionary-based line and word breaking for complex scripts (CJK, Thai, Khmer, Lao, Myanmar).
 //!   When disabled, a lightweight segmenter is used that falls back to character-level breaks for those scripts.
+//! - `unstable-dictionary-provider`: Enable [`DictionaryProvider`][], which loads the dictionaries for complex scripts at runtime.
+//!   It relies on `icu_segmenter` APIs that may break in minor releases, so you must pin `icu_segmenter = "~2.3.0"` yourself.
 //!   See [`DictionaryProvider`][] for full details.
 //!
 //! At least one of `std` and `libm` is required; `std` overrides `libm`.
@@ -152,6 +154,7 @@ mod tests;
 
 pub use linebender_resource_handle::FontData;
 pub use parlance::BaseDirection;
+#[cfg(feature = "unstable-dictionary-provider")]
 pub use parley_engine::DictionaryProvider;
 pub use parley_engine::break_overrides::{
     AsciiLineBreakTable, AsciiLineBreakTableBuilder, CHROMIUM_LINE_BREAK_OVERRIDE,

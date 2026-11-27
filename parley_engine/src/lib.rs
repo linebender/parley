@@ -99,6 +99,8 @@
 //! - `bytemuck`: Forwarded to [`parlance`][] which then implements traits from `bytemuck` on its types.
 //! - `complex-scripts`: Enable dictionary-based line and word breaking for complex scripts (CJK, Thai, Khmer, Lao, Myanmar).
 //!   When disabled, a lightweight segmenter is used that falls back to character-level breaks for those scripts.
+//! - `unstable-dictionary-provider`: Enable [`DictionaryProvider`][], which loads the dictionaries for complex scripts at runtime.
+//!   It relies on `icu_segmenter` APIs that may break in minor releases, so you must pin `icu_segmenter = "~2.3.0"` yourself.
 //!   See [`DictionaryProvider`][] for full details.
 //!
 //! At least one of `std` and `libm` is required; `std` overrides `libm`.
@@ -140,7 +142,9 @@ pub mod shape;
 pub use linebender_resource_handle::FontData;
 pub use parlance::{BaseDirection, NormalizedCoord, Synthesis};
 
-pub use analysis::{Analysis, AnalysisDataSources, CharInfo, DictionaryProvider};
+#[cfg(feature = "unstable-dictionary-provider")]
+pub use analysis::DictionaryProvider;
+pub use analysis::{Analysis, AnalysisDataSources, CharInfo};
 pub use analyzer::{AnalysisOptions, Analyzer, InlineObject, LineBreakConfig};
 pub use glyph::Glyph;
 pub use shape::atom::{Atom, Atoms, Grapheme, Graphemes, ShapedClusterGlyphs, ShapedSlice};
