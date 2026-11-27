@@ -835,6 +835,7 @@ impl BreakerState {
 
     /// Store the current iteration state so that we can revert to it if we later want to take
     /// the line breaking opportunity at this point.
+    #[inline]
     fn mark_line_break_opportunity(&mut self) {
         self.prev_boundary = Some(PrevBoundaryState {
             run_idx: self.run_idx,
@@ -848,6 +849,7 @@ impl BreakerState {
 
     /// Store the current iteration state so that we can revert to it if we later want to take
     /// an *emergency* line breaking opportunity at this point.
+    #[inline]
     fn mark_emergency_break_opportunity(&mut self) {
         self.emergency_boundary = Some(PrevBoundaryState {
             run_idx: self.run_idx,
