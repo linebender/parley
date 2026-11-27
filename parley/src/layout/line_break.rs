@@ -24,7 +24,7 @@ use core::range::Range;
 use parley_engine::shape::{
     Character, PendingLine, ReshapedTextMark, Reshaper, ShapedCluster, Whitespace,
 };
-use parley_engine::{Atom, ShapedSlice, ShapedText};
+use parley_engine::{ShapedSlice, ShapedText};
 use smallvec::SmallVec;
 
 #[derive(Default)]
@@ -766,38 +766,6 @@ impl Default for BreakerState {
 }
 
 impl BreakerState {
-    /// Add the atom currently being evaluated to the current line.
-    ///
-    /// `style_index` is the style of the atom's first character. The span boxes of the atom's
-    /// styles (and those of their ancestors) are added to the line too, as is the box of the atom's
-    /// run, see [`LineBoxMetrics::add_text`]. `is_word_separator` is `true` iff the atom is a
-    /// [word separator](`is_word_separator`), i.e., a justification opportunity.
-    #[inline(always)]
-    fn append_atom_to_line<B: Brush>(
-        &mut self,
-        atom: &Atom<'_>,
-        next_x: f32,
-        style_index: u16,
-        data: &LayoutData<B>,
-        is_word_separator: bool,
-    ) {
-        self.line.items.end = self.run_idx + 1;
-        self.line.chars.end = atom.char_range().end;
-        self.line.clusters.end = atom.shaped_clusters_range().end;
-        self.cluster_idx = atom.shaped_clusters_range().end;
-        self.line.x = next_x;
-        self.line.num_word_separators += u32::from(is_word_separator);
-        self.line.box_metrics.add_text(
-            self.run_idx,
-            style_index,
-            atom.characters(),
-            data,
-            &mut self.contributed,
-            &mut self.subtrees,
-        );
-        self.update_max_height_exceeded();
-    }
-
     /// Add a shaped cluster to the current line.
     ///
     /// `cluster_idx` is the index of `cluster`. Its characters are `characters`.
@@ -831,6 +799,35 @@ impl BreakerState {
             &mut self.subtrees,
         );
         self.update_max_height_exceeded();
+    }
+
+    /// Add the newline atom starting at shaped cluster `first` of `slice` to the current line.
+    ///
+    /// The whole newline atom goes on the line (e.g., both clusters of a CRLF).
+    ///
+    /// This is only used for forced breaks, so we don't inline it into the breaker's loop.
+    #[inline(never)]
+    fn append_newline_atom_to_line<B: Brush>(
+        &mut self,
+        slice: ShapedSlice<'_>,
+        first: u32,
+        data: &LayoutData<B>,
+        is_word_separator: bool,
+    ) {
+        let clusters = slice.shaped_clusters_in(first..slice.shaped_clusters_range().end);
+        for (cluster_idx, cluster) in (first..).zip(clusters) {
+            if cluster_idx != first && cluster.is_grapheme_start() {
+                break;
+            }
+            self.append_shaped_cluster_to_line(
+                cluster,
+                cluster_idx,
+                self.line.x,
+                slice.characters_in(cluster.chars_range()),
+                data,
+                is_word_separator && cluster_idx == first,
+            );
+        }
     }
 
     /// Store the current iteration state so that we can revert to it if we later want to take
@@ -1344,12 +1341,9 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         if max_height_exceeded {
                             return self.max_height_break_data(line_height);
                         }
-                        // The whole atom goes on the line (e.g., both clusters of a CRLF).
-                        let atom = slice.atoms_from(cluster_idx).next().unwrap();
-                        self.state.append_atom_to_line(
-                            &atom,
-                            self.state.line.x,
-                            cluster.style_index,
+                        self.state.append_newline_atom_to_line(
+                            slice,
+                            cluster_idx,
                             &self.layout.data,
                             is_separator,
                         );
@@ -1498,9 +1492,9 @@ impl<'a, B: Brush> BreakLines<'a, B> {
     /// Unlike `break_next`, this method does not respect normal line break opportunities and
     /// will break when the character limit is reached. It does not break on newlines, for example.
     ///
-    /// Breaks do fall on atom boundaries, however: when the limit is reached inside an atom (e.g. a
-    /// ligature or a multi-character grapheme), the whole atom is placed on the line before
-    /// breaking.
+    /// A line can end at any character, including inside a ligature or a multi-character grapheme.
+    /// The lines on either side of such a break are reshaped.
+    #[expect(clippy::cast_possible_truncation, reason = "deferred")]
     pub fn break_next_with_length(&mut self, max_chars: u32) -> Option<()> {
         if self.done {
             return None;
@@ -1508,17 +1502,17 @@ impl<'a, B: Brush> BreakLines<'a, B> {
 
         let line_indent = self.resolve_indent();
 
-        // Track cluster count for this line
-        let mut char_count: u32 = 0;
+        let characters = self.layout.data.shaped_text.characters();
+        // The exclusive end of the line's character range.
+        let end_char = (self.state.line.chars.start)
+            .saturating_add(max_chars.max(1))
+            .min(characters.len() as u32);
 
         let run_count = self.layout.data.runs.len();
-        while self.state.run_idx < run_count {
-            let run_idx = self.state.run_idx;
-            let shaped_run = &self.layout.data.shaped_text.runs()[run_idx];
-            let run = Run::new(self.layout, 0, 0, run_idx, None);
+        'runs: while self.state.run_idx < run_count {
+            let run = Run::new(self.layout, 0, 0, self.state.run_idx, None);
             let mut slice = run.line_slice();
-            let spacing = EffectiveSpacing::new(run.data.spacing, Justification::NONE);
-            let run_chars_end = shaped_run.characters_range.end;
+            let spacing = run.data.spacing;
 
             // Like in `break_next`, we first walk the line's reshaped start.
             let in_reshaped_start = self.state.line.in_reshaped_start;
@@ -1529,9 +1523,16 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                     .unwrap();
             }
 
-            for atom in slice.atoms_from(self.state.cluster_idx) {
+            let first = self.state.cluster_idx;
+            let clusters = slice.shaped_clusters_in(first..slice.shaped_clusters_range().end);
+            for (cluster_idx, cluster) in (first..).zip(clusters) {
+                let chars = cluster.chars_range();
+                if chars.start >= end_char {
+                    break 'runs;
+                }
+
                 // Skip floated boxes.
-                let text_index = atom.characters()[0].text_byte_start as usize;
+                let text_index = characters[chars.start as usize].text_byte_start as usize;
                 let floated_boxes = &self.layout.data.floated_boxes;
                 while floated_boxes
                     .get(self.state.floated_box_idx)
@@ -1540,55 +1541,28 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                     self.state.floated_box_idx += 1;
                 }
 
-                // Check if we should break before this atom
-                if char_count >= max_chars && max_chars != 0 {
-                    self.start_new_line(BreakReason::Regular, f32::MAX, line_indent);
-                    return Some(());
+                let whitespace = cluster.whitespace();
+                let is_atom_start = cluster_idx == first || cluster.is_grapheme_start();
+                // For measuring purposes, the atom's spacing is added at its first cluster.
+                let mut advance = cluster.advance;
+                if is_atom_start {
+                    advance += spacing
+                        .gaps(whitespace, cluster.is_default_ignorable())
+                        .total();
                 }
-
-                let first_cluster = atom.shaped_clusters()[0];
-                let whitespace = first_cluster.whitespace();
-                let is_newline = whitespace == Whitespace::Newline;
-                let is_separator = is_word_separator(whitespace);
-                let advance = spacing.atom_advance(&atom);
-
-                // Compute the x position.
-                // Newlines don't contribute to line width (matching break_next behavior).
-                let next_x = if is_newline {
-                    self.state.line.x
-                } else {
-                    self.state.line.x + advance
-                };
-                self.state.append_atom_to_line(
-                    &atom,
-                    next_x,
-                    first_cluster.style_index,
+                // Note the line may end inside a shaped cluster (e.g., inside a ligature). The line
+                // then gets reshaped.
+                self.state.append_shaped_cluster_to_line(
+                    cluster,
+                    cluster_idx,
+                    self.state.line.x + advance,
+                    slice.characters_in(chars.start..chars.end.min(end_char)),
                     &self.layout.data,
-                    is_separator,
+                    is_atom_start && is_word_separator(whitespace),
                 );
-                char_count += atom.char_range().len() as u32;
-
-                // Check if we've reached the limit after adding this atom
-                if char_count >= max_chars {
-                    // Determine the break reason:
-                    // - BreakReason::None for the last line (end of content)
-                    // - BreakReason::Explicit if this line ends with a newline
-                    // - BreakReason::Regular for soft wraps
-                    let is_last_cluster_of_run = self.state.line.chars.end >= run_chars_end;
-                    let is_last_item = self.state.run_idx + 1 >= self.layout.data.runs.len();
-                    let break_reason = if is_last_cluster_of_run && is_last_item {
-                        BreakReason::None
-                    } else if is_newline {
-                        BreakReason::Explicit
-                    } else {
-                        BreakReason::Regular
-                    };
-
-                    if break_reason == BreakReason::None {
-                        self.done = true;
-                    }
-                    self.start_new_line(break_reason, f32::MAX, line_indent);
-                    return Some(());
+                if chars.end > end_char {
+                    // The next line starts with the rest of this cluster.
+                    break 'runs;
                 }
             }
             if in_reshaped_start {
@@ -1598,10 +1572,20 @@ impl<'a, B: Brush> BreakLines<'a, B> {
             }
             self.state.run_idx += 1;
         }
+        self.state.line.chars.end = end_char;
 
-        // Commit the final line (only reached if content remains after all break_next_with_length calls)
-        self.done = true;
-        self.start_new_line(BreakReason::None, f32::MAX, line_indent);
+        // - BreakReason::None for the last line (end of content)
+        // - BreakReason::Explicit if this line ends with a newline
+        // - BreakReason::Regular for soft wraps
+        let break_reason = if end_char as usize == characters.len() {
+            BreakReason::None
+        } else if characters[end_char as usize - 1].whitespace == Whitespace::Newline {
+            BreakReason::Explicit
+        } else {
+            BreakReason::Regular
+        };
+        self.done = break_reason == BreakReason::None;
+        self.start_new_line(break_reason, f32::MAX, line_indent);
         Some(())
     }
 
