@@ -11,6 +11,7 @@ use core_maths::CoreFloat;
 use parlance::BidiLevel;
 
 use crate::inline_box::{LayoutInlineBox, inline_object_box_index};
+use crate::layout::Style;
 use crate::layout::data::{AlignedSubtreeOffset, run_box_metrics};
 use crate::layout::spacing::{EffectiveSpacing, Justification, is_word_separator};
 use crate::layout::style_metrics::{BoxMetrics, StyleMetrics, inline_box_placement};
@@ -20,8 +21,10 @@ use crate::style::Brush;
 use crate::{BaselineShift, OverflowWrap, TextWrapMode, VerticalAlign, WhiteSpaceCollapse};
 
 use core::range::Range;
-use parley_engine::shape::{Character, ReshapedTextMark, Reshaper, Whitespace};
-use parley_engine::{Atom, ShapedText};
+use parley_engine::shape::{
+    Character, PendingLine, ReshapedTextMark, Reshaper, ShapedCluster, Whitespace,
+};
+use parley_engine::{Atom, ShapedSlice, ShapedText};
 use smallvec::SmallVec;
 
 #[derive(Default)]
@@ -55,9 +58,15 @@ impl LineLayout {
 #[derive(Clone, Default)]
 struct LineState {
     x: f32,
-    /// The change in advance when reshaping the line's start, relative to the original shaped
-    /// clusters. See [`Reshaper::measure_start`].
-    reshaped_start_advance_delta: f32,
+    /// Whether we're walking the line's reshaped start.
+    ///
+    /// A line starting where it was unsafe to break starts with reshaped clusters (see
+    /// [`Reshaper::measure_start`]). We walk those first, and then continue walking the source
+    /// shaped clusters after them.
+    ///
+    /// While this is set, [`BreakerState::cluster_idx`] and `clusters.end` index the reshaped
+    /// start's shaped clusters.
+    in_reshaped_start: bool,
     items: Range<usize>,
     /// The line's characters, as a range into [`ShapedText::characters`].
     ///
@@ -92,7 +101,7 @@ impl LineState {
     /// Reset the per-line running state in preparation for building a new line.
     fn reset(&mut self) {
         self.x = 0.0;
-        self.reshaped_start_advance_delta = 0.0;
+        self.in_reshaped_start = false;
         self.box_metrics.reset();
         self.num_word_separators = 0;
     }
@@ -633,8 +642,9 @@ pub struct BreakerState {
     run_idx: usize,
     /// Iteration state: the current shaped cluster.
     ///
-    /// This indexes into [`parley_engine::ShapedText::shaped_clusters`]. It's atom-aligned, pointing
-    /// at the start of the next atom to consume.
+    /// This indexes into [`parley_engine::ShapedText::shaped_clusters`], or into the line's
+    /// reshaped start clusters while the breaker is walking that (see
+    /// [`LineState::in_reshaped_start`]).
     //
     // TODO: rename this `shaped_cluster_idx`
     cluster_idx: u32,
@@ -788,6 +798,41 @@ impl BreakerState {
         self.update_max_height_exceeded();
     }
 
+    /// Add a shaped cluster to the current line.
+    ///
+    /// `cluster_idx` is the index of `cluster`. Its characters are `characters`.
+    ///
+    /// The span boxes of the shaped cluster's styles (and those of their ancestors) are added to
+    /// the line too, as is the box of the shaped cluster's run, see [`LineBoxMetrics::add_text`].
+    /// `is_word_separator` should be `true` only for the first shaped cluster of an atom that is a
+    /// [word separator](`is_word_separator`), i.e., a justification opportunity.
+    #[inline(always)]
+    fn append_shaped_cluster_to_line<B: Brush>(
+        &mut self,
+        cluster: &ShapedCluster,
+        cluster_idx: u32,
+        next_x: f32,
+        characters: &[Character],
+        data: &LayoutData<B>,
+        is_word_separator: bool,
+    ) {
+        self.line.items.end = self.run_idx + 1;
+        self.line.chars.end = cluster.chars_range().end;
+        self.line.clusters.end = cluster_idx + 1;
+        self.cluster_idx = cluster_idx + 1;
+        self.line.x = next_x;
+        self.line.num_word_separators += u32::from(is_word_separator);
+        self.line.box_metrics.add_text(
+            self.run_idx,
+            cluster.style_index,
+            characters,
+            data,
+            &mut self.contributed,
+            &mut self.subtrees,
+        );
+        self.update_max_height_exceeded();
+    }
+
     /// Store the current iteration state so that we can revert to it if we later want to take
     /// the line breaking opportunity at this point.
     fn mark_line_break_opportunity(&mut self) {
@@ -812,6 +857,21 @@ impl BreakerState {
             contributed_len: self.contributed.len(),
             subtrees_len: self.subtrees.save(),
         });
+    }
+
+    /// Stop walking the line's reshaped start at the current position (see
+    /// [`LineState::in_reshaped_start`]).
+    ///
+    /// This points [`Self::cluster_idx`] and the line's `clusters.end` at the first source shaped
+    /// cluster starting at or after that position.
+    #[expect(clippy::cast_possible_truncation, reason = "deferred")]
+    fn leave_reshaped_start(&mut self, shaped_text: &ShapedText) {
+        let line = &mut self.line;
+        let clusters = &shaped_text.shaped_clusters()[line.clusters.start as usize..];
+        line.clusters.end = line.clusters.start
+            + clusters.partition_point(|c| c.chars_range().start < line.chars.end) as u32;
+        line.in_reshaped_start = false;
+        self.cluster_idx = line.clusters.end;
     }
 
     /// Revert boundary state to prev state
@@ -943,13 +1003,14 @@ impl<'a, B: Brush> BreakLines<'a, B> {
         state.update_max_height_exceeded();
 
         let data = &self.layout.data;
+        let (text, shaped_text) = (&data.text, &data.shaped_text);
         let line = &mut state.line;
-        if edge_is_unsafe_to_break(&data.shaped_text, line.chars.start, line.clusters.start) {
-            line.reshaped_start_advance_delta = self
-                .reshaper
-                .measure_start(&data.text, &data.shaped_text, line.chars.start, None)
-                .0
-                .advance_delta();
+        if edge_is_unsafe_to_break(shaped_text, line.chars.start, line.clusters.start)
+            && let Some(start) =
+                reshaped_start(&mut self.reshaper, text, shaped_text, line.chars.start)
+        {
+            line.in_reshaped_start = true;
+            state.cluster_idx = start.shaped_clusters_range().start;
         }
     }
 
@@ -974,10 +1035,10 @@ impl<'a, B: Brush> BreakLines<'a, B> {
 
             let line = &this.state.line;
 
-            // A line that already doesn't fit as originally shaped either only hangs whitespace
-            // (see the comment below), or was broken at its first opportunity, so there is no
-            // narrower break to step back to.
-            if line.x + line.reshaped_start_advance_delta > max_advance {
+            // A line that already doesn't fit before its end is reshaped either only hangs
+            // whitespace (see the comment below), or was broken at its first opportunity, so there
+            // is no narrower break to step back to.
+            if line.x > max_advance {
                 return false;
             }
 
@@ -993,21 +1054,20 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                 // in the non-hanging part.
                 return false;
             }
-            let reshaper = &mut this.reshaper;
-            let (start, _) = reshaper.measure_start(text, shaped_text, line.chars.start, None);
-            let end = reshaper.measure_end(text, shaped_text, line.chars.end, None);
-            let delta = reshaper
-                .line(text, shaped_text, &start, &end)
-                .advance_delta();
-            line.x + delta > max_advance
+            let (_, advance) = reshape_line(&mut this.reshaper, text, shaped_text, line);
+            advance > max_advance
         }
 
         let line = &self.state.line;
-        let end_is_unsafe_to_break = edge_is_unsafe_to_break(
-            &self.layout.data.shaped_text,
-            line.chars.end,
-            line.clusters.end,
-        );
+        // We explicitly test whether we're ending the line in the reshaped start of the line, as we
+        // can't pass reshaped clusters' indices into `edge_is_unsafe_to_break`. Such lines need to
+        // be reshaped as a whole.
+        let end_is_unsafe_to_break = line.in_reshaped_start
+            || edge_is_unsafe_to_break(
+                &self.layout.data.shaped_text,
+                line.chars.end,
+                line.clusters.end,
+            );
 
         // Note that, if the end needs no reshaping, reshaping changes only the line's start. We
         // already took that into account when fitting the line.
@@ -1037,6 +1097,10 @@ impl<'a, B: Brush> BreakLines<'a, B> {
         max_advance: f32,
         line_indent: f32,
     ) -> Option<YieldData> {
+        if self.state.line.in_reshaped_start {
+            self.state
+                .leave_reshaped_start(&self.layout.data.shaped_text);
+        }
         commit_line(
             self.layout,
             &mut self.reshaper,
@@ -1188,10 +1252,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
         let line_indent = self.resolve_indent();
 
         let max_advance = self.state.line_max_advance - line_indent;
-        // The advance available in "source shaped cluster space" when accounting for the difference
-        // that reshaping the line's start causes.
-        let fit_max_advance = (max_advance - self.state.line.reshaped_start_advance_delta)
-            .min(self.step_back_max_advance);
+        let fit_max_advance = max_advance.min(self.step_back_max_advance);
 
         // The text index of the next floated box.
         let floated_box_yield_index = self
@@ -1207,9 +1268,6 @@ impl<'a, B: Brush> BreakLines<'a, B> {
             let run_idx = self.state.run_idx;
             let run = Run::new(self.layout, 0, 0, run_idx, None);
             let slice = run.line_slice();
-
-            // Additional spacing to apply between atoms.
-            let spacing = EffectiveSpacing::new(run.data.spacing, Justification::NONE);
 
             // The height to report if the maximum line height is exceeded.
             let mut line_height = run.data.line_height;
@@ -1234,78 +1292,113 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                 }
             }
 
-            // Iterate over the remaining atoms in the Run
-            for atom in slice.atoms_from(self.state.cluster_idx) {
-                // Retrieve metadata about the atom
-                let first_cluster = atom.shaped_clusters()[0];
+            // If the line's start was reshaped, we first walk those reshaped clusters, then come
+            // back for the rest of the run.
+            let in_reshaped_start = self.state.line.in_reshaped_start;
+            let slice = if in_reshaped_start {
+                let data = &self.layout.data;
+                let start = self.state.line.chars.start;
+                reshaped_start(&mut self.reshaper, &data.text, &data.shaped_text, start).unwrap()
+            } else {
+                slice
+            };
 
-                // Yield floated boxes once the characters before them are on the line.
-                if atom.characters()[0].text_byte_start as usize >= floated_box_yield_index {
-                    return self.yield_floated_box();
-                }
-                let whitespace = first_cluster.whitespace();
-                let is_newline = whitespace == Whitespace::Newline;
-                // Whether this atom is a justification opportunity.
-                let is_separator = is_word_separator(whitespace);
-                let is_soft_wrap_opportunity = first_cluster.is_soft_wrap_opportunity_before();
-                let max_height_exceeded = self.state.line.max_height_exceeded;
-                let style_index = first_cluster.style_index;
-                let style = &self.layout.data.styles[style_index as usize];
+            // Iterate over the remaining shaped clusters in the run.
+            //
+            // Note we are moving to breaking at character or grapheme granularity, but for now we
+            // still break only at atom granularity. We use the atom's first shaped cluster's
+            // line-break opportunity, style and spacing.
+            let styles = &self.layout.data.styles;
+            let characters = self.layout.data.shaped_text.characters();
+            let run_spacing = run.data.spacing;
+            let is_spaced = !run_spacing.is_zero();
+            let first = self.state.cluster_idx;
+            let clusters = slice.shaped_clusters_in(first..slice.shaped_clusters_range().end);
+            // The breaker always resumes at the start of an atom.
+            let mut is_atom_start = true;
+            let mut max_height_exceeded = false;
+            for (cluster_idx, cluster) in (first..).zip(clusters) {
+                is_atom_start |= cluster.is_grapheme_start();
+                let mut advance = cluster.advance;
+                // Whether this cluster starts an atom that is a justification opportunity.
+                let mut is_separator = false;
 
-                // Lag text_wrap_mode style by one atom
-                let text_wrap_mode = self.state.line.text_wrap_mode;
-                self.state.line.text_wrap_mode = style.text_wrap_mode;
+                if is_atom_start {
+                    is_atom_start = false;
+                    let first_character = &characters[cluster.chars_range().start as usize];
+                    // Yield floated boxes once the characters before them are on the line.
+                    if first_character.text_byte_start as usize >= floated_box_yield_index {
+                        return self.yield_floated_box();
+                    }
+                    let whitespace = cluster.whitespace();
+                    is_separator = is_word_separator(whitespace);
+                    max_height_exceeded = self.state.line.max_height_exceeded;
+                    let style = &styles[cluster.style_index as usize];
 
-                // Take mandatory line breaks before checking for line wrapping.
-                if is_newline {
-                    if max_height_exceeded {
-                        return self.max_height_break_data(line_height);
+                    // Lag text_wrap_mode style by one atom
+                    let text_wrap_mode = self.state.line.text_wrap_mode;
+                    self.state.line.text_wrap_mode = style.text_wrap_mode;
+
+                    // Take mandatory line breaks before checking for line wrapping.
+                    if whitespace == Whitespace::Newline {
+                        if max_height_exceeded {
+                            return self.max_height_break_data(line_height);
+                        }
+                        // The whole atom goes on the line (e.g., both clusters of a CRLF).
+                        let atom = slice.atoms_from(cluster_idx).next().unwrap();
+                        self.state.append_atom_to_line(
+                            &atom,
+                            self.state.line.x,
+                            cluster.style_index,
+                            &self.layout.data,
+                            is_separator,
+                        );
+                        return self.start_new_line(
+                            BreakReason::Explicit,
+                            max_advance,
+                            line_indent,
+                        );
+                    } else if cluster.is_soft_wrap_opportunity_before()
+                        && text_wrap_mode == TextWrapMode::Wrap
+                    {
+                        // We don't record boundaries when the advance is 0. As we do not want overflowing content to cause extra consecutive
+                        // line breaks. We should accept the overflowing fragment in that scenario.
+                        if self.state.line.x != 0.0 {
+                            self.state.mark_line_break_opportunity();
+                        }
+                    } else if
+                    // This text can contribute "emergency" line breaks.
+                    style.overflow_wrap != OverflowWrap::Normal
+                        && text_wrap_mode == TextWrapMode::Wrap
+                        // If we're at the start of the line, this particular atom will never fit, so it's not a valid emergency break opportunity.
+                        && self.state.line.x != 0.0
+                    {
+                        self.state.mark_emergency_break_opportunity();
                     }
 
-                    self.state.append_atom_to_line(
-                        &atom,
-                        self.state.line.x,
-                        style_index,
-                        &self.layout.data,
-                        is_separator,
-                    );
-
-                    return self.start_new_line(BreakReason::Explicit, max_advance, line_indent);
-                } else if is_soft_wrap_opportunity && text_wrap_mode == TextWrapMode::Wrap {
-                    // We don't record boundaries when the advance is 0. As we do not want overflowing content to cause extra consecutive
-                    // line breaks. We should accept the overflowing fragment in that scenario.
-                    if self.state.line.x != 0.0 {
-                        self.state.mark_line_break_opportunity();
-                        // break_opportunity = true;
+                    // The atom's spacing is added along with its first cluster.
+                    if is_spaced {
+                        advance += run_spacing
+                            .gaps(whitespace, cluster.is_default_ignorable())
+                            .total();
                     }
-                } else if
-                // This text can contribute "emergency" line breaks.
-                style.overflow_wrap != OverflowWrap::Normal
-                && text_wrap_mode == TextWrapMode::Wrap
-                // If we're at the start of the line, this particular atom will never fit, so it's not a valid emergency break opportunity.
-                && self.state.line.x != 0.0
-                {
-                    self.state.mark_emergency_break_opportunity();
                 }
-
-                // Breaking an atom requires reshaping, which we don't do here, so it is
-                // consumed as a whole (this includes all clusters of a ligature).
-                let advance = spacing.atom_advance(&atom);
 
                 // Compute the x position of the content being currently processed
                 let next_x = self.state.line.x + advance;
 
                 // If the content fits (the x position does NOT exceed max_advance)
                 //
-                // We simply append the atom to the current line
+                // We simply append the shaped cluster to the current line
                 if next_x <= fit_max_advance {
                     if max_height_exceeded {
                         return self.max_height_break_data(line_height);
                     }
-                    self.state.append_atom_to_line(
-                        &atom,
+                    self.state.append_shaped_cluster_to_line(
+                        cluster,
+                        cluster_idx,
                         next_x,
-                        style_index,
+                        slice.characters_in(cluster.chars_range()),
                         &self.layout.data,
                         is_separator,
                     );
@@ -1316,24 +1409,18 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                 // in the line. If there is no such line-breaking opportunity (such as if wrapping is disabled), then
                 // we fall back to appending the content to the line anyway.
                 else {
-                    // Case: the atom fits once its hanging whitespace is excluded.
+                    // Case: the shaped cluster is whitespace that hangs.
                     //
                     // We append it to the line, with the whitespace hanging past the end.
-                    let (hanging, all_hang) = atom_hanging_advance(
-                        slice,
-                        &atom,
-                        &self.layout.data.styles,
-                        spacing,
-                        run.is_rtl(),
-                    );
-                    if all_hang || next_x - hanging <= fit_max_advance {
+                    if hangs(slice.characters_in(cluster.chars_range()), styles) {
                         if max_height_exceeded {
                             return self.max_height_break_data(line_height);
                         }
-                        self.state.append_atom_to_line(
-                            &atom,
+                        self.state.append_shaped_cluster_to_line(
+                            cluster,
+                            cluster_idx,
                             next_x,
-                            style_index,
+                            slice.characters_in(cluster.chars_range()),
                             &self.layout.data,
                             is_separator,
                         );
@@ -1374,15 +1461,21 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                         if max_height_exceeded {
                             return self.max_height_break_data(line_height);
                         }
-                        self.state.append_atom_to_line(
-                            &atom,
+                        self.state.append_shaped_cluster_to_line(
+                            cluster,
+                            cluster_idx,
                             next_x,
-                            style_index,
+                            slice.characters_in(cluster.chars_range()),
                             &self.layout.data,
                             is_separator,
                         );
                     }
                 }
+            }
+            if in_reshaped_start {
+                self.state
+                    .leave_reshaped_start(&self.layout.data.shaped_text);
+                continue;
             }
             self.state.run_idx += 1;
         }
@@ -1423,9 +1516,18 @@ impl<'a, B: Brush> BreakLines<'a, B> {
             let run_idx = self.state.run_idx;
             let shaped_run = &self.layout.data.shaped_text.runs()[run_idx];
             let run = Run::new(self.layout, 0, 0, run_idx, None);
-            let slice = run.line_slice();
+            let mut slice = run.line_slice();
             let spacing = EffectiveSpacing::new(run.data.spacing, Justification::NONE);
-            let cluster_end = shaped_run.shaped_clusters_range.end;
+            let run_chars_end = shaped_run.characters_range.end;
+
+            // Like in `break_next`, we first walk the line's reshaped start.
+            let in_reshaped_start = self.state.line.in_reshaped_start;
+            if in_reshaped_start {
+                let data = &self.layout.data;
+                let start = self.state.line.chars.start;
+                slice = reshaped_start(&mut self.reshaper, &data.text, &data.shaped_text, start)
+                    .unwrap();
+            }
 
             for atom in slice.atoms_from(self.state.cluster_idx) {
                 // Skip floated boxes.
@@ -1472,7 +1574,7 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                     // - BreakReason::None for the last line (end of content)
                     // - BreakReason::Explicit if this line ends with a newline
                     // - BreakReason::Regular for soft wraps
-                    let is_last_cluster_of_run = self.state.cluster_idx >= cluster_end;
+                    let is_last_cluster_of_run = self.state.line.chars.end >= run_chars_end;
                     let is_last_item = self.state.run_idx + 1 >= self.layout.data.runs.len();
                     let break_reason = if is_last_cluster_of_run && is_last_item {
                         BreakReason::None
@@ -1488,6 +1590,11 @@ impl<'a, B: Brush> BreakLines<'a, B> {
                     self.start_new_line(break_reason, f32::MAX, line_indent);
                     return Some(());
                 }
+            }
+            if in_reshaped_start {
+                self.state
+                    .leave_reshaped_start(&self.layout.data.shaped_text);
+                continue;
             }
             self.state.run_idx += 1;
         }
@@ -1737,29 +1844,29 @@ fn commit_line<B: Brush>(
     let shaped_text = &layout.data.shaped_text;
     let shaped_clusters = shaped_text.shaped_clusters();
 
-    // Ensure that the cluster and item endpoints are within range
+    // Ensure that the shaped cluster and item endpoints are within range
     state.clusters.end = state.clusters.end.min(shaped_clusters.len() as u32);
     state.items.end = state.items.end.min(layout.data.runs.len());
 
     // Reshape the line if its edges fell at positions that are unsafe to break at.
-    let reshaped_line =
+    let (reshaped_line, reshaped_advance) =
         (edge_is_unsafe_to_break(shaped_text, state.chars.start, state.clusters.start)
             || edge_is_unsafe_to_break(shaped_text, state.chars.end, state.clusters.end))
         .then(
             #[inline(never)]
             || {
                 let text = &layout.data.text;
-                let (start, _) = reshaper.measure_start(text, shaped_text, state.chars.start, None);
-                let end = reshaper.measure_end(text, shaped_text, state.chars.end, None);
-                let line = reshaper.line(text, shaped_text, &start, &end);
-                reshaper.push_line(text, shaped_text, &line, &mut layout.data.reshaped)
+                let (line, advance) = reshape_line(reshaper, text, shaped_text, state);
+                let line = reshaper.push_line(text, shaped_text, &line, &mut layout.data.reshaped);
+                (line, advance)
             },
-        );
+        )
+        .unzip();
     let source_clusters =
         reshaped_line.map_or(state.clusters, |l| l.source_shaped_clusters_range().into());
     let (reshaped_start_run, reshaped_end_run) =
         reshaped_line.map_or((None, None), |l| (l.start_run(), l.end_run()));
-    let advance = state.x + reshaped_line.map_or(0., |l| l.advance_delta());
+    let advance = reshaped_advance.unwrap_or(state.x);
 
     let start_item_idx = lines.line_items.len();
 
@@ -1832,7 +1939,7 @@ fn commit_line<B: Brush>(
         if !cluster_range.is_empty() {
             committed_text_run = true;
 
-            // Map the cluster range to the source-text range.
+            // Map the shaped cluster range to the source-text range.
             let slice = shaped_text.run_slice(run_idx as u32);
             let char_range = shaped_clusters[cluster_range.start as usize]
                 .chars_range()
@@ -1936,6 +2043,68 @@ fn commit_line<B: Brush>(
     // in line N+1. The item is later filtered out (see `continue` in loop above) if there are not
     // actually any clusters in line N+1.
     state.items.start = state.items.end.saturating_sub(1);
+}
+
+/// Whether a shaped cluster with the given `characters` is whitespace that hangs past the end of a
+/// line.
+///
+/// Cold and kept out-of-line, as this is called only for overflowing clusters.
+#[cold]
+#[inline(never)]
+fn hangs<B: Brush>(characters: &[Character], styles: &[Style<B>]) -> bool {
+    (characters.iter()).all(|c| whitespace_hangs(c.whitespace, &styles[c.style_index as usize]))
+}
+
+/// The reshaped clusters starting a line at character index `line_start_char`, if its start needs
+/// reshaping.
+///
+/// See [`LineState::in_reshaped_start`].
+#[cold]
+#[inline(never)]
+fn reshaped_start<'a>(
+    reshaper: &'a mut Reshaper,
+    text: &str,
+    shaped_text: &'a ShapedText,
+    line_start_char: u32,
+) -> Option<ShapedSlice<'a>> {
+    // In our normal line breaking paths, the reshaper will still have this cached.
+    (reshaper.measure_start(text, shaped_text, line_start_char, None)).1
+}
+
+/// Measure reshaping `line`, returning the pending reshaped line and its advance.
+fn reshape_line(
+    reshaper: &mut Reshaper,
+    text: &str,
+    shaped_text: &ShapedText,
+    line: &LineState,
+) -> (PendingLine<'static>, f32) {
+    let (start, start_slice) = reshaper.measure_start(text, shaped_text, line.chars.start, None);
+    // We've walked the reshaped start of the line at least partially, and so part of the line's
+    // advance delta will already be in `line.x`.
+    //
+    // The following calculates how much of that delta is already in `line.x`.
+    let already_applied_delta = match start_slice {
+        // The line ends inside its reshaped start, so we walked only part of it.
+        Some(slice) if line.chars.end < slice.char_range().end => {
+            let advance = |clusters: &[ShapedCluster]| -> f32 {
+                clusters
+                    .iter()
+                    .take_while(|cluster| cluster.chars_range().start < line.chars.end)
+                    .map(|cluster| cluster.advance)
+                    .sum()
+            };
+            advance(slice.shaped_clusters())
+                - advance(&shaped_text.shaped_clusters()[line.clusters.start as usize..])
+        }
+        // We walked the whole reshaped start (including if there is no reshaped start).
+        _ => start.advance_delta(),
+    };
+    let end = reshaper.measure_end(text, shaped_text, line.chars.end, None);
+    let pending = reshaper.line(text, shaped_text, &start, &end);
+    (
+        pending,
+        line.x + (pending.advance_delta() - already_applied_delta),
+    )
 }
 
 /// Whether a line edge at character index `char` needs reshaping. `cluster` is the first shaped
