@@ -11,7 +11,7 @@ use icu_provider::{
     DataError, DataIdentifierBorrowed, DataMarker, DataMarkerAttributes, DataProvider, DataRequest,
 };
 use icu_provider_blob::export::BlobExporter;
-use icu_segmenter::provider::{Baked, SegmenterDictionaryAutoV1, SegmenterDictionaryExtendedV1};
+use icu_segmenter::provider::{Baked, SegmenterDictionaryAutoV2, SegmenterDictionaryExtendedV2};
 
 fn main() -> Result<(), Box<dyn Error>> {
     let output_dir = std::path::Path::new(env!("CARGO_MANIFEST_DIR")).join("../_output");
@@ -20,9 +20,9 @@ fn main() -> Result<(), Box<dyn Error>> {
     let mut bytes = Vec::new();
     {
         let mut exporter = BlobExporter::new_with_sink(Box::new(&mut bytes));
-        // ICU4X 2.3 dictionary identifiers; revisit these when upgrading ICU.
-        export::<SegmenterDictionaryAutoV1>(&exporter, &["cjdict"])?;
-        export::<SegmenterDictionaryExtendedV1>(
+        // ICU4X 2.4 dictionary identifiers; revisit these when upgrading ICU.
+        export::<SegmenterDictionaryAutoV2>(&exporter, &["cjdict"])?;
+        export::<SegmenterDictionaryExtendedV2>(
             &exporter,
             &["burmesedict", "khmerdict", "laodict", "thaidict"],
         )?;

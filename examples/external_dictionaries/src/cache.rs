@@ -5,17 +5,17 @@ use icu_provider::{
     DataError, DataErrorKind, DataIdentifierBorrowed, DataMarker, DataMarkerAttributes,
     DataProvider, DataRequest, DataResponse, ResultDataError,
 };
-use icu_segmenter::provider::{SegmenterDictionaryAutoV1, SegmenterDictionaryExtendedV1};
+use icu_segmenter::provider::{SegmenterDictionaryAutoV2, SegmenterDictionaryExtendedV2};
 use parley::DictionaryProvider;
 
 /// An implementation of [`DictionaryProvider`] which builds a cache around a different `DictionaryProvider`.
 pub(super) struct CachingDictionary {
-    auto: CachedProvider<SegmenterDictionaryAutoV1>,
-    extended: CachedProvider<SegmenterDictionaryExtendedV1>,
+    auto: CachedProvider<SegmenterDictionaryAutoV2>,
+    extended: CachedProvider<SegmenterDictionaryExtendedV2>,
 }
 
 impl CachingDictionary {
-    /// Loads each dictionary `icu_segmenter` v2.3.0 uses.
+    /// Loads each dictionary `icu_segmenter` v2.4.0 uses.
     /// Errors (except for missing identifiers) are returned.
     pub(super) fn try_new<P: DictionaryProvider + ?Sized>(provider: &P) -> Result<Self, DataError> {
         // ICU4X's invariant dictionary identifiers. Revisit when upgrading ICU.
@@ -74,20 +74,20 @@ impl<M: DataMarker> CachedProvider<M> {
     }
 }
 
-impl DataProvider<SegmenterDictionaryAutoV1> for CachingDictionary {
+impl DataProvider<SegmenterDictionaryAutoV2> for CachingDictionary {
     fn load(
         &self,
         req: DataRequest<'_>,
-    ) -> Result<DataResponse<SegmenterDictionaryAutoV1>, DataError> {
+    ) -> Result<DataResponse<SegmenterDictionaryAutoV2>, DataError> {
         self.auto.get(req)
     }
 }
 
-impl DataProvider<SegmenterDictionaryExtendedV1> for CachingDictionary {
+impl DataProvider<SegmenterDictionaryExtendedV2> for CachingDictionary {
     fn load(
         &self,
         req: DataRequest<'_>,
-    ) -> Result<DataResponse<SegmenterDictionaryExtendedV1>, DataError> {
+    ) -> Result<DataResponse<SegmenterDictionaryExtendedV2>, DataError> {
         self.extended.get(req)
     }
 }
