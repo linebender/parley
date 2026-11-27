@@ -6,8 +6,8 @@
 use crate::test_name;
 use crate::util::{ColorBrush, TestEnv};
 use parley::{
-    BreakReason, CHROMIUM_LINE_BREAK_OVERRIDE, IndentOptions, Layout, OverflowWrap, StyleProperty,
-    TextWrapMode, WordBreak,
+    BreakReason, CHROMIUM_LINE_BREAK_OVERRIDE, IndentOptions, Layout, LineHeight, OverflowWrap,
+    StyleProperty, TextWrapMode, WordBreak,
 };
 use peniko::color::palette::css;
 
@@ -171,6 +171,67 @@ fn reshaped_lines_measure_as_shaped_alone() {
     breaker.revert();
     breaker.break_remaining(line_width);
     assert_eq!(lines(&layout), expected);
+}
+
+/// Lines can end between the letters of a ligature. The letters on either side are reshaped.
+///
+/// Line height should come from the characters that are actually on it.
+///
+/// Compare in a browser (and as of writing, 2026-11-27, :
+///
+/// ```
+/// <style>
+///   div { font: 16px/20px Roboto; margin: 1em; border: 1px solid black; }
+///   span { line-height: 40px; }
+/// </style>
+/// <div style="width: 0; overflow-wrap: anywhere;">abf<span>i</span></div>
+/// <div style="width: 10px; overflow-wrap: anywhere;">ffi</div>
+/// <div style="width: 15px; word-break: break-all;">fifi</div>
+/// ```
+///
+/// Blink gives the same lines and line heights. In the first case its "f" line is as wide as the
+/// whole ligature, as it doesn't reshape a ligature that a `span` boundary runs through.
+#[test]
+fn wrap_inside_ligature() {
+    let mut env = TestEnv::new(test_name!(), None);
+    let anywhere = StyleProperty::OverflowWrap(OverflowWrap::Anywhere);
+    let break_all = StyleProperty::WordBreak(WordBreak::BreakAll);
+    // Roboto's advances: "f" 5.6, "ff" 11.1, "fi" 8.9, "ffi" 13.7, "fif" 14.4, "fifi" 17.7.
+    let cases = [
+        // Nothing fits, so each line takes one letter. Only the "i" has the bigger line height.
+        ("abfi", anywhere.clone(), 0., 3..4, BreakReason::Emergency),
+        // Going by the ligature's advance "ff" fits, but it doesn't once reshaped.
+        ("ffi", anywhere, 10., 0..0, BreakReason::Emergency),
+        // With soft wrap opportunities between all letters, a line takes the "f" of the second
+        // ligature.
+        ("fifi", break_all, 15., 0..0, BreakReason::Regular),
+    ];
+    for (text, wrap, width, tall, reason) in cases {
+        let mut builder = env.ranged_builder(text);
+        builder.push_default(wrap);
+        builder.push_default(LineHeight::Absolute(20.));
+        builder.push(LineHeight::Absolute(40.), tall);
+        let mut layout = builder.build(text);
+        layout.break_all_lines(Some(width));
+        assert_eq!(layout.lines().next().unwrap().break_reason(), reason);
+        env.check_layout_snapshot(&layout);
+    }
+}
+
+/// We also take soft wrap opportunities if they fall inside graphemes.
+///
+/// Compare in a browser:
+///
+/// ```
+/// <div style="width: 1px; font: 16px Roboto; background: #eee;">foo &#x0301;bar</div>
+/// ```
+#[test]
+fn wrap_between_space_and_combining_mark() {
+    let mut env = TestEnv::new(test_name!(), None);
+    let text = "foo \u{301}bar";
+    let mut layout = env.ranged_builder(text).build(text);
+    layout.break_all_lines(Some(1.));
+    env.check_layout_snapshot(&layout);
 }
 
 #[test]
