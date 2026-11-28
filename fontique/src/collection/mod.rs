@@ -5,25 +5,25 @@
 
 mod query;
 
-pub use query::{Query, QueryFamily, QueryFont, QueryStatus};
+pub use query::{DeferredFont, Query, QueryCandidate, QueryFamily, QueryFont, QueryStatus};
 
 use crate::font::FontInfoOverride;
 
 use super::SourceCache;
 
 use super::{
-    Blob, FontStyle, FontWeight, FontWidth, GenericFamily, Language, Script,
+    Blob, GenericFamily, Language, Script,
     backend::SystemFonts,
     fallback::{FallbackKey, FallbackMap},
     family::{FamilyId, FamilyInfo},
     family_name::{FamilyName, FamilyNameMap},
-    font::FontInfo,
+    font::{FontId, FontInfo},
     generic::GenericFamilyMap,
     source::{SourceId, SourceInfo, SourceKind},
 };
 use crate::{AtomicCounter, CounterInt};
-use alloc::{string::String, sync::Arc, vec::Vec};
-use hashbrown::HashMap;
+use alloc::{string::String, sync::Arc, vec, vec::Vec};
+use hashbrown::{HashMap, HashSet};
 use read_fonts::types::NameId;
 #[cfg(feature = "std")]
 use std::path::Path;
@@ -66,6 +66,8 @@ impl Default for CollectionOptions {
 pub struct Collection {
     inner: Inner,
     query_state: query::QueryState,
+    /// The [`DeferredFont`]s requested by queries. See also [`Self::drain_font_requests`].
+    font_requests: HashSet<FontId>,
 }
 
 impl Collection {
@@ -82,6 +84,7 @@ impl Collection {
         Self {
             inner: Inner::new(options),
             query_state: query::QueryState::default(),
+            font_requests: HashSet::default(),
         }
     }
 
@@ -222,17 +225,63 @@ impl Collection {
         self.inner.register_fonts(data, info_override)
     }
 
-    /// Unregisters the font with the given attributes from the given family.
+    /// Registers a font in the family named `family_name` whose data is not available yet.
     ///
-    /// Returns true if a font was removed from the family, false otherwise.
-    pub fn unregister_font(
+    /// The font's data can be provided later using [`Self::supply_deferred_font`].
+    ///
+    /// Queries yield such fonts as [`QueryCandidate::Deferred`]. The font's data can be requested
+    /// using [`DeferredFont::request`]. Fonts requested like this are yielded by the collection's
+    /// [`Self::drain_font_requests`].
+    ///
+    /// This can be useful, for example, for fonts that are loaded over the network and/or take a
+    /// large chunk of memory and are not commonly needed, and particularly so in combination with
+    /// [`FontInfoOverride::unicode_range`].
+    ///
+    /// The font has the attributes given in `info`. The family name of `info` is ignored.
+    ///
+    /// Deferred fonts, like any font, can be removed through [`Self::unregister_font`]. This can be
+    /// useful if the font failed to load, for example.
+    pub fn register_deferred_font(
         &mut self,
-        family: FamilyId,
-        width: FontWidth,
-        style: FontStyle,
-        weight: FontWeight,
-    ) -> bool {
-        self.inner.unregister_font(family, width, style, weight)
+        family_name: &str,
+        info: FontInfoOverride<'_>,
+    ) -> (FamilyId, FontId) {
+        self.inner.register_deferred_font(family_name, info)
+    }
+
+    /// Supplies the data of a font registered with [`Self::register_deferred_font`].
+    ///
+    /// `index` selects the font to use if `data` is a font collection, and should be 0 otherwise.
+    ///
+    /// Returns `false` if `id` is not a deferred font or if `data` has no usable font at `index`.
+    pub fn supply_deferred_font(&mut self, id: FontId, data: Blob<u8>, index: u32) -> bool {
+        let supplied = self.inner.supply_deferred_font(id, data, index);
+        if supplied {
+            self.font_requests.remove(&id);
+        }
+        supplied
+    }
+
+    /// Returns the identifiers of the [`DeferredFont`]s queries [requested](DeferredFont::request)
+    /// since the last call to this method.
+    ///
+    /// Later queries can request the same fonts again, until their data is
+    /// [supplied](Self::supply_deferred_font).
+    ///
+    /// Requests are recorded per [`Collection`] handle, also for
+    /// [shared collections](CollectionOptions::shared).
+    pub fn drain_font_requests(&mut self) -> impl Iterator<Item = FontId> + '_ {
+        self.font_requests.drain()
+    }
+
+    /// Unregisters the font with the given identifier. This can be a font registered with
+    /// [`Self::register_deferred_font`], for example because its data could not be fetched.
+    ///
+    /// Returns `true` if the font was removed from its family, `false` otherwise. System fonts
+    /// can't be removed.
+    pub fn unregister_font(&mut self, id: FontId) -> bool {
+        self.font_requests.remove(&id);
+        self.inner.unregister_font(id)
     }
 
     /// Clears this collection. Un-registers all fonts previously registered via
@@ -240,6 +289,7 @@ impl Collection {
     /// and fallbacks. This will not remove any system fonts.
     pub fn clear(&mut self) {
         self.inner.clear();
+        self.font_requests.clear();
     }
 }
 
@@ -545,34 +595,58 @@ impl Inner {
         self.data.register_fonts(data, info_override)
     }
 
-    /// Unregisters the font with the given attributes from the given family.
-    ///
-    /// Returns true if a font was removed from the family, false otherwise.
-    fn unregister_font(
+    fn register_deferred_font(
         &mut self,
-        family: FamilyId,
-        width: FontWidth,
-        style: FontStyle,
-        weight: FontWeight,
-    ) -> bool {
+        family_name: &str,
+        info: FontInfoOverride<'_>,
+    ) -> (FamilyId, FontId) {
         #[cfg(feature = "std")]
         if let Some(shared) = &self.shared {
             let result = shared
                 .data
                 .lock()
                 .unwrap()
-                .unregister_font(family, width, style, weight);
+                .register_deferred_font(family_name, info);
+            shared.bump_version();
+            result
+        } else {
+            self.data.register_deferred_font(family_name, info)
+        }
+        #[cfg(not(feature = "std"))]
+        self.data.register_deferred_font(family_name, info)
+    }
+
+    fn supply_deferred_font(&mut self, id: FontId, data: Blob<u8>, index: u32) -> bool {
+        #[cfg(feature = "std")]
+        if let Some(shared) = &self.shared {
+            let result = shared
+                .data
+                .lock()
+                .unwrap()
+                .supply_deferred_font(id, data, index);
             shared.bump_version();
             result.is_some()
         } else {
-            self.data
-                .unregister_font(family, width, style, weight)
-                .is_some()
+            self.data.supply_deferred_font(id, data, index).is_some()
         }
         #[cfg(not(feature = "std"))]
-        self.data
-            .unregister_font(family, width, style, weight)
-            .is_some()
+        self.data.supply_deferred_font(id, data, index).is_some()
+    }
+
+    /// Unregisters the font with the given identifier.
+    ///
+    /// Returns `true` if the font was removed from its family, `false` otherwise.
+    fn unregister_font(&mut self, id: FontId) -> bool {
+        #[cfg(feature = "std")]
+        if let Some(shared) = &self.shared {
+            let result = shared.data.lock().unwrap().unregister_font(id);
+            shared.bump_version();
+            result
+        } else {
+            self.data.unregister_font(id)
+        }
+        #[cfg(not(feature = "std"))]
+        self.data.unregister_font(id)
     }
 
     /// Clears this collection. Un-registers all fonts previously registered via
@@ -759,6 +833,36 @@ impl CommonData {
             .collect()
     }
 
+    fn register_deferred_font(
+        &mut self,
+        family_name: &str,
+        info: FontInfoOverride<'_>,
+    ) -> (FamilyId, FontId) {
+        let font = FontInfo::deferred(&info);
+        let id = font.id();
+        let name = self.family_names.get_or_insert(family_name);
+        let family = name.id();
+        self.merge_families(&HashMap::from_iter([(family, (name, vec![font]))]));
+        (family, id)
+    }
+
+    fn supply_deferred_font(&mut self, id: FontId, data: Blob<u8>, index: u32) -> Option<()> {
+        let is_deferred = |font: &FontInfo| {
+            font.id() == id && matches!(font.source().kind(), SourceKind::Deferred)
+        };
+        for family in self.families.values_mut().flatten() {
+            let Some(position) = family.fonts().iter().position(is_deferred) else {
+                continue;
+            };
+            let mut fonts = family.fonts().to_vec();
+            fonts[position] = fonts[position].supply(data, index)?;
+            let name = self.family_names.get_by_id(family.id())?;
+            *family = FamilyInfo::new(name.clone(), fonts);
+            return Some(());
+        }
+        None
+    }
+
     fn register_scanned_font(
         &mut self,
         scanned_font: &crate::scan::ScannedFont<'_>,
@@ -820,24 +924,23 @@ impl CommonData {
         }
     }
 
-    fn unregister_font(
-        &mut self,
-        family: FamilyId,
-        width: FontWidth,
-        style: FontStyle,
-        weight: FontWeight,
-    ) -> Option<()> {
-        let family_name = self.family_names.get_by_id(family)?;
-        let family = self.families.get_mut(&family)?.as_mut()?;
+    fn unregister_font(&mut self, id: FontId) -> bool {
+        // If the following search for the font's family ever shows up in profiles, we could create
+        // an index. In practice it should be cheap relative to the other work that's happening.
+        let has_font = |family: &&mut FamilyInfo| family.fonts().iter().any(|f| f.id() == id);
+        let Some(family) = self.families.values_mut().flatten().find(has_font) else {
+            return false;
+        };
 
-        let new_fonts = family
-            .fonts()
-            .iter()
-            .filter(|f| f.width() != width || f.style() != style || f.weight() != weight)
-            .cloned();
+        // Note that families of system fonts are not in `self.family_names`, so they're untouched.
+        let Some(family_name) = self.family_names.get_by_id(family.id()) else {
+            return false;
+        };
+
+        let new_fonts = family.fonts().iter().filter(|f| f.id() != id).cloned();
         *family = FamilyInfo::new(family_name.clone(), new_fonts);
 
-        Some(())
+        true
     }
 
     fn clear(&mut self) {
