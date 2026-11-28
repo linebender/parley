@@ -7,7 +7,7 @@ use crate::{CharmapIndex, UnicodeRangeSet};
 
 use super::source::{SourceInfo, SourceKind};
 use super::{Blob, source_cache::SourceCache};
-use crate::{FontStyle, FontWeight, FontWidth};
+use crate::{FontStyle, FontStyleRange, FontWeight, FontWeightRange, FontWidth, FontWidthRange};
 use parlance::Synthesis;
 use read_fonts::{FontRef, TableProvider as _, types::Tag};
 use smallvec::SmallVec;
@@ -19,9 +19,9 @@ type AxisVec = SmallVec<[AxisInfo; 1]>;
 pub struct FontInfo {
     source: SourceInfo,
     index: u32,
-    width: FontWidth,
-    style: FontStyle,
-    weight: FontWeight,
+    width: FontWidthRange,
+    style: FontStyleRange,
+    weight: FontWeightRange,
     axes: AxisVec,
     attr_axes: u8,
     charmap_index: CharmapIndex,
@@ -70,20 +70,26 @@ impl FontInfo {
         }
     }
 
-    /// Returns the visual width of the font-- a relative change from the normal
-    /// aspect ratio, typically in the range `0.5` to `2.0`.
-    pub fn width(&self) -> FontWidth {
+    /// Returns the range of visual widths the font supports. Each is a relative
+    /// change from the normal aspect ratio, typically in the range `0.5` to `2.0`.
+    ///
+    /// For a variable font this is the range of its `wdth` axis, unless
+    /// overridden when the font was registered.
+    pub fn width(&self) -> FontWidthRange {
         self.width
     }
 
-    /// Returns the visual style or 'slope' of the font.
-    pub fn style(&self) -> FontStyle {
+    /// Returns the range of visual styles or 'slopes' the font supports.
+    pub fn style(&self) -> FontStyleRange {
         self.style
     }
 
-    /// Returns the visual weight class of the font, typically on a scale
-    /// from `1.0` to `1000.0`.
-    pub fn weight(&self) -> FontWeight {
+    /// Returns the range of visual weight classes the font supports, typically
+    /// on a scale from `1.0` to `1000.0`.
+    ///
+    /// For a variable font this is the range of its `wght` axis, unless
+    /// overridden when the font was registered.
+    pub fn weight(&self) -> FontWeightRange {
         self.weight
     }
 
@@ -98,20 +104,25 @@ impl FontInfo {
         // when the axis default and requested weight are not the same, synthesize
         // the requested weight for correct shaping.
         //
+        // The requested values are clamped to the font's supported ranges, as
+        // CSS requires for variable fonts.
+        //
         // The font's declared attributes and the axis defaults can differ when:
         // 1. A `FontInfoOverride` overrides the width, style, or weight.
         // 2. A non-conformant font specifies different values in its OS/2 and `fvar` tables.
         //      - See: <https://learn.microsoft.com/en-us/typography/opentype/spec/dvaraxistag_wght#additional-information>
+        let clamped_width = self.width.clamp(width).percentage();
         if let Some(width_axis) = self.axes.iter().find(|axis| axis.tag == Tag::new(b"wdth"))
-            && width_axis.default != width.percentage()
+            && width_axis.default != clamped_width
         {
-            synth = synth.with_width(width.percentage());
+            synth = synth.with_width(clamped_width);
         }
         if let Some(weight_axis) = self.axes.iter().find(|axis| axis.tag == Tag::new(b"wght")) {
-            if weight_axis.default != weight.value() {
-                synth = synth.with_weight(weight.value());
+            let clamped_weight = self.weight.clamp(weight).value();
+            if weight_axis.default != clamped_weight {
+                synth = synth.with_weight(clamped_weight);
             }
-        } else if weight.value() > self.weight.value() + 200.0 {
+        } else if weight.value() > self.weight.max().value() + 200.0 {
             synth = synth.with_embolden(true);
         }
         // A positive `slnt` slants counter-clockwise, whereas positive CSS obliques slant
@@ -123,17 +134,20 @@ impl FontInfo {
                     synth = synth.with_italic();
                 } else if self.has_slant_axis() {
                     synth = synth.with_slant(-14.0);
-                } else if self.style == FontStyle::Normal {
+                } else if self.style.is_normal() {
                     synth = synth.with_skew(14);
                 }
             }
             FontStyle::Oblique(angle) => {
-                let degrees = angle.unwrap_or(14.0);
+                let degrees = match self.style.clamp_angle(angle.unwrap_or(14.0)) {
+                    FontStyle::Oblique(Some(clamped)) => clamped,
+                    _ => angle.unwrap_or(14.0),
+                };
                 if self.has_slant_axis() {
                     synth = synth.with_slant(-degrees);
                 } else if self.has_italic_axis() && degrees > 0. {
                     synth = synth.with_italic();
-                } else if self.style == FontStyle::Normal {
+                } else if self.style.is_normal() {
                     synth = synth.with_skew(degrees as i8);
                 }
             }
@@ -247,11 +261,25 @@ impl FontInfo {
         } else {
             (SmallVec::default(), 0)
         };
+        let axis_range = |tag: &[u8; 4]| {
+            axes.iter()
+                .find(|axis| axis.tag == Tag::new(tag))
+                .map(|axis| (axis.min, axis.max))
+        };
+        let width = axis_range(b"wdth").map_or(width.into(), |(min, max)| {
+            FontWidthRange::new(
+                FontWidth::from_percentage(min),
+                FontWidth::from_percentage(max),
+            )
+        });
+        let weight = axis_range(b"wght").map_or(weight.into(), |(min, max)| {
+            FontWeightRange::new(FontWeight::new(min), FontWeight::new(max))
+        });
         Some(Self {
             source,
             index,
             width,
-            style,
+            style: style.into(),
             weight,
             axes,
             attr_axes,
@@ -267,14 +295,14 @@ impl FontInfo {
         style: FontStyle,
         weight: FontWeight,
     ) {
-        if self.width == FontWidth::default() {
-            self.width = width;
+        if self.width == FontWidthRange::default() {
+            self.width = width.into();
         }
-        if self.style == FontStyle::default() {
-            self.style = style;
+        if self.style == FontStyleRange::default() {
+            self.style = style.into();
         }
-        if self.weight == FontWeight::default() {
-            self.weight = weight;
+        if self.weight == FontWeightRange::default() {
+            self.weight = weight.into();
         }
     }
 
@@ -427,13 +455,16 @@ pub struct FontInfoOverride<'a> {
     /// Font family name to be used instead of the one specified in the font
     /// itself.
     pub family_name: Option<&'a str>,
-    /// Font width to be used instead of the one specified in the font itself.
-    pub width: Option<FontWidth>,
-    /// Font's visual style / "slope" to be used instead of the one specified in
-    /// the font itself.
-    pub style: Option<FontStyle>,
-    /// Font weight to be used instead of the one specified in the font itself.
-    pub weight: Option<FontWeight>,
+    /// Range of font widths to be used instead of the one specified in the font
+    /// itself, like the CSS `@font-face` `font-width` descriptor.
+    pub width: Option<FontWidthRange>,
+    /// Range of visual styles / "slopes" to be used instead of the one
+    /// specified in the font itself, like the CSS `@font-face` `font-style`
+    /// descriptor.
+    pub style: Option<FontStyleRange>,
+    /// Range of font weights to be used instead of the one specified in the
+    /// font itself, like the CSS `@font-face` `font-weight` descriptor.
+    pub weight: Option<FontWeightRange>,
     /// Default values for the font's variation axes. Axes not included within
     /// the font will be ignored.
     pub axes: Option<&'a [(Tag, f32)]>,
@@ -465,6 +496,27 @@ mod tests {
         FontInfo::from_source(source, 0).unwrap()
     }
 
+    fn weights(min: f32, max: f32) -> FontWeightRange {
+        FontWeightRange::new(FontWeight::new(min), FontWeight::new(max))
+    }
+
+    #[test]
+    fn variable_font_ranges_come_from_axes() {
+        let font = font_info(ROBOTO_FLEX);
+        let wght = font
+            .axes()
+            .iter()
+            .find(|axis| axis.tag == Tag::new(b"wght"))
+            .unwrap();
+        assert_eq!(font.weight(), weights(wght.min, wght.max));
+        assert!(font.weight().min() < font.weight().max());
+        assert!(font.width().min() < font.width().max());
+
+        let font = font_info(ROBOTO);
+        assert_eq!(font.weight(), FontWeight::NORMAL.into());
+        assert_eq!(font.width(), FontWidth::NORMAL.into());
+    }
+
     #[test]
     fn variable_weight_synthesis_uses_axis_default() {
         let mut font = font_info(ROBOTO_FLEX);
@@ -474,9 +526,6 @@ mod tests {
             ..Default::default()
         });
 
-        // Model a face whose declared weight is 400 but whose `wght` axis
-        // defaults to 100.
-        assert_eq!(font.weight(), FontWeight::NORMAL);
         assert_eq!(
             font.axes()
                 .iter()
@@ -486,7 +535,7 @@ mod tests {
             FontWeight::THIN.value()
         );
 
-        let synthesis = font.synthesis(font.width(), font.style(), FontWeight::NORMAL);
+        let synthesis = font.synthesis(FontWidth::NORMAL, FontStyle::Normal, FontWeight::NORMAL);
         assert_eq!(
             synthesis
                 .variation_settings()
@@ -495,25 +544,52 @@ mod tests {
         );
         assert!(!synthesis.embolden());
 
-        let synthesis = font.synthesis(font.width(), font.style(), FontWeight::THIN);
+        let synthesis = font.synthesis(FontWidth::NORMAL, FontStyle::Normal, FontWeight::THIN);
         assert!(!synthesis.any());
+    }
+
+    #[test]
+    fn variable_weight_synthesis_clamps_to_declared_range() {
+        let mut font = font_info(ROBOTO_FLEX);
+        font.apply_override(&FontInfoOverride {
+            weight: Some(weights(300., 500.)),
+            ..Default::default()
+        });
+
+        let synthesis = font.synthesis(FontWidth::NORMAL, FontStyle::Normal, FontWeight::BOLD);
+        assert_eq!(
+            synthesis
+                .variation_settings()
+                .collect::<alloc::vec::Vec<_>>(),
+            [(parlance::Tag::new(b"wght"), 500.)]
+        );
+        assert!(!synthesis.embolden());
+
+        let synthesis = font.synthesis(FontWidth::NORMAL, FontStyle::Normal, FontWeight::THIN);
+        assert_eq!(
+            synthesis
+                .variation_settings()
+                .collect::<alloc::vec::Vec<_>>(),
+            [(parlance::Tag::new(b"wght"), 300.)]
+        );
     }
 
     #[test]
     fn static_weight_synthesis_requires_more_than_200_weight_increase() {
         let font = font_info(ROBOTO);
+        let weight = font.weight().max().value();
 
         let synthesis = font.synthesis(
-            font.width(),
-            font.style(),
-            FontWeight::new(font.weight().value() + 1.0),
+            FontWidth::NORMAL,
+            FontStyle::Normal,
+            FontWeight::new(weight + 1.0),
         );
         assert!(!synthesis.any());
 
         let synthesis = font.synthesis(
-            font.width(),
-            font.style(),
-            FontWeight::new(font.weight().value() + 201.0),
+            FontWidth::NORMAL,
+            FontStyle::Normal,
+            FontWeight::new(weight + 201.0),
         );
         assert!(synthesis.embolden());
         assert!(!synthesis.has_variations());
